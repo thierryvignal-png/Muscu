@@ -111,7 +111,7 @@ export function ring(ratio, label, sub) {
   return `<div class="ring ${over ? 'over' : ''}">
     <svg viewBox="0 0 80 80">
       <circle cx="40" cy="40" r="${r}" class="ring-bg"/>
-      <circle cx="40" cy="40" r="${r}" class="ring-fg" stroke-dasharray="${(c * v).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 40 40)"/>
+      ${v > 0 ? `<circle cx="40" cy="40" r="${r}" class="ring-fg" stroke-dasharray="${(c * v).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 40 40)"/>` : ''}
     </svg>
     <div class="ring-text"><strong>${label}</strong><span>${sub}</span></div>
   </div>`;
