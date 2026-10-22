@@ -1,0 +1,95 @@
+// Stockage local (sur le téléphone). Aucune donnée ne quitte l'appareil.
+const KEY = 'muscu.data.v1';
+
+const DEFAULT = {
+  version: 1,
+  settings: {
+    calorieGoal: 2200,
+    proteinGoal: 160,
+    stepsGoal: 10000,
+    weightGoal: null,
+    heightCm: null,
+  },
+  meals: [],    // {id, date, name, kcal, protein, carbs, fat}
+  steps: [],    // {id, date, steps}  (une entrée par jour)
+  rides: [],    // {id, date, minutes, km, kcal, notes}
+  workouts: [], // {id, date, name, exercises: [{name, sets: [{reps, weight}]}], notes}
+  body: [],     // {id, date, weight, bodyfat, waist}
+  labs: [],     // {id, date, marker, value, unit}
+};
+
+let data = load();
+const listeners = new Set();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return structuredClone(DEFAULT);
+    return merge(JSON.parse(raw));
+  } catch {
+    return structuredClone(DEFAULT);
+  }
+}
+
+function merge(obj) {
+  const base = structuredClone(DEFAULT);
+  for (const k of Object.keys(base)) {
+    if (k === 'settings') base.settings = { ...base.settings, ...(obj.settings || {}) };
+    else if (Array.isArray(base[k])) base[k] = Array.isArray(obj[k]) ? obj[k] : [];
+  }
+  return base;
+}
+
+function save() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(data));
+  } catch (e) {
+    alert("Impossible d'enregistrer : " + e.message);
+  }
+  listeners.forEach((fn) => fn());
+}
+
+export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+export const store = {
+  get: () => data,
+  settings: () => data.settings,
+  onChange: (fn) => listeners.add(fn),
+
+  add(collection, item) {
+    data[collection].push({ id: uid(), ...item });
+    save();
+  },
+  update(collection, id, patch) {
+    const it = data[collection].find((x) => x.id === id);
+    if (it) Object.assign(it, patch);
+    save();
+  },
+  remove(collection, id) {
+    data[collection] = data[collection].filter((x) => x.id !== id);
+    save();
+  },
+  // Une seule valeur de pas par jour : on remplace si elle existe déjà.
+  setSteps(date, steps) {
+    const it = data.steps.find((x) => x.date === date);
+    if (it) it.steps = steps;
+    else data.steps.push({ id: uid(), date, steps });
+    save();
+  },
+  setSettings(patch) {
+    Object.assign(data.settings, patch);
+    save();
+  },
+
+  exportJSON: () => JSON.stringify(data, null, 2),
+  importJSON(text) {
+    const parsed = JSON.parse(text);
+    if (typeof parsed !== 'object' || !parsed) throw new Error('Fichier invalide');
+    data = merge(parsed);
+    save();
+  },
+  reset() {
+    data = structuredClone(DEFAULT);
+    save();
+  },
+};
