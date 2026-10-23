@@ -1,6 +1,6 @@
 // Service worker : met l'app en cache pour qu'elle marche sans réseau.
 // Incrémente VERSION à chaque mise à jour des fichiers.
-const VERSION = 'muscu-v14';
+const VERSION = 'muscu-v15';
 const FILES = [
   './',
   './index.html',
@@ -37,7 +37,8 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    // no-cache : revalide auprès du serveur au lieu de resservir une version gardée jusqu'à 10 min
+    fetch(e.request, { cache: 'no-cache' })
       .then((res) => {
         const copy = res.clone();
         caches.open(VERSION).then((c) => c.put(e.request, copy));

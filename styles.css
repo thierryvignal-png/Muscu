@@ -116,7 +116,8 @@ input, select, textarea {
   width: 100%;
   min-width: 0;
 }
-input[type="date"] { min-height: 44px; }
+input[type="date"] { min-height: 44px; -webkit-appearance: none; appearance: none; display: block; max-width: 100%; text-align: left; }
+input::-webkit-date-and-time-value { text-align: left; }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
 select { margin-bottom: 8px; appearance: none; }
 
