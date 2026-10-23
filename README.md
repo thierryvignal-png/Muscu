@@ -6,7 +6,7 @@ Un bouton en haut de l'écran permet de passer d'un espace à l'autre. Chaque es
 - **🏠 Ma journée** — écran d'accueil à chaque ouverture : déficit du jour, dépense, protéines, ajout rapide de repas, poids, objectif 75 kg, alcool ; puis tâches du jour, prochaines good news, objectifs à surveiller.
 - **💪 Muscu** — décrit ci-dessous.
 - **✅ Todo** — tâches avec échéance, priorité, catégorie (Perso / Clinique / Atom) et répétition (jour / semaine / mois) ; vue en retard / aujourd'hui / à venir / sans date.
-- **⚛️ Atom** — deals transaction et location (étape, prix ou loyer, honoraires, contact, next step daté), onglet Next steps qui regroupe les prochaines actions + les tâches Todo « Atom » ; next steps du jour / en retard sur Ma journée.
+- **⚛️ Atom** — deux listes simples (deals transaction, deals location), chaque deal avec son next step.
 - **🎉 Good news** — tout ce qui t'attend de cool (livraison, voyage, anniversaire…) avec compte à rebours ; dates estimées (≈) et événements annuels.
 - **🎯 Objectifs de vie** — progression en % ou chiffrée (ex : 0 → 50 000 €), comparée à la progression attendue selon le temps écoulé entre le début et l'échéance : dans les temps / presque / en retard.
 - **✨ Roadmap esthétique** — traitements prévus avec date approximative et points ajoutés au score esthétique /100 (estimés par l'IA) ; score actuel, score après la roadmap, courbe d'évolution prévue.

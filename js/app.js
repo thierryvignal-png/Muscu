@@ -1014,7 +1014,6 @@ function journeeView() {
   const news = goodnews.upcomingList(3);
   const gs = goals.summary();
   const es = esthetique.scores();
-  const atomDue = atom.dueSteps();
   const head = (title, spaceKey, label = 'Tout voir ›') =>
     `<div class="j-head"><h2>${title}</h2><button class="chip" data-action="space" data-space="${spaceKey}">${label}</button></div>`;
 
@@ -1064,11 +1063,6 @@ function journeeView() {
       ${tasks.length ? `<ul class="task-list">${tasks.slice(0, 8).map((x) => todo.row(x, true)).join('')}</ul>${tasks.length > 8 ? `<p class="hint">+ ${tasks.length - 8} autres</p>` : ''}` : '<p class="hint">Rien de prévu aujourd\'hui 🙌</p>'}
     </section>
 
-    ${atomDue.length ? `<section class="card">
-      ${head(`⚛️ Atom · next steps <small class="hint">${atomDue.length}</small>`, 'atom')}
-      <ul class="task-list">${atomDue.slice(0, 6).map((d) => atom.nextRow(d, true)).join('')}</ul>
-    </section>` : ''}
-
     <section class="card">
       ${head('🎉 Good news à venir', 'goodnews')}
       ${news.length ? `<ul class="gn-list">${news.map((it) => `
@@ -1099,13 +1093,7 @@ function journeeView() {
 spaceViews.today = journeeView;
 spaceViews.todo = todo.view;
 spaceViews.esthetique = esthetique.view;
-// Atom : next steps des deals + tâches Todo de la catégorie Atom
-spaceViews.atom = () => {
-  const tasks = todo.openByCat('atom');
-  return atom.view(tasks.length
-    ? `<section class="card"><div class="j-head"><h2>Tâches Atom (Todo)</h2><button class="chip" data-action="space" data-space="todo">Todo ›</button></div><ul class="task-list">${tasks.slice(0, 10).map((t) => todo.row(t, true)).join('')}</ul></section>`
-    : '');
-};
+spaceViews.atom = atom.view;
 spaceViews.goodnews = goodnews.view;
 spaceViews.goals = goals.view;
 function wrapSpace(handlers) {
