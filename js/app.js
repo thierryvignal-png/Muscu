@@ -1167,8 +1167,8 @@ document.addEventListener('change', (e) => {
 
 // Traitements esthétiques notés dans Good news → Roadmap esthétique (une seule fois)
 esthetique.importFromGoodnews();
-const estPoints = esthetique.applyEstimatedPoints();
-if (estPoints) setTimeout(() => toast(`✨ ${estPoints} notes ajoutées à ta roadmap esthétique`), 600);
+const estPoints = esthetique.applyEstimatedPointsV2();
+if (estPoints) setTimeout(() => toast(`✨ Roadmap esthétique mise à jour : ${estPoints} notes, départ 50/100`), 600);
 
 // Premiers relevés Visbody (salle On Air), ajoutés une seule fois.
 // S'ils sont supprimés ensuite, ils ne reviennent pas.
