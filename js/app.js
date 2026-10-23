@@ -1152,6 +1152,19 @@ document.addEventListener('change', (e) => {
   }
 });
 
+// Premiers relevés Visbody (salle On Air), ajoutés une seule fois.
+// S'ils sont supprimés ensuite, ils ne reviennent pas.
+const VISBODY_SEED = [
+  { date: '2026-10-05', bodyfat: 12.6, fatMass: 9.8, smm: 38.8, weight: 77.4 },
+  { date: '2026-10-15', bodyfat: 10.4, fatMass: 7.9, smm: 39.4, weight: 76.2 },
+];
+if (!store.settings().visbodySeeded) {
+  for (const x of VISBODY_SEED) {
+    if (!store.get().visbody.some((v) => v.date === x.date)) store.add('visbody', x);
+  }
+  store.setSettings({ visbodySeeded: true });
+}
+
 store.onChange(render);
 
 const initial = location.hash.slice(1);
