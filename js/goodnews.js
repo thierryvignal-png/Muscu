@@ -43,6 +43,17 @@ function row(it) {
     </li>`;
 }
 
+// Prochaines good news (pour l'écran « Ma journée »)
+export function upcomingList(n = 3) {
+  const t = today();
+  return load().items
+    .map((it) => ({ ...it, next: nextDate(it) }))
+    .filter((it) => it.next >= t)
+    .sort((a, b) => (a.next < b.next ? -1 : 1))
+    .slice(0, n)
+    .map((it) => ({ ...it, days: daysBetween(t, it.next), badge: countdown(daysBetween(t, it.next)) }));
+}
+
 export function view() {
   const items = load().items.map((it) => ({ ...it, next: nextDate(it) }));
   const t = today();

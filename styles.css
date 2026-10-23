@@ -366,3 +366,51 @@ body.no-tabbar .tabbar { display: none; }
 .goal-legend { display: flex; justify-content: space-between; margin: 6px 0; }
 .goal .burn-form { margin-top: 8px; }
 .section-title { font-size: 16px; margin: 18px 2px 10px; }
+
+/* Ma journée */
+.j-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.j-head h2 { margin: 0; }
+.j-deficit strong { display: block; font-size: 34px; letter-spacing: -0.02em; }
+.j-deficit .hint { display: block; margin-bottom: 10px; }
+.j-gap { margin-top: 14px; }
+.quick-meal { display: grid; grid-template-columns: 1.6fr 1fr 1fr auto; gap: 6px; margin-top: 12px; }
+.quick-meal button { padding: 10px 14px; }
+.j-lines { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; }
+.j-lines > div { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.j-lines .chip { margin-left: auto; }
+.mini .good { color: var(--good); }
+.mini .mid { color: #f59e0b; }
+.mini .warn { color: var(--warn); }
+b.good { color: var(--good); }
+b.mid { color: #f59e0b; }
+b.warn { color: var(--warn); }
+
+/* Todo */
+.filter-chips { margin: 0 0 12px; }
+.chip.active { background: var(--accent); color: #fff; }
+.chip.active small { color: rgba(255, 255, 255, .8); }
+.todo-add { display: flex; gap: 8px; }
+.todo-add button { flex: none; width: 48px; font-size: 20px; padding: 8px; }
+.opts-toggle { background: none; color: var(--muted); font-size: 13px; font-weight: 500; padding: 8px 2px 0; }
+.todo-form.open .opts-toggle { display: none; }
+.todo-opts { display: none; margin-top: 10px; }
+.todo-form.open .todo-opts { display: block; }
+.todo-opts .chips { margin: 0 0 10px; }
+.todo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.todo-grid select { margin: 0; }
+.todo-opts > .full { width: 100%; margin-top: 10px; }
+.task-list { list-style: none; margin: 0; padding: 0; }
+.task { display: flex; align-items: center; gap: 10px; padding: 9px 0 9px 8px; border-top: 1px solid var(--line); border-left: 3px solid transparent; }
+.task:first-child { border-top-color: transparent; }
+.task.prio-high { border-left-color: var(--warn); }
+.task.prio-low { opacity: .75; }
+.task > div { flex: 1; min-width: 0; }
+.task b { display: block; font-size: 15px; font-weight: 500; }
+.task small { color: var(--muted); font-size: 12px; }
+.task.done b { text-decoration: line-through; color: var(--muted); }
+.task .icon-btn { padding: 6px; }
+.tick { flex: none; width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid var(--muted); background: none; color: transparent; font-size: 14px; line-height: 1; }
+.tick.on { background: var(--good); border-color: var(--good); color: #fff; }
+.late { color: var(--warn); }
+.late-card { border-color: color-mix(in srgb, var(--warn) 50%, var(--line)); }
+.card h2 small.hint { font-weight: 500; }

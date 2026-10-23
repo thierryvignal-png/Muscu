@@ -2,7 +2,9 @@
 // Chaque espace a sa propre clé de stockage local : une modif de l'un ne touche pas les autres.
 
 export const SPACES = [
+  { key: 'today', icon: '🏠', name: 'Ma journée', desc: 'Tout l\'essentiel en un écran' },
   { key: 'muscu', icon: '💪', name: 'Muscu', desc: 'Déficit, repas, salle, poids' },
+  { key: 'todo', icon: '✅', name: 'Todo', desc: 'Perso, Clinique, Atom' },
   { key: 'goodnews', icon: '🎉', name: 'Good news', desc: 'Tout ce qui t\'attend de cool' },
   { key: 'goals', icon: '🎯', name: 'Objectifs de vie', desc: 'Suis-je dans les temps ?' },
   { key: 'esthetique', icon: '✨', name: 'Roadmap esthétique', desc: 'Bientôt' },
@@ -23,8 +25,8 @@ function write(key, value) {
 }
 
 export const getSpace = () => {
-  const k = read(SPACE_KEY, 'muscu');
-  return SPACES.some((s) => s.key === k) ? k : 'muscu';
+  const k = read(SPACE_KEY, 'today');
+  return SPACES.some((s) => s.key === k) ? k : 'today';
 };
 export const setSpace = (k) => write(SPACE_KEY, k);
 export const spaceOf = (k) => SPACES.find((s) => s.key === k);
@@ -92,6 +94,6 @@ function clinique() {
 }
 
 // Clés de stockage des espaces autres que Muscu (pour la sauvegarde complète)
-export const SPACE_KEYS = ['goodnews.data.v1', 'goals.data.v1', CLINIC_KEY];
+export const SPACE_KEYS = ['todo.data.v1', 'goodnews.data.v1', 'goals.data.v1', CLINIC_KEY];
 
 export const spaceViews = { esthetique, clinique };

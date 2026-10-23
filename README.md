@@ -3,7 +3,9 @@ App de musculation & sèche — suivi perso, installable sur iPhone/Android, qui
 
 ## Espaces (super app)
 Un bouton en haut de l'écran permet de passer d'un espace à l'autre. Chaque espace a son propre code et ses propres données (clé de stockage séparée) :
+- **🏠 Ma journée** — écran d'accueil à chaque ouverture : déficit du jour, dépense, protéines, ajout rapide de repas, poids, objectif 75 kg, alcool ; puis tâches du jour, prochaines good news, objectifs à surveiller.
 - **💪 Muscu** — décrit ci-dessous.
+- **✅ Todo** — tâches avec échéance, priorité, catégorie (Perso / Clinique / Atom) et répétition (jour / semaine / mois) ; vue en retard / aujourd'hui / à venir / sans date.
 - **🎉 Good news** — tout ce qui t'attend de cool (livraison, voyage, anniversaire…) avec compte à rebours ; dates estimées (≈) et événements annuels.
 - **🎯 Objectifs de vie** — progression en % ou chiffrée (ex : 0 → 50 000 €), comparée à la progression attendue selon le temps écoulé entre le début et l'échéance : dans les temps / presque / en retard.
 - **✨ Roadmap esthétique** — à construire.
@@ -38,6 +40,6 @@ C'est un site statique (HTML/CSS/JS, aucune dépendance, pas de build).
 - `js/store.js` — stockage local, export/import
 - `js/charts.js` — graphiques SVG
 - `js/spaces.js` — sélecteur d'espaces et espaces Esthétique / Clinique
-- `js/goodnews.js`, `js/goals.js` — espaces Good news et Objectifs de vie
+- `js/goodnews.js`, `js/goals.js`, `js/todo.js` — espaces Good news, Objectifs de vie et Todo
 - `js/util.js` — outils partagés (dates, nombres, stockage)
 - `sw.js`, `manifest.webmanifest`, `icons/` — installation et mode hors ligne (incrémenter `VERSION` dans `sw.js` à chaque mise à jour)

@@ -88,6 +88,16 @@ function goalForm(g) {
     </section>`;
 }
 
+// Résumé pour l'écran « Ma journée » : objectifs en cours et ceux à surveiller
+export function summary() {
+  const active = load().goals.map((g) => ({ g, c: compute(g) })).filter((x) => x.c.progress < 1);
+  return {
+    total: active.length,
+    onTrack: active.filter((x) => x.c.cls === 'good').length,
+    watch: active.filter((x) => x.c.cls !== 'good').sort((a, b) => a.c.delta - b.c.delta),
+  };
+}
+
 export function view() {
   const goals = load().goals;
   const edit = editing ? goals.find((g) => g.id === editing) : null;

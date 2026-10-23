@@ -1,7 +1,8 @@
 import { store } from './store.js';
-import { getSpace, setSpace, spaceSwitch, spaceMenu, spaceViews, clinic, SPACE_KEYS } from './spaces.js';
+import { setSpace, spaceSwitch, spaceMenu, spaceViews, clinic, SPACE_KEYS } from './spaces.js';
 import * as goodnews from './goodnews.js';
 import * as goals from './goals.js';
+import * as todo from './todo.js';
 import { lineChart, barChart, balanceChart } from './charts.js';
 
 // ---------- Utilitaires ----------
@@ -707,7 +708,7 @@ views.more = () => {
     )}
     ${card(
       'Sauvegarde',
-      `<p class="hint">Tes données restent sur ce téléphone. Exporte-les régulièrement pour ne rien perdre : la sauvegarde contient tous tes espaces (Muscu, Good news, Objectifs, Clinique).</p>
+      `<p class="hint">Tes données restent sur ce téléphone. Exporte-les régulièrement pour ne rien perdre : la sauvegarde contient tous tes espaces (Muscu, Todo, Good news, Objectifs, Clinique).</p>
        <div class="form">
          <button class="full" data-action="export">⬇︎ Exporter (JSON)</button>
          <label class="full button-like">⬆︎ Importer<input type="file" accept="application/json,.json" id="importFile" hidden></label>
@@ -718,7 +719,8 @@ views.more = () => {
 };
 
 // ---------- Rendu & navigation ----------
-let space = getSpace();
+// À chaque ouverture de l'app : « Ma journée »
+let space = 'today';
 
 function render() {
   const main = $('#main');
@@ -741,8 +743,8 @@ function go(tab) {
 const forms = {
   meal(f) {
     store.add('meals', {
-      date: state.mealDate,
-      name: f.name.trim(),
+      date: f.date || state.mealDate,
+      name: (f.name || '').trim() || 'Repas',
       kcal: num(f.kcal) || 0,
       protein: num(f.protein),
     });
@@ -761,7 +763,7 @@ const forms = {
   },
   burn(f) {
     const n = num(f.kcal);
-    store.setBurn(state.homeDate, n == null ? null : Math.round(n));
+    store.setBurn(f.date || state.homeDate, n == null ? null : Math.round(n));
     toast(n == null ? 'Dépense effacée' : 'Dépense enregistrée');
   },
   settings(f) {
@@ -802,9 +804,18 @@ const actions = {
   },
   alcohol(el) {
     const v = el.dataset.v === '1';
-    const manual = store.get().alcohol.find((x) => x.date === state.homeDate);
+    const date = el.dataset.date || state.homeDate;
+    const manual = store.get().alcohol.find((x) => x.date === date);
     // Re-toucher le choix actif l'annule (retour à la détection auto)
-    store.setAlcohol(state.homeDate, manual && manual.value === v ? null : v);
+    store.setAlcohol(date, manual && manual.value === v ? null : v);
+  },
+  'open-muscu'(el) {
+    $('#sheet').hidden = true;
+    space = 'muscu';
+    current = el.dataset.mtab || 'home';
+    location.hash = current;
+    render();
+    window.scrollTo(0, 0);
   },
   'space-menu'() {
     const sheet = $('#sheet');
@@ -835,7 +846,7 @@ const actions = {
     const m = store.get().meals.find((x) => x.id === el.dataset.id);
     if (!m) return;
     const { id, date, ...rest } = m;
-    store.add('meals', { ...rest, date: state.mealDate });
+    store.add('meals', { ...rest, date: el.dataset.date || state.mealDate });
     toast(`${m.name} ajouté`);
   },
   'new-workout'() {
@@ -922,8 +933,113 @@ const actions = {
   },
 };
 
-// ---------- Espaces Good news / Objectifs ----------
+// ---------- Écran « Ma journée » (accueil de la super app) ----------
+// Priorité : déficit / poids / protéines en haut, le reste en dessous.
+function favMeals(n) {
+  const freq = {};
+  store.get().meals.forEach((m) => {
+    const k = m.name.trim().toLowerCase();
+    if (!k) return;
+    freq[k] = freq[k] || { n: 0, m };
+    freq[k].n++;
+    if (m.date >= freq[k].m.date) freq[k].m = m;
+  });
+  return Object.values(freq).sort((a, b) => b.n - a.n).slice(0, n).map((f) => f.m);
+}
+
+function journeeView() {
+  const s = store.settings();
+  const t = today();
+  const b = dayBalance(t);
+  const g = goalProjection();
+  const { trend } = weightSeries();
+  const lastW = trend[trend.length - 1];
+  const slope = weightSlope();
+  const protRatio = Math.min(1, (b.protein || 0) / s.proteinGoal);
+  const alc = alcoholDay(t);
+  const favs = favMeals(6);
+
+  let goalLine;
+  if (g.missing) goalLine = `<span class="hint">${g.missing}</span>`;
+  else {
+    const st = g.toLose <= 0 ? ['good', 'Objectif atteint 🎉'] : g.margin >= 0 ? ['good', 'Dans les temps ✅'] : g.margin > -1 ? ['mid', 'Presque 💪'] : ['warn', 'En retard ⚠️'];
+    goalLine = `<b class="${st[0]}">${st[1]}</b> <span class="hint">· ${fr(g.projected, 1)} kg projeté au ${fmtDay(g.target)}</span>`;
+  }
+
+  const tasks = todo.todayList();
+  const news = goodnews.upcomingList(3);
+  const gs = goals.summary();
+  const head = (title, spaceKey, label = 'Tout voir ›') =>
+    `<div class="j-head"><h2>${title}</h2><button class="chip" data-action="space" data-space="${spaceKey}">${label}</button></div>`;
+
+  return `
+    <header class="page-head"><h1>Ma journée</h1><p>${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</p></header>
+
+    <section class="card j-muscu">
+      <div class="j-head"><h2>💪 Déficit du jour</h2><button class="chip" data-action="open-muscu" data-mtab="home">Muscu ›</button></div>
+      <div class="j-deficit">
+        <strong class="${balanceCls(b.deficit)}">${b.deficit == null ? '–' : signed(b.deficit) + ' kcal'}</strong>
+        <span class="hint">${b.deficit == null ? 'saisis ta dépense du jour' : balanceLabel(b.deficit)} · mangé ${fr(b.kcal)} − dépensé ${b.burn == null ? '?' : fr(b.burn)}</span>
+      </div>
+      <form data-form="burn" class="burn-form">
+        <input type="hidden" name="date" value="${t}">
+        <input name="kcal" inputmode="numeric" placeholder="Dépense totale du jour (kcal)" value="${b.burn ?? ''}" autocomplete="off">
+        <button class="primary">OK</button>
+      </form>
+
+      <div class="protein-head j-gap"><span>Protéines</span><b class="${protRatio >= 1 ? 'good' : ''}">${fr(b.protein)} / ${s.proteinGoal} g</b></div>
+      <div class="progress"><div style="width:${(protRatio * 100).toFixed(0)}%"></div></div>
+
+      <form data-form="meal" class="quick-meal">
+        <input type="hidden" name="date" value="${t}">
+        <input name="name" placeholder="Repas" autocomplete="off" list="jMealNames">
+        <input name="kcal" inputmode="numeric" placeholder="kcal" required autocomplete="off">
+        <input name="protein" inputmode="decimal" placeholder="prot." autocomplete="off">
+        <button class="primary" aria-label="Ajouter le repas">＋</button>
+      </form>
+      <datalist id="jMealNames">${favMeals(30).map((m) => `<option value="${esc(m.name)}">`).join('')}</datalist>
+      ${favs.length ? `<div class="chips">${favs.map((m) => `<button class="chip" data-action="fav-meal" data-id="${m.id}" data-date="${t}">${esc(m.name)} <small>${fr(m.kcal)}</small></button>`).join('')}</div>` : ''}
+
+      <div class="j-lines">
+        <div>⚖️ ${lastW ? `<b>${fr(lastW.value, 1)} kg</b> <span class="hint">moy. 7 j${slope == null ? '' : ` · ${slope > 0 ? '+' : '−'}${fr(Math.abs(slope), 2)} kg/sem`}</span>` : '<span class="hint">pas encore de pesée</span>'}
+          <button class="chip" data-action="open-muscu" data-mtab="body">＋ Pesée</button></div>
+        <div>🎯 ${goalLine}</div>
+      </div>
+
+      <div class="alcohol">
+        <button class="seg ${alc.value === false ? 'on good' : ''} ${alc.source === 'auto' ? 'soft' : ''}" data-action="alcohol" data-date="${t}" data-v="0">🚫 Sans alcool</button>
+        <button class="seg ${alc.value === true ? 'on warn' : ''}" data-action="alcohol" data-date="${t}" data-v="1">🍷 Alcool</button>
+      </div>
+    </section>
+
+    <section class="card">
+      ${head(`✅ À faire aujourd'hui${tasks.length ? ` <small class="hint">${tasks.length}</small>` : ''}`, 'todo')}
+      ${tasks.length ? `<ul class="task-list">${tasks.slice(0, 8).map((x) => todo.row(x, true)).join('')}</ul>${tasks.length > 8 ? `<p class="hint">+ ${tasks.length - 8} autres</p>` : ''}` : '<p class="hint">Rien de prévu aujourd\'hui 🙌</p>'}
+    </section>
+
+    <section class="card">
+      ${head('🎉 Good news à venir', 'goodnews')}
+      ${news.length ? `<ul class="gn-list">${news.map((it) => `
+        <li class="gn-item"><span class="gn-emoji">${esc(it.emoji || '🎉')}</span>
+          <div><b>${esc(it.title)}</b><small>${it.estimated ? '≈ ' : ''}${fmtDate(it.next)}</small></div>
+          <span class="gn-badge ${it.badge.cls}">${it.badge.label}</span></li>`).join('')}</ul>`
+        : '<p class="hint">Ajoute ce qui t\'attend de cool.</p>'}
+    </section>
+
+    <section class="card">
+      ${head('🎯 Objectifs de vie', 'goals')}
+      ${gs.total ? `
+        <p><b class="${gs.onTrack === gs.total ? 'good' : gs.onTrack >= gs.total / 2 ? 'mid' : 'warn'}">${gs.onTrack}/${gs.total}</b> dans les temps</p>
+        ${gs.watch.length ? `<ul class="mini">${gs.watch.slice(0, 4).map((x) => `<li>${esc(x.g.emoji || '🎯')} ${esc(x.g.title)} <span class="${x.c.cls}">· ${x.c.status} (${fr(x.c.progress * 100)} % vs ${fr(x.c.expected * 100)} %)</span></li>`).join('')}</ul>` : '<p class="hint">Tout est dans les temps ✅</p>'}`
+        : '<p class="hint">Aucun objectif pour l\'instant.</p>'}
+    </section>
+  `;
+}
+
+// ---------- Espaces Good news / Objectifs / Todo ----------
 // Chaque espace gère ses données ; ici on rafraîchit l'écran et on affiche son message.
+spaceViews.today = journeeView;
+spaceViews.todo = todo.view;
 spaceViews.goodnews = goodnews.view;
 spaceViews.goals = goals.view;
 function wrapSpace(handlers) {
@@ -934,8 +1050,8 @@ function wrapSpace(handlers) {
     render();
   }]));
 }
-Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions));
-Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms));
+Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions), wrapSpace(todo.actions));
+Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms), wrapSpace(todo.forms));
 
 // ---------- Événements (délégation) ----------
 document.addEventListener('click', (e) => {
