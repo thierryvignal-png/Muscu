@@ -1,6 +1,6 @@
 // Espace « Roadmap esthétique » : traitements prévus, date approximative,
 // points ajoutés au score esthétique (sur 100, estimés par l'IA).
-import { esc, today, daysBetween, num, fr, uid, read, write } from './util.js';
+import { esc, today, daysBetween, isoOf, num, fr, uid, read, write } from './util.js';
 import { lineChart } from './charts.js';
 
 export const KEY = 'esthetique.data.v1';
@@ -80,6 +80,23 @@ export function applyEstimatedPointsV2() {
   return n;
 }
 
+// Délai avant que l'effet d'un traitement soit visible (en mois), selon son nom
+function effectDelayMonths(name) {
+  const n = norm(name);
+  if (n.includes('greffe')) return 12;
+  if (n.includes('lenisna')) return 2;
+  if (n.includes('juvelook')) return 1; // Juvelook et Rejuvelook
+  return 0;
+}
+// Date à laquelle les points du traitement comptent dans la courbe
+export function effectDate(it) {
+  const m = effectDelayMonths(it.name);
+  if (!m) return it.date;
+  const [y, mo, d] = it.date.split('-').map(Number);
+  const last = new Date(y, mo - 1 + m + 1, 0).getDate();
+  return isoOf(new Date(y, mo - 1 + m, Math.min(d, last)));
+}
+
 export function scores() {
   const d = load();
   const base = d.base ?? 0;
@@ -100,7 +117,7 @@ function itemRow(it) {
   return `
     <li class="task ${it.done ? 'done' : ''}">
       <button class="tick ${it.done ? 'on' : ''}" data-action="est-toggle" data-id="${it.id}" aria-label="${it.done ? 'Marquer prévu' : 'Marquer fait'}">✓</button>
-      <div><b>${esc(it.name)}</b><small>≈ ${monthText(it.date)}${when ? ` · ${when}` : ''}</small></div>
+      <div><b>${esc(it.name)}</b><small>≈ ${monthText(it.date)}${when ? ` · ${when}` : ''}${effectDate(it) !== it.date ? ` · effet ≈ ${monthText(effectDate(it))}` : ''}</small></div>
       <span class="gn-badge ${it.points == null ? '' : 'soon'}">${pts(it.points)}</span>
       <button class="icon-btn" data-action="est-edit" data-id="${it.id}" aria-label="Modifier">✎</button>
     </li>`;
@@ -133,8 +150,12 @@ export function view() {
   const done = items.filter((x) => x.done);
 
   // Évolution du score : départ aujourd'hui, puis + points à chaque traitement prévu
+  // Chaque gain de points est placé à la date où l'effet est visible (séance + délai)
   let run = s.current;
-  const curve = [{ date: today(), value: run }, ...planned.filter((x) => x.date >= today()).map((x) => ({ date: x.date, value: (run = clamp100(run + x.points)) }))];
+  const effects = planned
+    .map((x) => ({ date: effectDate(x) < today() ? today() : effectDate(x), points: x.points || 0 }))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  const curve = [{ date: today(), value: run }, ...effects.map((x) => ({ date: x.date, value: (run = clamp100(run + x.points)) }))];
 
   return `
     <header class="page-head"><h1>Roadmap esthétique</h1></header>
@@ -161,7 +182,7 @@ export function view() {
     ${edit || adding ? itemForm(edit) : '<button class="primary block" data-action="est-add">＋ Ajouter un traitement</button>'}
 
     ${planned.length ? `<section class="card"><h2>Prévus</h2><ul class="task-list">${planned.map(itemRow).join('')}</ul></section>` : ''}
-    ${s.hasBase && curve.length > 1 ? `<section class="card"><h2>Évolution prévue du score</h2>${lineChart(curve, { unit: ' / 100' })}</section>` : ''}
+    ${s.hasBase && curve.length > 1 ? `<section class="card"><h2>Évolution prévue du score</h2><p class="hint">Chaque gain est placé à la date où l'effet est visible : Juvelook / Rejuvelook +1 mois, Lenisna +2 mois, greffe +1 an.</p>${lineChart(curve, { unit: ' / 100' })}</section>` : ''}
     ${done.length ? `<section class="card"><h2>Faits ✓</h2><ul class="task-list">${done.map(itemRow).join('')}</ul></section>` : ''}
     ${!items.length ? '<p class="hint center">Ajoute ton premier traitement prévu.</p>' : ''}
   `;
