@@ -1,7 +1,13 @@
 # Muscu
 App de musculation & sèche — suivi perso, installable sur iPhone/Android, qui marche hors ligne.
 
-## Ce que l'app suit
+## Espaces (super app)
+Un bouton en haut de l'écran permet de passer d'un espace à l'autre. Chaque espace a son propre code et ses propres données (clé de stockage séparée) :
+- **💪 Muscu** — décrit ci-dessous.
+- **✨ Roadmap esthétique** — à construire.
+- **🏥 Clinique Singulier** — modèle financier à construire ; en attendant, raccourci vers un fichier existant (lien gardé sur le téléphone). Le dépôt étant public, aucun chiffre de la clinique ne doit être écrit dans le code : tout se saisit dans l'app.
+
+## Ce que l'espace Muscu suit
 - **Déficit calorique (accueil)** : tu saisis ta dépense totale du jour (estimée par une IA à partir de tes activités). L'app la compare à tes repas et calcule le déficit ou l'excédent du jour, la moyenne sur 7 et 30 jours, le cumul en kg de gras, un graphique sur 14 jours, et une carte objectif (date d'atteinte du poids cible, poids projeté à la date cible, indicateur « dans les temps / en retard », sur la base de 1 kg = 7 700 kcal).
 - **Repas** : calories + protéines, repas fréquents en 1 tap, graphique 14 jours.
 - **Salle** : séances (exercices, séries, reps × kg), « refaire » une séance, perf de la dernière fois affichée pendant la saisie, progression par exercice (1RM estimé, records). Le brouillon de séance est gardé si l'app se ferme.
@@ -29,4 +35,5 @@ C'est un site statique (HTML/CSS/JS, aucune dépendance, pas de build).
 - `js/app.js` — écrans et logique
 - `js/store.js` — stockage local, export/import
 - `js/charts.js` — graphiques SVG
+- `js/spaces.js` — sélecteur d'espaces et espaces Esthétique / Clinique
 - `sw.js`, `manifest.webmanifest`, `icons/` — installation et mode hors ligne (incrémenter `VERSION` dans `sw.js` à chaque mise à jour)

@@ -1,4 +1,5 @@
 import { store } from './store.js';
+import { getSpace, setSpace, spaceSwitch, spaceMenu, spaceViews, clinic } from './spaces.js';
 import { lineChart, barChart, balanceChart } from './charts.js';
 
 // ---------- Utilitaires ----------
@@ -715,10 +716,14 @@ views.more = () => {
 };
 
 // ---------- Rendu & navigation ----------
+let space = getSpace();
+
 function render() {
   const main = $('#main');
   const y = window.scrollY;
-  main.innerHTML = views[current]();
+  const page = space === 'muscu' ? views[current]() : spaceViews[space]();
+  main.innerHTML = spaceSwitch(space) + page;
+  document.body.classList.toggle('no-tabbar', space !== 'muscu');
   document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.tab === current));
   window.scrollTo(0, y);
 }
@@ -746,6 +751,11 @@ const forms = {
     if (weight == null && bodyfat == null && waist == null) return toast('Rien à enregistrer');
     store.add('body', { date: f.date || today(), weight, bodyfat, waist });
     toast('Mesure enregistrée');
+  },
+  clinicLink(f) {
+    clinic.setLink(f.link);
+    render();
+    toast(f.link.trim() ? 'Lien enregistré' : 'Lien effacé');
   },
   burn(f) {
     const n = num(f.kcal);
@@ -793,6 +803,21 @@ const actions = {
     const manual = store.get().alcohol.find((x) => x.date === state.homeDate);
     // Re-toucher le choix actif l'annule (retour à la détection auto)
     store.setAlcohol(state.homeDate, manual && manual.value === v ? null : v);
+  },
+  'space-menu'() {
+    const sheet = $('#sheet');
+    sheet.innerHTML = spaceMenu(space);
+    sheet.hidden = false;
+  },
+  'space-close'() {
+    $('#sheet').hidden = true;
+  },
+  space(el) {
+    $('#sheet').hidden = true;
+    space = el.dataset.space;
+    setSpace(space);
+    render();
+    window.scrollTo(0, 0);
   },
   'home-day'(el) {
     const d = addDays(state.homeDate, +el.dataset.delta);

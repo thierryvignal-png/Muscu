@@ -1,0 +1,92 @@
+// Super app : plusieurs espaces indépendants (code et données séparés).
+// Chaque espace a sa propre clé de stockage local : une modif de l'un ne touche pas les autres.
+
+export const SPACES = [
+  { key: 'muscu', icon: '💪', name: 'Muscu', desc: 'Déficit, repas, salle, poids' },
+  { key: 'esthetique', icon: '✨', name: 'Roadmap esthétique', desc: 'Bientôt' },
+  { key: 'clinique', icon: '🏥', name: 'Clinique Singulier', desc: 'Modèle financier · bientôt' },
+];
+
+const SPACE_KEY = 'hub.space';
+const CLINIC_KEY = 'clinique.data.v1';
+
+const esc = (s) =>
+  String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function read(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
+}
+function write(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+
+export const getSpace = () => {
+  const k = read(SPACE_KEY, 'muscu');
+  return SPACES.some((s) => s.key === k) ? k : 'muscu';
+};
+export const setSpace = (k) => write(SPACE_KEY, k);
+export const spaceOf = (k) => SPACES.find((s) => s.key === k);
+
+// Bouton en haut de chaque écran pour changer d'espace
+export function spaceSwitch(current) {
+  const s = spaceOf(current);
+  return `<button class="space-switch" data-action="space-menu">${s.icon} ${esc(s.name)} <span>▾</span></button>`;
+}
+
+export function spaceMenu(current) {
+  return `
+    <div class="sheet-backdrop" data-action="space-close"></div>
+    <div class="sheet" role="dialog" aria-label="Changer d'espace">
+      <h2>Mes espaces</h2>
+      ${SPACES.map((s) => `
+        <button class="space-item ${s.key === current ? 'active' : ''}" data-action="space" data-space="${s.key}">
+          <span class="space-icon">${s.icon}</span>
+          <span><b>${esc(s.name)}</b><small>${esc(s.desc)}</small></span>
+        </button>`).join('')}
+    </div>`;
+}
+
+// ---------- Espace Roadmap esthétique (à construire) ----------
+function esthetique() {
+  return `
+    <header class="page-head"><h1>Roadmap esthétique</h1></header>
+    <section class="card">
+      <h2>✨ Espace prêt, contenu à venir</h2>
+      <p class="hint">On définira ensemble ce que tu veux y suivre : soins et interventions prévus,
+      dates et rappels, budget, photos avant / après…</p>
+    </section>`;
+}
+
+// ---------- Espace Clinique Singulier (à construire) ----------
+export const clinic = {
+  get: () => read(CLINIC_KEY, { link: '' }),
+  setLink(link) {
+    let l = (link || '').trim();
+    if (l && !/^https?:\/\//i.test(l)) l = 'https://' + l; // n'accepte que des liens web
+    write(CLINIC_KEY, { ...clinic.get(), link: l });
+  },
+};
+
+function clinique() {
+  const { link } = clinic.get();
+  return `
+    <header class="page-head"><h1>Clinique Singulier</h1><p>Modèle financier</p></header>
+    <section class="card">
+      <h2>🏥 Espace prêt, module à construire</h2>
+      <p class="hint">Hypothèses, compte de résultat prévisionnel, trésorerie, scénarios… On le construit ensemble quand tu veux.</p>
+      <p class="hint">🔒 Confidentialité : le code de l'app est public sur GitHub. Tes chiffres seront saisis
+      dans l'app et resteront sur ton téléphone, jamais dans le code.</p>
+    </section>
+    <section class="card">
+      <h2>Raccourci vers un fichier existant</h2>
+      <p class="hint">Si ton modèle existe déjà (Google Sheets, Excel en ligne…), colle son lien ici pour l'ouvrir en un tap.
+      Le lien reste sur ce téléphone.</p>
+      <form data-form="clinicLink" class="burn-form">
+        <input name="link" type="text" inputmode="url" autocapitalize="off" placeholder="https://…" value="${esc(link)}" autocomplete="off">
+        <button class="primary">OK</button>
+      </form>
+      ${link ? `<a class="button-like block-link" href="${esc(link)}" target="_blank" rel="noopener">Ouvrir mon modèle ↗</a>` : ''}
+    </section>`;
+}
+
+export const spaceViews = { esthetique, clinique };
