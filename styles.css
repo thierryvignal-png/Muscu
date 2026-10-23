@@ -130,6 +130,7 @@ button:active, .button-like:active { transform: scale(0.98); }
 .day-nav input { text-align: center; }
 
 .macros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0; text-align: center; }
+.macros.two { grid-template-columns: 1fr 1fr; }
 .macros div { background: var(--input); border-radius: 10px; padding: 8px 4px; }
 .macros b { display: block; font-size: 16px; }
 .macros span { font-size: 11px; color: var(--muted); }

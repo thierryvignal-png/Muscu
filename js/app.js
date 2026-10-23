@@ -60,8 +60,6 @@ function dayTotals(date) {
     meals,
     kcal: sum(meals, (m) => m.kcal),
     protein: sum(meals, (m) => m.protein),
-    carbs: sum(meals, (m) => m.carbs),
-    fat: sum(meals, (m) => m.fat),
   };
 }
 
@@ -242,8 +240,6 @@ views.food = () => {
         ${input('name', 'Aliment / repas', { placeholder: 'ex : Poulet riz', required: true, list: 'mealNames', cls: 'full' })}
         ${input('kcal', 'Kcal', { numeric: true, required: true })}
         ${input('protein', 'Protéines (g)', { decimal: true })}
-        ${input('carbs', 'Glucides (g)', { decimal: true })}
-        ${input('fat', 'Lipides (g)', { decimal: true })}
         <button class="primary full">Ajouter</button>
       </form>
       <datalist id="mealNames">${Object.values(freq).map((f) => `<option value="${esc(f.m.name)}">`).join('')}</datalist>
@@ -251,13 +247,12 @@ views.food = () => {
     )}
     ${card(
       `${fmtDate(d)} — ${fr(t.kcal)} / ${fr(s.calorieGoal)} kcal`,
-      `<div class="macros">
-         <div><b>${fr(t.protein)} g</b><span>prot. (obj. ${s.proteinGoal})</span></div>
-         <div><b>${fr(t.carbs)} g</b><span>gluc.</span></div>
-         <div><b>${fr(t.fat)} g</b><span>lip.</span></div>
+      `<div class="macros two">
+         <div><b>${fr(t.protein)} g</b><span>protéines (obj. ${s.proteinGoal})</span></div>
+         <div><b>${fr(s.calorieGoal - t.kcal)}</b><span>kcal restantes</span></div>
        </div>
        ${t.meals.length ? `<ul class="list">${t.meals.map((m) => `
-         <li><div><b>${esc(m.name)}</b><small>${fr(m.kcal)} kcal${m.protein != null ? ` · P ${fr(m.protein)}` : ''}${m.carbs != null ? ` · G ${fr(m.carbs)}` : ''}${m.fat != null ? ` · L ${fr(m.fat)}` : ''}</small></div>${delBtn('meals', m.id)}</li>`).join('')}</ul>`
+         <li><div><b>${esc(m.name)}</b><small>${fr(m.kcal)} kcal${m.protein != null ? ` · P ${fr(m.protein)}` : ''}</small></div>${delBtn('meals', m.id)}</li>`).join('')}</ul>`
          : '<p class="hint">Rien de noté ce jour-là.</p>'}`
     )}
     ${card('14 derniers jours', barChart(bars, { goal: s.calorieGoal, unit: ' kcal' }) + (avg ? `<p class="hint">Moyenne des jours notés : <b>${fr(avg)} kcal</b></p>` : ''))}
@@ -561,8 +556,6 @@ const forms = {
       name: f.name.trim(),
       kcal: num(f.kcal) || 0,
       protein: num(f.protein),
-      carbs: num(f.carbs),
-      fat: num(f.fat),
     });
     toast('Repas ajouté');
   },
