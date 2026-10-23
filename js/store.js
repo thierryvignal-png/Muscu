@@ -7,10 +7,9 @@ const DEFAULT = {
     calorieGoal: 2200,
     deficitGoal: 500,
     proteinGoal: 160,
-    weightGoal: null,
+    weightGoal: 75,
+    targetDate: '2026-12-31',
     heightCm: null,
-    sex: null,
-    age: null,
   },
   meals: [],    // {id, date, name, kcal, protein}
   burn: [],     // {id, date, kcal}  dépense totale du jour (une entrée par jour)

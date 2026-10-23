@@ -14,8 +14,18 @@ const addDays = (iso, n) => {
   return isoOf(new Date(y, m - 1, d + n));
 };
 const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
-const fmtDate = (iso) =>
-  new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+const fmtDate = (iso) => {
+  const d = new Date(iso + 'T12:00:00');
+  const opts = { weekday: 'short', day: 'numeric', month: 'short' };
+  if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  return d.toLocaleDateString('fr-FR', opts);
+};
+const fmtDay = (iso) => {
+  const d = new Date(iso + 'T12:00:00');
+  const opts = { day: 'numeric', month: 'short' };
+  if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  return d.toLocaleDateString('fr-FR', opts);
+};
 const dayLetter = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'narrow' });
 
 // Accepte "82,5" comme "82.5"
@@ -164,19 +174,62 @@ const signed = (v) => (v == null ? '–' : `${v > 0 ? '−' : v < 0 ? '+' : ''}$
 const balanceLabel = (v) => (v == null ? '' : v >= 0 ? 'déficit' : 'excédent');
 const balanceCls = (v) => (v == null ? '' : v >= 0 ? 'good' : 'warn');
 
-function aiPrompt(date) {
+// Objectif de poids : projections au rythme du déficit moyen (1 kg = 7 700 kcal)
+const KCAL_PER_KG = 7700;
+
+function goalProjection() {
   const s = store.settings();
-  const w = [...store.get().body].filter((b) => b.weight != null).sort(byDate).pop()?.weight;
-  const profil = [
-    s.sex === 'F' ? 'femme' : s.sex === 'H' ? 'homme' : null,
-    s.age ? `${s.age} ans` : null,
-    s.heightCm ? `${s.heightCm} cm` : null,
-    w ? `${fr(w, 1)} kg` : null,
-  ].filter(Boolean).join(', ');
-  return `Estime ma dépense calorique TOTALE de la journée du ${fmtDate(date)} (métabolisme de base + toutes mes activités).
-Profil : ${profil || '[sexe, âge, taille, poids]'}.
-Activités du jour : [ex : 9 000 pas, 1 h de vélo à ~25 km/h, séance de muscu 1 h…]
-Réponds avec un seul chiffre final en kcal.`;
+  const goal = s.weightGoal ?? 75;
+  const target = s.targetDate || '2026-12-31';
+  const { raw, trend } = weightSeries();
+  if (!trend.length) return { goal, target, missing: 'Ajoute une pesée dans Corps pour voir tes projections.' };
+  let stats = deficitStats(7);
+  let basis = '7 j';
+  if (!stats || stats.n < 3) {
+    const s30 = deficitStats(30);
+    if (s30) { stats = s30; basis = '30 j'; }
+  }
+  if (!stats) return { goal, target, missing: 'Note ta dépense et tes repas pour voir tes projections.' };
+
+  const cur = trend[trend.length - 1].value; // poids moyen 7 j
+  const start = raw[0].value;
+  const perDay = stats.avg / KCAL_PER_KG; // kg perdus par jour
+  const daysLeft = Math.max(1, daysBetween(today(), target));
+  const projected = cur - perDay * daysLeft;
+  const toLose = cur - goal;
+  const eta = toLose <= 0 ? today() : perDay > 0 ? addDays(today(), Math.ceil(toLose / perDay)) : null;
+  const required = toLose > 0 ? (toLose * KCAL_PER_KG) / daysLeft : 0;
+  const margin = goal - projected; // > 0 = en avance
+  const progress = start > goal ? Math.max(0, Math.min(1, (start - cur) / (start - goal))) : 1;
+  return { goal, target, cur, start, avg: stats.avg, basis, daysLeft, projected, eta, required, margin, progress, toLose };
+}
+
+function goalCard() {
+  const g = goalProjection();
+  const title = `Objectif ${fr(g.goal, 1)} kg au ${fmtDay(g.target)}`;
+  if (g.missing) return card(title, `<p class="hint">${g.missing}</p>`);
+
+  let status, cls;
+  if (g.toLose <= 0) { status = 'Objectif atteint 🎉'; cls = 'good'; }
+  else if (g.margin >= 0) { status = `Dans les temps ✅ · ${fr(g.margin, 1)} kg d'avance`; cls = 'good'; }
+  else if (g.margin > -1) { status = `Presque 💪 · il manque ${fr(-g.margin, 1)} kg`; cls = 'mid'; }
+  else { status = `En retard ⚠️ · il manque ${fr(-g.margin, 1)} kg`; cls = 'warn'; }
+
+  const pace = g.required > 0 ? Math.max(0, g.avg / g.required) : 1;
+
+  return card(title, `
+    <div class="track ${cls}">${status}</div>
+    <div class="progress"><div style="width:${(g.progress * 100).toFixed(0)}%"></div></div>
+    <p class="hint progress-legend"><span>${fr(g.start, 1)} kg</span><span><b>${fr(g.cur, 1)} kg</b> (moy. 7 j)</span><span>${fr(g.goal, 1)} kg</span></p>
+    <div class="macros">
+      <div><b>${g.toLose <= 0 ? '✓' : g.eta ? fmtDay(g.eta) : 'jamais'}</b><span>${fr(g.goal, 0)} kg atteint le</span></div>
+      <div><b class="${cls}">${fr(g.projected, 1)} kg</b><span>poids au ${fmtDay(g.target)}</span></div>
+      <div><b class="${pace >= 1 ? 'good' : pace >= 0.8 ? 'mid' : 'warn'}">${fr(pace * 100)} %</b><span>du rythme nécessaire</span></div>
+    </div>
+    <p class="hint">${g.toLose > 0
+      ? `Il te faut un déficit moyen de <b>${fr(g.required)} kcal/j</b> d'ici le ${fmtDay(g.target)} (${g.daysLeft} j). Ton rythme actuel : <b>${g.avg >= 0 ? `déficit de ${fr(g.avg)}` : `excédent de ${fr(-g.avg)}`} kcal/j</b> (moy. ${g.basis}).`
+      : 'Tu es sous ton objectif, garde le cap !'}</p>
+  `);
 }
 
 views.home = () => {
@@ -221,8 +274,9 @@ views.home = () => {
         <input name="kcal" inputmode="numeric" placeholder="Dépense totale du jour (kcal)" value="${b.burn ?? ''}" autocomplete="off">
         <button class="primary">OK</button>
       </form>
-      <button class="chip ai-btn" data-action="copy-prompt">📋 Copier le prompt pour l'IA</button>
     </section>
+
+    ${goalCard()}
 
     <section class="card rings two">
       ${ring(b.kcal / b.target, fr(b.kcal), `/ ${fr(b.target)} kcal`)}
@@ -508,23 +562,10 @@ views.more = () => {
         ${input('deficitGoal', 'Déficit visé (kcal/j)', { numeric: true, value: s.deficitGoal })}
         ${input('proteinGoal', 'Protéines (g/j)', { numeric: true, value: s.proteinGoal })}
         ${input('calorieGoal', 'Calories par défaut', { numeric: true, value: s.calorieGoal })}
-        ${input('weightGoal', 'Poids cible (kg)', { decimal: true, value: s.weightGoal ?? '' })}
+        ${input('weightGoal', 'Poids cible (kg)', { decimal: true, value: s.weightGoal ?? 75 })}
+        ${input('targetDate', 'Date cible', { type: 'date', value: s.targetDate || '2026-12-31' })}
+        ${input('heightCm', 'Taille (cm, pour l\'IMC)', { numeric: true, value: s.heightCm ?? '' })}
         <p class="hint full">« Calories par défaut » sert d'objectif les jours où tu n'as pas encore saisi ta dépense.</p>
-        <button class="primary full">Enregistrer</button>
-      </form>`
-    )}
-    ${card(
-      'Profil (pour le prompt IA)',
-      `<form data-form="profile" class="form">
-        <label class="field"><span>Sexe</span>
-          <select name="sex">
-            <option value="">–</option>
-            <option value="H" ${s.sex === 'H' ? 'selected' : ''}>Homme</option>
-            <option value="F" ${s.sex === 'F' ? 'selected' : ''}>Femme</option>
-          </select>
-        </label>
-        ${input('age', 'Âge', { numeric: true, value: s.age ?? '' })}
-        ${input('heightCm', 'Taille (cm)', { numeric: true, value: s.heightCm ?? '' })}
         <button class="primary full">Enregistrer</button>
       </form>`
     )}
@@ -584,12 +625,10 @@ const forms = {
       proteinGoal: num(f.proteinGoal) || 150,
       calorieGoal: num(f.calorieGoal) || 2200,
       weightGoal: num(f.weightGoal),
+      targetDate: f.targetDate || '2026-12-31',
+      heightCm: num(f.heightCm),
     });
     toast('Objectifs enregistrés');
-  },
-  profile(f) {
-    store.setSettings({ sex: f.sex || null, age: num(f.age), heightCm: num(f.heightCm) });
-    toast('Profil enregistré');
   },
   workout() {
     const d = state.draft;
@@ -623,15 +662,6 @@ const actions = {
     if (d > today()) return;
     state.homeDate = d;
     render();
-  },
-  async 'copy-prompt'() {
-    const text = aiPrompt(state.homeDate);
-    try {
-      await navigator.clipboard.writeText(text);
-      toast("Prompt copié — colle-le dans ton IA");
-    } catch {
-      window.prompt('Copie ce texte :', text);
-    }
   },
   'meal-day'(el) {
     state.mealDate = addDays(state.mealDate, +el.dataset.delta);

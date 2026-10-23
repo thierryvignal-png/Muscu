@@ -2,7 +2,7 @@
 App de musculation & sèche — suivi perso, installable sur iPhone/Android, qui marche hors ligne.
 
 ## Ce que l'app suit
-- **Déficit calorique (accueil)** : tu saisis ta dépense totale du jour (estimée par une IA à partir de tes activités ; un bouton copie le prompt tout prêt). L'app la compare à tes repas et calcule le déficit ou l'excédent du jour, la moyenne sur 7 et 30 jours, le cumul en kg de gras, et un graphique sur 14 jours.
+- **Déficit calorique (accueil)** : tu saisis ta dépense totale du jour (estimée par une IA à partir de tes activités). L'app la compare à tes repas et calcule le déficit ou l'excédent du jour, la moyenne sur 7 et 30 jours, le cumul en kg de gras, un graphique sur 14 jours, et une carte objectif (date d'atteinte du poids cible, poids projeté à la date cible, indicateur « dans les temps / en retard », sur la base de 1 kg = 7 700 kcal).
 - **Repas** : calories + protéines, repas fréquents en 1 tap, graphique 14 jours.
 - **Salle** : séances (exercices, séries, reps × kg), « refaire » une séance, perf de la dernière fois affichée pendant la saisie, progression par exercice (1RM estimé, records). Le brouillon de séance est gardé si l'app se ferme.
 - **Corps** : poids avec moyenne glissante 7 jours, kg/semaine, date estimée d'atteinte de l'objectif, body fat %, masse maigre / grasse, tour de taille, IMC.
