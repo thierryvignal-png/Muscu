@@ -3,6 +3,7 @@ import { setSpace, spaceSwitch, spaceMenu, spaceViews, clinic, SPACE_KEYS } from
 import * as goodnews from './goodnews.js';
 import * as goals from './goals.js';
 import * as todo from './todo.js';
+import * as esthetique from './esthetique.js';
 import { lineChart, barChart, balanceChart } from './charts.js';
 
 // ---------- Utilitaires ----------
@@ -708,7 +709,7 @@ views.more = () => {
     )}
     ${card(
       'Sauvegarde',
-      `<p class="hint">Tes données restent sur ce téléphone. Exporte-les régulièrement pour ne rien perdre : la sauvegarde contient tous tes espaces (Muscu, Todo, Good news, Objectifs, Clinique).</p>
+      `<p class="hint">Tes données restent sur ce téléphone. Exporte-les régulièrement pour ne rien perdre : la sauvegarde contient tous tes espaces (Muscu, Todo, Good news, Objectifs, Esthétique, Clinique).</p>
        <div class="form">
          <button class="full" data-action="export">⬇︎ Exporter (JSON)</button>
          <label class="full button-like">⬆︎ Importer<input type="file" accept="application/json,.json" id="importFile" hidden></label>
@@ -969,6 +970,7 @@ function journeeView() {
   const tasks = todo.todayList();
   const news = goodnews.upcomingList(3);
   const gs = goals.summary();
+  const es = esthetique.scores();
   const head = (title, spaceKey, label = 'Tout voir ›') =>
     `<div class="j-head"><h2>${title}</h2><button class="chip" data-action="space" data-space="${spaceKey}">${label}</button></div>`;
 
@@ -1033,6 +1035,12 @@ function journeeView() {
         ${gs.watch.length ? `<ul class="mini">${gs.watch.slice(0, 4).map((x) => `<li>${esc(x.g.emoji || '🎯')} ${esc(x.g.title)} <span class="${x.c.cls}">· ${x.c.status} (${fr(x.c.progress * 100)} % vs ${fr(x.c.expected * 100)} %)</span></li>`).join('')}</ul>` : '<p class="hint">Tout est dans les temps ✅</p>'}`
         : '<p class="hint">Aucun objectif pour l\'instant.</p>'}
     </section>
+
+    ${es.hasBase || es.next ? `<section class="card">
+      ${head('✨ Roadmap esthétique', 'esthetique')}
+      ${es.hasBase ? `<p>Score <b>${fr(es.current, 1)}</b> → <b class="good">${fr(es.projected, 1)}</b> <span class="hint">/ 100 après la roadmap</span></p>` : ''}
+      ${es.next ? `<p class="hint">Prochain : <b>${esc(es.next.name)}</b> · ≈ ${new Date(es.next.date + 'T12:00:00').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })} · +${fr(es.next.points, es.next.points % 1 ? 1 : 0)} pts</p>` : ''}
+    </section>` : ''}
   `;
 }
 
@@ -1040,6 +1048,7 @@ function journeeView() {
 // Chaque espace gère ses données ; ici on rafraîchit l'écran et on affiche son message.
 spaceViews.today = journeeView;
 spaceViews.todo = todo.view;
+spaceViews.esthetique = esthetique.view;
 spaceViews.goodnews = goodnews.view;
 spaceViews.goals = goals.view;
 function wrapSpace(handlers) {
@@ -1050,8 +1059,8 @@ function wrapSpace(handlers) {
     render();
   }]));
 }
-Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions), wrapSpace(todo.actions));
-Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms), wrapSpace(todo.forms));
+Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions), wrapSpace(todo.actions), wrapSpace(esthetique.actions));
+Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms), wrapSpace(todo.forms), wrapSpace(esthetique.forms));
 
 // ---------- Événements (délégation) ----------
 document.addEventListener('click', (e) => {

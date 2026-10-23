@@ -1,0 +1,151 @@
+// Espace « Roadmap esthétique » : traitements prévus, date approximative,
+// points ajoutés au score esthétique (sur 100, estimés par l'IA).
+import { esc, today, daysBetween, num, fr, uid, read, write } from './util.js';
+import { lineChart } from './charts.js';
+
+export const KEY = 'esthetique.data.v1';
+// {base: score de départ, items: [{id, name, date, points, done}]}
+const load = () => read(KEY, { base: null, items: [] });
+const save = (d) => write(KEY, d);
+
+let editing = null;
+let adding = false;
+
+const monthText = (iso) =>
+  new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+const pts = (p) => `${p >= 0 ? '+' : '−'}${fr(Math.abs(p), p % 1 ? 1 : 0)} pt${Math.abs(p) > 1 ? 's' : ''}`;
+const sumPts = (list) => list.reduce((s, x) => s + (x.points || 0), 0);
+const clamp100 = (v) => Math.min(100, v);
+
+export function scores() {
+  const d = load();
+  const base = d.base ?? 0;
+  const done = d.items.filter((x) => x.done);
+  const planned = d.items.filter((x) => !x.done).sort((a, b) => (a.date < b.date ? -1 : 1));
+  return {
+    hasBase: d.base != null,
+    current: clamp100(base + sumPts(done)),
+    projected: clamp100(base + sumPts(d.items)),
+    next: planned[0] || null,
+    planned,
+  };
+}
+
+function itemRow(it) {
+  const days = daysBetween(today(), it.date);
+  const when = it.done ? '✓ fait' : days < 0 ? '⏰ date dépassée' : days <= 31 ? `dans ${days} j` : '';
+  return `
+    <li class="task ${it.done ? 'done' : ''}">
+      <button class="tick ${it.done ? 'on' : ''}" data-action="est-toggle" data-id="${it.id}" aria-label="${it.done ? 'Marquer prévu' : 'Marquer fait'}">✓</button>
+      <div><b>${esc(it.name)}</b><small>≈ ${monthText(it.date)}${when ? ` · ${when}` : ''}</small></div>
+      <span class="gn-badge soon">${pts(it.points)}</span>
+      <button class="icon-btn" data-action="est-edit" data-id="${it.id}" aria-label="Modifier">✎</button>
+    </li>`;
+}
+
+function itemForm(it) {
+  return `
+    <section class="card">
+      <h2>${it ? 'Modifier le traitement' : 'Nouveau traitement'}</h2>
+      <form data-form="est" class="form">
+        <label class="field full"><span>Traitement</span>
+          <input name="name" required placeholder="ex : Greffe de cheveux, facettes, laser…" value="${esc(it?.name || '')}" autocomplete="off">
+        </label>
+        <label class="field"><span>Date approximative</span><input name="date" type="date" required value="${esc(it?.date || '')}"></label>
+        <label class="field"><span>Points ajoutés</span><input name="points" inputmode="decimal" required placeholder="ex : 4" value="${it?.points ?? ''}"></label>
+        <p class="hint full">Demande à ton IA : « Combien de points ce traitement ajouterait-il à mon score esthétique sur 100 ? »</p>
+        <button class="primary full">${it ? 'Enregistrer' : 'Ajouter'}</button>
+        <button type="button" class="full" data-action="est-cancel">Annuler</button>
+        ${it ? `<button type="button" class="full danger" data-action="est-delete" data-id="${it.id}">Supprimer</button>` : ''}
+      </form>
+    </section>`;
+}
+
+export function view() {
+  const d = load();
+  const s = scores();
+  const edit = editing ? d.items.find((x) => x.id === editing) : null;
+  const items = [...d.items].sort((a, b) => (a.date < b.date ? -1 : 1));
+  const planned = items.filter((x) => !x.done);
+  const done = items.filter((x) => x.done);
+
+  // Évolution du score : départ aujourd'hui, puis + points à chaque traitement prévu
+  let run = s.current;
+  const curve = [{ date: today(), value: run }, ...planned.filter((x) => x.date >= today()).map((x) => ({ date: x.date, value: (run = clamp100(run + x.points)) }))];
+
+  return `
+    <header class="page-head"><h1>Roadmap esthétique</h1></header>
+
+    <section class="card est-hero">
+      <div class="est-scores">
+        <div><span class="hint">Score actuel</span><strong>${s.hasBase ? fr(s.current, 1) : '?'}</strong><small class="hint">/ 100</small></div>
+        <div class="est-arrow">→</div>
+        <div><span class="hint">Après la roadmap</span><strong class="good">${s.hasBase ? fr(s.projected, 1) : '?'}</strong><small class="hint">/ 100</small></div>
+      </div>
+      ${s.hasBase ? `
+        <div class="est-bar">
+          <div class="est-done" style="width:${s.current}%"></div>
+          <div class="est-plan" style="left:${s.current}%;width:${Math.max(0, s.projected - s.current)}%"></div>
+        </div>
+        <p class="hint">${planned.length ? `${planned.length} traitement${planned.length > 1 ? 's' : ''} prévu${planned.length > 1 ? 's' : ''} · ${pts(sumPts(planned))} à venir` : 'Aucun traitement prévu'}</p>` : ''}
+      <form data-form="estBase" class="burn-form">
+        <input name="base" inputmode="decimal" placeholder="Ton score de départ (sur 100)" value="${d.base ?? ''}" autocomplete="off">
+        <button class="primary">OK</button>
+      </form>
+      <p class="hint">Score de départ, avant tout traitement (estimé par l'IA).</p>
+    </section>
+
+    ${edit || adding ? itemForm(edit) : '<button class="primary block" data-action="est-add">＋ Ajouter un traitement</button>'}
+
+    ${planned.length ? `<section class="card"><h2>Prévus</h2><ul class="task-list">${planned.map(itemRow).join('')}</ul></section>` : ''}
+    ${s.hasBase && curve.length > 1 ? `<section class="card"><h2>Évolution prévue du score</h2>${lineChart(curve, { unit: ' / 100' })}</section>` : ''}
+    ${done.length ? `<section class="card"><h2>Faits ✓</h2><ul class="task-list">${done.map(itemRow).join('')}</ul></section>` : ''}
+    ${!items.length ? '<p class="hint center">Ajoute ton premier traitement prévu.</p>' : ''}
+  `;
+}
+
+export const forms = {
+  estBase(f) {
+    const d = load();
+    const v = num(f.base);
+    d.base = v == null ? null : Math.max(0, Math.min(100, v));
+    save(d);
+    return 'Score de départ enregistré';
+  },
+  est(f) {
+    const name = (f.name || '').trim();
+    const points = num(f.points);
+    if (!name || !f.date || points == null) return 'Traitement, date et points requis';
+    const d = load();
+    if (editing) {
+      Object.assign(d.items.find((x) => x.id === editing) || {}, { name, date: f.date, points });
+    } else {
+      d.items.push({ id: uid(), name, date: f.date, points, done: false });
+    }
+    editing = null;
+    adding = false;
+    save(d);
+    return 'Traitement enregistré';
+  },
+};
+
+export const actions = {
+  'est-add'() { adding = true; editing = null; },
+  'est-edit'(el) { editing = el.dataset.id; adding = false; window.scrollTo(0, 0); },
+  'est-cancel'() { editing = null; adding = false; },
+  'est-toggle'(el) {
+    const d = load();
+    const it = d.items.find((x) => x.id === el.dataset.id);
+    if (!it) return false;
+    it.done = !it.done;
+    save(d);
+    return it.done ? `Fait ✓ ${pts(it.points)} au score` : 'Remis en prévu';
+  },
+  'est-delete'(el) {
+    if (!confirm('Supprimer ce traitement ?')) return false;
+    const d = load();
+    d.items = d.items.filter((x) => x.id !== el.dataset.id);
+    editing = null;
+    save(d);
+  },
+};

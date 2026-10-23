@@ -8,7 +8,7 @@ Un bouton en haut de l'écran permet de passer d'un espace à l'autre. Chaque es
 - **✅ Todo** — tâches avec échéance, priorité, catégorie (Perso / Clinique / Atom) et répétition (jour / semaine / mois) ; vue en retard / aujourd'hui / à venir / sans date.
 - **🎉 Good news** — tout ce qui t'attend de cool (livraison, voyage, anniversaire…) avec compte à rebours ; dates estimées (≈) et événements annuels.
 - **🎯 Objectifs de vie** — progression en % ou chiffrée (ex : 0 → 50 000 €), comparée à la progression attendue selon le temps écoulé entre le début et l'échéance : dans les temps / presque / en retard.
-- **✨ Roadmap esthétique** — à construire.
+- **✨ Roadmap esthétique** — traitements prévus avec date approximative et points ajoutés au score esthétique /100 (estimés par l'IA) ; score actuel, score après la roadmap, courbe d'évolution prévue.
 - **🏥 Clinique Singulier** — modèle financier à construire ; en attendant, raccourci vers un fichier existant (lien gardé sur le téléphone). Le dépôt étant public, aucun chiffre de la clinique ne doit être écrit dans le code : tout se saisit dans l'app.
 
 ## Ce que l'espace Muscu suit
@@ -39,7 +39,7 @@ C'est un site statique (HTML/CSS/JS, aucune dépendance, pas de build).
 - `js/app.js` — écrans et logique
 - `js/store.js` — stockage local, export/import
 - `js/charts.js` — graphiques SVG
-- `js/spaces.js` — sélecteur d'espaces et espaces Esthétique / Clinique
-- `js/goodnews.js`, `js/goals.js`, `js/todo.js` — espaces Good news, Objectifs de vie et Todo
+- `js/spaces.js` — sélecteur d'espaces et espace Clinique
+- `js/goodnews.js`, `js/goals.js`, `js/todo.js`, `js/esthetique.js` — espaces Good news, Objectifs de vie, Todo et Roadmap esthétique
 - `js/util.js` — outils partagés (dates, nombres, stockage)
 - `sw.js`, `manifest.webmanifest`, `icons/` — installation et mode hors ligne (incrémenter `VERSION` dans `sw.js` à chaque mise à jour)

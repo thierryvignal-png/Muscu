@@ -7,7 +7,7 @@ export const SPACES = [
   { key: 'todo', icon: '✅', name: 'Todo', desc: 'Perso, Clinique, Atom' },
   { key: 'goodnews', icon: '🎉', name: 'Good news', desc: 'Tout ce qui t\'attend de cool' },
   { key: 'goals', icon: '🎯', name: 'Objectifs de vie', desc: 'Suis-je dans les temps ?' },
-  { key: 'esthetique', icon: '✨', name: 'Roadmap esthétique', desc: 'Bientôt' },
+  { key: 'esthetique', icon: '✨', name: 'Roadmap esthétique', desc: 'Traitements prévus et score /100' },
   { key: 'clinique', icon: '🏥', name: 'Clinique Singulier', desc: 'Modèle financier · bientôt' },
 ];
 
@@ -50,17 +50,6 @@ export function spaceMenu(current) {
     </div>`;
 }
 
-// ---------- Espace Roadmap esthétique (à construire) ----------
-function esthetique() {
-  return `
-    <header class="page-head"><h1>Roadmap esthétique</h1></header>
-    <section class="card">
-      <h2>✨ Espace prêt, contenu à venir</h2>
-      <p class="hint">On définira ensemble ce que tu veux y suivre : soins et interventions prévus,
-      dates et rappels, budget, photos avant / après…</p>
-    </section>`;
-}
-
 // ---------- Espace Clinique Singulier (à construire) ----------
 export const clinic = {
   get: () => read(CLINIC_KEY, { link: '' }),
@@ -94,6 +83,6 @@ function clinique() {
 }
 
 // Clés de stockage des espaces autres que Muscu (pour la sauvegarde complète)
-export const SPACE_KEYS = ['todo.data.v1', 'goodnews.data.v1', 'goals.data.v1', CLINIC_KEY];
+export const SPACE_KEYS = ['todo.data.v1', 'goodnews.data.v1', 'goals.data.v1', 'esthetique.data.v1', CLINIC_KEY];
 
-export const spaceViews = { esthetique, clinique };
+export const spaceViews = { clinique };
