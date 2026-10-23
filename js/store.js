@@ -5,17 +5,20 @@ const DEFAULT = {
   version: 1,
   settings: {
     calorieGoal: 2200,
+    deficitGoal: 500,
     proteinGoal: 160,
-    stepsGoal: 10000,
     weightGoal: null,
     heightCm: null,
+    sex: null,
+    age: null,
   },
-  meals: [],    // {id, date, name, kcal, protein, carbs, fat}
+  meals: [],    // {id, date, name, kcal, protein}
+  burn: [],     // {id, date, kcal}  dépense totale du jour (une entrée par jour)
   steps: [],    // {id, date, steps}  (une entrée par jour)
   rides: [],    // {id, date, minutes, km, kcal, notes}
   workouts: [], // {id, date, name, exercises: [{name, sets: [{reps, weight}]}], notes}
   body: [],     // {id, date, weight, bodyfat, waist}
-  labs: [],     // {id, date, marker, value, unit}
+  labs: [],     // (ancienne section Labo, conservée pour ne pas perdre de données)
 };
 
 let data = load();
@@ -74,6 +77,12 @@ export const store = {
     const it = data.steps.find((x) => x.date === date);
     if (it) it.steps = steps;
     else data.steps.push({ id: uid(), date, steps });
+    save();
+  },
+  // Dépense totale du jour (null = effacer)
+  setBurn(date, kcal) {
+    data.burn = data.burn.filter((x) => x.date !== date);
+    if (kcal != null) data.burn.push({ id: uid(), date, kcal });
     save();
   },
   setSettings(patch) {

@@ -74,7 +74,24 @@ main {
 .ring-text span { font-size: 10px; color: var(--muted); }
 
 .quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+.quick.three { grid-template-columns: repeat(3, 1fr); }
 .quick button { font-size: 12px; padding: 10px 4px; }
+
+.rings.two { justify-content: space-evenly; }
+.rings.two .ring { width: 38%; }
+
+/* Bilan du jour */
+.hero { text-align: center; }
+.hero-main strong { display: block; font-size: 40px; letter-spacing: -0.02em; margin: 2px 0 8px; }
+.hero-row { display: flex; justify-content: center; align-items: center; gap: 14px; margin-bottom: 12px; }
+.hero-row div { display: flex; flex-direction: column; }
+.hero-row span { font-size: 12px; color: var(--muted); }
+.hero-row b { font-size: 20px; }
+.hero-row .op { font-size: 22px; color: var(--muted); }
+.burn-form { display: flex; gap: 8px; }
+.burn-form button { flex: none; padding: 10px 18px; }
+.ai-btn { margin-top: 10px; }
+button:disabled { opacity: .35; }
 
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .grid2 .card { margin: 0; }
@@ -175,6 +192,12 @@ button:active, .button-like:active { transform: scale(0.98); }
 .lg { display: inline-block; width: 14px; height: 3px; border-radius: 2px; }
 .lg.raw { background: var(--muted); opacity: .6; }
 .lg.trend { background: var(--accent); margin-left: 8px; }
+.lg.good { background: var(--good); }
+.lg.warn { background: var(--warn); margin-left: 8px; }
+.lg.goal { background: none; border-top: 2px dashed var(--muted); margin-left: 8px; }
+.chart .bar.neg { fill: var(--warn); }
+.chart .zero { stroke: var(--muted); stroke-width: 1; }
+.chart .goal.neutral { stroke: var(--muted); }
 
 .lab-last b { font-size: 22px; margin-right: 6px; }
 .lab-last b.ok { color: var(--good); }
@@ -185,7 +208,7 @@ button:active, .button-like:active { transform: scale(0.98); }
   position: fixed;
   left: 0; right: 0; bottom: 0;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background: color-mix(in srgb, var(--card) 92%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);

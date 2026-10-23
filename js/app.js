@@ -1,6 +1,5 @@
 import { store } from './store.js';
-import { lineChart, barChart, ring } from './charts.js';
-import { LAB_MARKERS, markerByName, rangeStatus, rangeText } from './labs.js';
+import { lineChart, barChart, balanceChart, ring } from './charts.js';
 
 // ---------- Utilitaires ----------
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -134,68 +133,139 @@ const views = {};
 let current = 'home';
 const state = {
   mealDate: today(),
+  homeDate: today(),
   exercise: null,
   draft: loadDraft(),
 };
 
+// Dépense et bilan d'un jour. deficit > 0 = déficit, < 0 = excédent.
+function dayBalance(date) {
+  const s = store.settings();
+  const t = dayTotals(date);
+  const burn = store.get().burn.find((x) => x.date === date)?.kcal ?? null;
+  const deficit = burn != null ? burn - t.kcal : null;
+  const target = burn != null ? burn - (s.deficitGoal || 0) : s.calorieGoal;
+  return { ...t, burn, deficit, target };
+}
+
+// Moyenne du déficit sur les n derniers jours où dépense ET repas sont notés
+function deficitStats(n) {
+  const vals = [];
+  for (let i = 0; i < n; i++) {
+    const b = dayBalance(addDays(today(), -i));
+    if (b.deficit != null && b.kcal > 0) vals.push(b.deficit);
+  }
+  if (!vals.length) return null;
+  const total = sum(vals, (v) => v);
+  return { avg: total / vals.length, total, n: vals.length };
+}
+
+const signed = (v) => (v == null ? '–' : `${v > 0 ? '−' : v < 0 ? '+' : ''}${fr(Math.abs(v))}`);
+const balanceLabel = (v) => (v == null ? '' : v >= 0 ? 'déficit' : 'excédent');
+const balanceCls = (v) => (v == null ? '' : v >= 0 ? 'good' : 'warn');
+
+function aiPrompt(date) {
+  const s = store.settings();
+  const w = [...store.get().body].filter((b) => b.weight != null).sort(byDate).pop()?.weight;
+  const profil = [
+    s.sex === 'F' ? 'femme' : s.sex === 'H' ? 'homme' : null,
+    s.age ? `${s.age} ans` : null,
+    s.heightCm ? `${s.heightCm} cm` : null,
+    w ? `${fr(w, 1)} kg` : null,
+  ].filter(Boolean).join(', ');
+  return `Estime ma dépense calorique TOTALE de la journée du ${fmtDate(date)} (métabolisme de base + toutes mes activités).
+Profil : ${profil || '[sexe, âge, taille, poids]'}.
+Activités du jour : [ex : 9 000 pas, 1 h de vélo à ~25 km/h, séance de muscu 1 h…]
+Réponds avec un seul chiffre final en kcal.`;
+}
+
 views.home = () => {
   const s = store.settings();
-  const d = today();
-  const t = dayTotals(d);
-  const steps = store.get().steps.find((x) => x.date === d)?.steps || 0;
-
-  const weekStart = addDays(d, -6);
-  const rides = store.get().rides.filter((r) => r.date >= weekStart);
-  const rideMin = sum(rides, (r) => r.minutes);
-
+  const d = state.homeDate;
+  const isToday = d === today();
+  const b = dayBalance(d);
+  const w7 = deficitStats(7);
+  const w30 = deficitStats(30);
   const { trend } = weightSeries();
   const lastW = trend[trend.length - 1];
   const slope = weightSlope();
-  const lastBody = [...store.get().body].sort(byDate).reverse();
-  const lastBf = lastBody.find((b) => b.bodyfat != null);
   const lastWorkout = [...store.get().workouts].sort(byDate).pop();
-  const tdee = estimatedTDEE();
 
-  const remaining = s.calorieGoal - t.kcal;
+  const bars = Array.from({ length: 14 }, (_, i) => {
+    const x = addDays(today(), i - 13);
+    const bb = dayBalance(x);
+    return { label: dayLetter(x), value: bb.kcal > 0 ? bb.deficit : null };
+  });
+
+  const remaining = b.target - b.kcal;
 
   return `
-    <header class="page-head"><h1>Aujourd'hui</h1><p>${fmtDate(d)}</p></header>
-    <section class="card rings">
-      ${ring(t.kcal / s.calorieGoal, fr(t.kcal), `/ ${fr(s.calorieGoal)} kcal`)}
-      ${ring(t.protein / s.proteinGoal, fr(t.protein) + ' g', `/ ${s.proteinGoal} g prot.`)}
-      ${ring(steps / s.stepsGoal, fr(steps), `/ ${fr(s.stepsGoal)} pas`)}
-    </section>
-    <p class="hint center">${remaining >= 0 ? `Il te reste <b>${fr(remaining)} kcal</b>` : `Objectif dépassé de <b>${fr(-remaining)} kcal</b>`}</p>
+    <header class="page-head"><h1>${isToday ? "Aujourd'hui" : 'Bilan'}</h1></header>
+    <div class="day-nav">
+      <button data-action="home-day" data-delta="-1">‹</button>
+      <input type="date" id="homeDate" value="${d}" max="${today()}">
+      <button data-action="home-day" data-delta="1" ${isToday ? 'disabled' : ''}>›</button>
+    </div>
 
-    <div class="quick">
+    <section class="card hero">
+      <div class="hero-main">
+        <span class="hint">${b.deficit == null ? 'Bilan du jour' : balanceLabel(b.deficit) + ' du jour'}</span>
+        <strong class="${balanceCls(b.deficit)}">${b.deficit == null ? '–' : signed(b.deficit) + ' kcal'}</strong>
+      </div>
+      <div class="hero-row">
+        <div><span>Mangé</span><b>${fr(b.kcal)}</b></div>
+        <div class="op">−</div>
+        <div><span>Dépensé</span><b>${b.burn == null ? '?' : fr(b.burn)}</b></div>
+      </div>
+      <form data-form="burn" class="burn-form">
+        <input name="kcal" inputmode="numeric" placeholder="Dépense totale du jour (kcal)" value="${b.burn ?? ''}" autocomplete="off">
+        <button class="primary">OK</button>
+      </form>
+      <button class="chip ai-btn" data-action="copy-prompt">📋 Copier le prompt pour l'IA</button>
+    </section>
+
+    <section class="card rings two">
+      ${ring(b.kcal / b.target, fr(b.kcal), `/ ${fr(b.target)} kcal`)}
+      ${ring((b.protein || 0) / s.proteinGoal, fr(b.protein) + ' g', `/ ${s.proteinGoal} g prot.`)}
+    </section>
+    <p class="hint center">${
+      b.burn == null
+        ? `Objectif par défaut ${fr(s.calorieGoal)} kcal — saisis ta dépense pour viser un déficit de ${fr(s.deficitGoal)} kcal`
+        : remaining >= 0
+          ? `Encore <b>${fr(remaining)} kcal</b> pour un déficit de ${fr(s.deficitGoal)}`
+          : `<b>${fr(-remaining)} kcal</b> au-dessus de l'objectif de déficit`
+    }</p>
+
+    <div class="quick three">
       <button data-go="food">＋ Repas</button>
-      <button data-go="activity">＋ Pas / Vélo</button>
       <button data-go="gym">＋ Séance</button>
       <button data-go="body">＋ Pesée</button>
     </div>
 
     <div class="grid2">
       <section class="card stat">
+        <h3>Déficit moyen 7 j</h3>
+        <strong class="${balanceCls(w7?.avg)}">${w7 ? signed(w7.avg) : '–'}</strong>
+        <span>${w7 ? `kcal/j · ${w7.n} j notés` : 'aucun jour complet'}</span>
+      </section>
+      <section class="card stat">
+        <h3>Déficit moyen 30 j</h3>
+        <strong class="${balanceCls(w30?.avg)}">${w30 ? signed(w30.avg) : '–'}</strong>
+        <span>${w30 ? `kcal/j · ${w30.n} j notés` : 'aucun jour complet'}</span>
+      </section>
+      <section class="card stat">
+        <h3>Cumul 30 j</h3>
+        <strong class="${balanceCls(w30?.total)}">${w30 ? signed(w30.total) : '–'}</strong>
+        <span>${w30 ? `≈ ${fr(w30.total / 7700, 2)} kg de gras` : 'kcal'}</span>
+      </section>
+      <section class="card stat">
         <h3>Poids (moy. 7 j)</h3>
         <strong>${lastW ? fr(lastW.value, 1) + ' kg' : '–'}</strong>
         <span class="${slope == null ? '' : slope < 0 ? 'good' : 'warn'}">${slope == null ? 'pas assez de pesées' : `${slope > 0 ? '+' : ''}${fr(slope, 2)} kg/sem`}</span>
       </section>
-      <section class="card stat">
-        <h3>Body fat</h3>
-        <strong>${lastBf ? fr(lastBf.bodyfat, 1) + ' %' : '–'}</strong>
-        <span>${lastBf ? fmtDate(lastBf.date) : ''}</span>
-      </section>
-      <section class="card stat">
-        <h3>Vélo (7 j)</h3>
-        <strong>${fr(rideMin)} min</strong>
-        <span>${rides.length} sortie${rides.length > 1 ? 's' : ''} · ${fr(sum(rides, (r) => r.km), 1)} km</span>
-      </section>
-      <section class="card stat">
-        <h3>Dépense estimée</h3>
-        <strong>${tdee ? fr(Math.round(tdee.tdee / 10) * 10) + ' kcal' : '–'}</strong>
-        <span>${tdee ? `déficit ≈ ${fr(tdee.tdee - tdee.avgIntake)} kcal/j` : '≥10 j de repas + 2 sem. de pesées'}</span>
-      </section>
     </div>
+
+    ${card('Déficit — 14 derniers jours', balanceChart(bars, { goal: s.deficitGoal }) + '<p class="hint legend"><i class="lg good"></i> déficit <i class="lg warn"></i> excédent <i class="lg goal"></i> objectif</p>')}
 
     ${card(
       'Dernière séance',
@@ -210,7 +280,7 @@ views.home = () => {
 views.food = () => {
   const s = store.settings();
   const d = state.mealDate;
-  const t = dayTotals(d);
+  const t = dayBalance(d);
   const last14 = Array.from({ length: 14 }, (_, i) => addDays(today(), i - 13));
   const bars = last14.map((x) => ({ label: dayLetter(x), value: dayTotals(x).kcal }));
   const logged = last14.map((x) => dayTotals(x).kcal).filter((k) => k > 0);
@@ -246,61 +316,16 @@ views.food = () => {
       ${favs.length ? `<div class="chips">${favs.map((f) => `<button class="chip" data-action="fav-meal" data-id="${f.m.id}">${esc(f.m.name)} <small>${fr(f.m.kcal)}</small></button>`).join('')}</div>` : ''}`
     )}
     ${card(
-      `${fmtDate(d)} — ${fr(t.kcal)} / ${fr(s.calorieGoal)} kcal`,
+      `${fmtDate(d)} — ${fr(t.kcal)} / ${fr(t.target)} kcal`,
       `<div class="macros two">
          <div><b>${fr(t.protein)} g</b><span>protéines (obj. ${s.proteinGoal})</span></div>
-         <div><b>${fr(s.calorieGoal - t.kcal)}</b><span>kcal restantes</span></div>
+         <div><b>${fr(t.target - t.kcal)}</b><span>kcal restantes</span></div>
        </div>
        ${t.meals.length ? `<ul class="list">${t.meals.map((m) => `
          <li><div><b>${esc(m.name)}</b><small>${fr(m.kcal)} kcal${m.protein != null ? ` · P ${fr(m.protein)}` : ''}</small></div>${delBtn('meals', m.id)}</li>`).join('')}</ul>`
          : '<p class="hint">Rien de noté ce jour-là.</p>'}`
     )}
-    ${card('14 derniers jours', barChart(bars, { goal: s.calorieGoal, unit: ' kcal' }) + (avg ? `<p class="hint">Moyenne des jours notés : <b>${fr(avg)} kcal</b></p>` : ''))}
-  `;
-};
-
-views.activity = () => {
-  const s = store.settings();
-  const d = today();
-  const stepsToday = store.get().steps.find((x) => x.date === d)?.steps;
-  const last14 = Array.from({ length: 14 }, (_, i) => addDays(d, i - 13));
-  const stepBars = last14.map((x) => ({ label: dayLetter(x), value: store.get().steps.find((y) => y.date === x)?.steps || 0 }));
-  const stepVals = stepBars.map((b) => b.value).filter(Boolean);
-
-  // Vélo : minutes par semaine sur 8 semaines
-  const rides = [...store.get().rides].sort(byDate).reverse();
-  const weekBars = Array.from({ length: 8 }, (_, i) => {
-    const end = addDays(d, -7 * (7 - i));
-    const start = addDays(end, -6);
-    return { label: i === 7 ? 'S0' : `S-${7 - i}`, value: sum(store.get().rides.filter((r) => r.date >= start && r.date <= end), (r) => r.minutes) };
-  });
-
-  return `
-    <header class="page-head"><h1>Activité</h1></header>
-    ${card(
-      'Pas',
-      `<form data-form="steps" class="form">
-        ${input('date', 'Date', { type: 'date', value: d })}
-        ${input('steps', 'Nombre de pas', { numeric: true, required: true, value: stepsToday ?? '' })}
-        <button class="primary full">Enregistrer</button>
-      </form>
-      ${barChart(stepBars, { goal: s.stepsGoal, unit: ' pas' })}
-      ${stepVals.length ? `<p class="hint">Moyenne 14 j : <b>${fr(sum(stepVals, (v) => v) / stepVals.length)} pas</b></p>` : ''}`
-    )}
-    ${card(
-      'Vélo',
-      `<form data-form="ride" class="form">
-        ${input('date', 'Date', { type: 'date', value: d })}
-        ${input('minutes', 'Durée (min)', { numeric: true, required: true })}
-        ${input('km', 'Distance (km)', { decimal: true })}
-        ${input('kcal', 'Kcal (montre)', { numeric: true })}
-        ${input('notes', 'Notes', { placeholder: 'ex : home-trainer Z2', cls: 'full' })}
-        <button class="primary full">Ajouter la sortie</button>
-      </form>
-      ${barChart(weekBars, { unit: ' min' })}
-      ${rides.length ? `<ul class="list">${rides.slice(0, 15).map((r) => `
-        <li><div><b>${fmtDate(r.date)} · ${fr(r.minutes)} min</b><small>${r.km != null ? fr(r.km, 1) + ' km' : ''}${r.km && r.minutes ? ` · ${fr(r.km / (r.minutes / 60), 1)} km/h` : ''}${r.kcal ? ` · ${fr(r.kcal)} kcal` : ''}${r.notes ? ` · ${esc(r.notes)}` : ''}</small></div>${delBtn('rides', r.id)}</li>`).join('')}</ul>` : ''}`
-    )}
+    ${card('14 derniers jours', barChart(bars, { unit: ' kcal' }) + (avg ? `<p class="hint">Moyenne des jours notés : <b>${fr(avg)} kcal</b></p>` : ''))}
   `;
 };
 
@@ -447,7 +472,11 @@ views.body = () => {
          <div><b class="${slope == null ? '' : slope < 0 ? 'good' : 'warn'}">${slope == null ? '–' : (slope > 0 ? '+' : '') + fr(slope, 2)}</b><span>kg / semaine</span></div>
          <div><b>${bmi ? fr(bmi, 1) : '–'}</b><span>IMC</span></div>
        </div>
-       ${eta}`
+       ${eta}
+       ${(() => {
+         const t = estimatedTDEE();
+         return t ? `<p class="hint">Dépense réelle estimée d'après ton poids et tes repas (28 j) : <b>${fr(Math.round(t.tdee / 10) * 10)} kcal/j</b>. Compare avec les chiffres de l'IA.</p>` : '';
+       })()}`
     )}
     ${card(
       'Body fat',
@@ -471,51 +500,30 @@ views.body = () => {
 
 views.more = () => {
   const s = store.settings();
-  const labs = store.get().labs;
-  const markers = [...new Set(labs.map((l) => l.marker))];
-  const groups = markers
-    .map((name) => {
-      const pts = labs.filter((l) => l.marker === name).sort(byDate);
-      const preset = markerByName(name);
-      const last = pts[pts.length - 1];
-      const st = preset ? rangeStatus(last.value, preset.range) : null;
-      return { name, pts, preset, last, st };
-    })
-    .sort((a, b) => (a.last.date < b.last.date ? 1 : -1));
-
   return `
-    <header class="page-head"><h1>Labo & réglages</h1></header>
-    ${card(
-      'Analyse de sang',
-      `<form data-form="lab" class="form">
-        ${input('date', 'Date du prélèvement', { type: 'date', value: today() })}
-        <label class="field"><span>Marqueur</span>
-          <select name="marker" id="labMarker">
-            ${LAB_MARKERS.map((m) => `<option>${esc(m.name)}</option>`).join('')}
-            <option value="__other">Autre…</option>
-          </select>
-        </label>
-        ${input('other', 'Nom du marqueur', { cls: 'full hidden', placeholder: 'ex : PSA' })}
-        ${input('value', 'Valeur', { decimal: true, required: true })}
-        ${input('unit', 'Unité', { value: LAB_MARKERS[0].unit })}
-        <button class="primary full">Ajouter</button>
-      </form>
-      <p class="hint">Plages indicatives seulement : réfère-toi aux normes de ton labo et à ton médecin. Attention aux unités (ex : testo en ng/mL vs nmol/L).</p>`
-    )}
-    ${groups.map((g) => card(
-      esc(g.name),
-      `<p class="lab-last"><b class="${g.st || ''}">${fr(g.last.value, g.last.value % 1 ? 2 : 0)} ${esc(g.last.unit || '')}</b>
-         <small>${fmtDate(g.last.date)}${g.preset ? ` · réf. ${rangeText(g.preset.range)}` : ''}</small></p>
-       ${g.pts.length > 1 ? lineChart(g.pts.map((p) => ({ date: p.date, value: p.value })), { band: g.preset?.range, unit: ' ' + (g.last.unit || '') }) : ''}
-       <ul class="list">${[...g.pts].reverse().map((p) => `<li><div><b>${fmtDate(p.date)}</b><small>${fr(p.value, p.value % 1 ? 2 : 0)} ${esc(p.unit || '')}</small></div>${delBtn('labs', p.id)}</li>`).join('')}</ul>`
-    )).join('')}
+    <header class="page-head"><h1>Réglages</h1></header>
     ${card(
       'Objectifs',
       `<form data-form="settings" class="form">
-        ${input('calorieGoal', 'Calories / jour', { numeric: true, value: s.calorieGoal })}
-        ${input('proteinGoal', 'Protéines (g)', { numeric: true, value: s.proteinGoal })}
-        ${input('stepsGoal', 'Pas / jour', { numeric: true, value: s.stepsGoal })}
+        ${input('deficitGoal', 'Déficit visé (kcal/j)', { numeric: true, value: s.deficitGoal })}
+        ${input('proteinGoal', 'Protéines (g/j)', { numeric: true, value: s.proteinGoal })}
+        ${input('calorieGoal', 'Calories par défaut', { numeric: true, value: s.calorieGoal })}
         ${input('weightGoal', 'Poids cible (kg)', { decimal: true, value: s.weightGoal ?? '' })}
+        <p class="hint full">« Calories par défaut » sert d'objectif les jours où tu n'as pas encore saisi ta dépense.</p>
+        <button class="primary full">Enregistrer</button>
+      </form>`
+    )}
+    ${card(
+      'Profil (pour le prompt IA)',
+      `<form data-form="profile" class="form">
+        <label class="field"><span>Sexe</span>
+          <select name="sex">
+            <option value="">–</option>
+            <option value="H" ${s.sex === 'H' ? 'selected' : ''}>Homme</option>
+            <option value="F" ${s.sex === 'F' ? 'selected' : ''}>Femme</option>
+          </select>
+        </label>
+        ${input('age', 'Âge', { numeric: true, value: s.age ?? '' })}
         ${input('heightCm', 'Taille (cm)', { numeric: true, value: s.heightCm ?? '' })}
         <button class="primary full">Enregistrer</button>
       </form>`
@@ -559,38 +567,29 @@ const forms = {
     });
     toast('Repas ajouté');
   },
-  steps(f) {
-    const n = num(f.steps);
-    if (n == null) return;
-    store.setSteps(f.date || today(), Math.round(n));
-    toast('Pas enregistrés');
-  },
-  ride(f) {
-    store.add('rides', { date: f.date || today(), minutes: num(f.minutes) || 0, km: num(f.km), kcal: num(f.kcal), notes: f.notes.trim() });
-    toast('Sortie ajoutée');
-  },
   body(f) {
     const weight = num(f.weight), bodyfat = num(f.bodyfat), waist = num(f.waist);
     if (weight == null && bodyfat == null && waist == null) return toast('Rien à enregistrer');
     store.add('body', { date: f.date || today(), weight, bodyfat, waist });
     toast('Mesure enregistrée');
   },
-  lab(f) {
-    const marker = f.marker === '__other' ? f.other.trim() : f.marker;
-    const value = num(f.value);
-    if (!marker || value == null) return toast('Marqueur ou valeur manquant');
-    store.add('labs', { date: f.date || today(), marker, value, unit: f.unit.trim() });
-    toast('Résultat ajouté');
+  burn(f) {
+    const n = num(f.kcal);
+    store.setBurn(state.homeDate, n == null ? null : Math.round(n));
+    toast(n == null ? 'Dépense effacée' : 'Dépense enregistrée');
   },
   settings(f) {
     store.setSettings({
-      calorieGoal: num(f.calorieGoal) || 2200,
+      deficitGoal: num(f.deficitGoal) ?? 500,
       proteinGoal: num(f.proteinGoal) || 150,
-      stepsGoal: num(f.stepsGoal) || 10000,
+      calorieGoal: num(f.calorieGoal) || 2200,
       weightGoal: num(f.weightGoal),
-      heightCm: num(f.heightCm),
     });
     toast('Objectifs enregistrés');
+  },
+  profile(f) {
+    store.setSettings({ sex: f.sex || null, age: num(f.age), heightCm: num(f.heightCm) });
+    toast('Profil enregistré');
   },
   workout() {
     const d = state.draft;
@@ -618,6 +617,21 @@ const actions = {
   delete(el) {
     if (!confirm('Supprimer cette entrée ?')) return;
     store.remove(el.dataset.col, el.dataset.id);
+  },
+  'home-day'(el) {
+    const d = addDays(state.homeDate, +el.dataset.delta);
+    if (d > today()) return;
+    state.homeDate = d;
+    render();
+  },
+  async 'copy-prompt'() {
+    const text = aiPrompt(state.homeDate);
+    try {
+      await navigator.clipboard.writeText(text);
+      toast("Prompt copié — colle-le dans ton IA");
+    } catch {
+      window.prompt('Copie ce texte :', text);
+    }
   },
   'meal-day'(el) {
     state.mealDate = addDays(state.mealDate, +el.dataset.delta);
@@ -743,15 +757,10 @@ document.addEventListener('input', (e) => {
 
 document.addEventListener('change', (e) => {
   const el = e.target;
+  if (el.id === 'homeDate') { state.homeDate = el.value && el.value <= today() ? el.value : today(); render(); }
   if (el.id === 'mealDate') { state.mealDate = el.value || today(); render(); }
   if (el.id === 'exSelect') { state.exercise = el.value; render(); }
   if (el.dataset.field === 'ex-name') render(); // affiche "dernière fois"
-  if (el.id === 'labMarker') {
-    const form = el.closest('form');
-    const other = form.elements.other.closest('.field');
-    other.classList.toggle('hidden', el.value !== '__other');
-    form.elements.unit.value = markerByName(el.value)?.unit || '';
-  }
   if (el.id === 'importFile' && el.files[0]) {
     el.files[0].text().then((txt) => {
       if (!confirm('Remplacer les données actuelles par ce fichier ?')) return;

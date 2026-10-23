@@ -116,3 +116,36 @@ export function ring(ratio, label, sub) {
     <div class="ring-text"><strong>${label}</strong><span>${sub}</span></div>
   </div>`;
 }
+
+/**
+ * Barres de bilan autour de zéro : déficit (> 0) en vert vers le haut,
+ * excédent (< 0) en rouge vers le bas. bars: [{label, value|null}]
+ */
+export function balanceChart(bars, opts = {}) {
+  const vals = bars.map((b) => b.value).filter((v) => v != null);
+  if (!vals.length) return empty('Saisis ta dépense et tes repas pour voir ton bilan');
+  const hi = Math.max(0, ...vals, opts.goal || 0) * 1.15 || 100;
+  const lo = Math.min(0, ...vals) * 1.15;
+  const innerW = W - PAD.l - PAD.r;
+  const bw = innerW / bars.length;
+  const y = (v) => PAD.t + ((hi - v) / (hi - lo)) * (H - PAD.t - PAD.b);
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img">`;
+  svg += `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${y(0)}" y2="${y(0)}" class="zero"/>`;
+  svg += `<text x="${PAD.l - 4}" y="${y(0) + 3}" class="axis" text-anchor="end">0</text>`;
+  if (opts.goal) {
+    svg += `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${y(opts.goal)}" y2="${y(opts.goal)}" class="goal neutral"/>`;
+    svg += `<text x="${PAD.l - 4}" y="${y(opts.goal) + 3}" class="axis" text-anchor="end">${opts.goal}</text>`;
+  }
+  bars.forEach((b, i) => {
+    const bx = PAD.l + i * bw + bw * 0.15;
+    if (b.value != null) {
+      const top = Math.min(y(b.value), y(0));
+      const h = Math.max(1, Math.abs(y(b.value) - y(0)));
+      svg += `<rect x="${bx}" y="${top}" width="${bw * 0.7}" height="${h}" rx="3" class="bar ${b.value >= 0 ? 'ok' : 'neg'}"><title>${b.label} : ${b.value >= 0 ? 'déficit' : 'excédent'} ${Math.abs(Math.round(b.value))} kcal</title></rect>`;
+    }
+    svg += `<text x="${bx + bw * 0.35}" y="${H - 6}" class="axis" text-anchor="middle">${b.label}</text>`;
+  });
+  svg += '</svg>';
+  return svg;
+}
