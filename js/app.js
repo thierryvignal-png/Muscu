@@ -1168,6 +1168,7 @@ document.addEventListener('change', (e) => {
 // Traitements esthétiques notés dans Good news → Roadmap esthétique (une seule fois)
 esthetique.importFromGoodnews();
 const estPoints = esthetique.applyEstimatedPointsV2();
+if (esthetique.fixTretRoutine()) setTimeout(() => toast('✨ Protocole Tret corrigé : +6 pts, doublon retiré'), 2600);
 if (estPoints) setTimeout(() => toast(`✨ Roadmap esthétique mise à jour : ${estPoints} notes, départ 50/100`), 600);
 
 // Premiers relevés Visbody (salle On Air), ajoutés une seule fois.

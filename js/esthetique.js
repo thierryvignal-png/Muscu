@@ -46,7 +46,7 @@ function estimatedPointsV2(name) {
   const num = Number((n.match(/\d+/g) || []).pop()) || null;
   if (n.includes('greffe')) return 14;
   if (n.includes('moxi') || n.includes('bbl') || n.includes('exion')) return 8;
-  if (n.includes('tretinoine') || n.includes('triwings')) return 6;
+  if (isTretRoutine(name)) return 6;
   if (n.includes('radiesse')) return 4.5;
   if (n.includes('retouche')) return num === 2 ? 1.5 : 4.5;
   if (n.includes('juvelook')) return { 2: 3, 3: 2, 4: 1, 5: 0.5 }[num] ?? null;
@@ -61,7 +61,7 @@ export function applyEstimatedPointsV2() {
   const inOneYear = (() => { const t = new Date(); t.setFullYear(t.getFullYear() + 1); return t.toISOString().slice(0, 10); })();
   const routines = [
     ['Discipline Moxi / BBL / Exion (rythme défini par le médecin)', ['moxi', 'bbl', 'exion']],
-    ['Routine trétinoïne + azélaïque + SPF50 + LED Triwings', ['tretinoine', 'triwings']],
+    [DUPLICATE_ROUTINE, ['tret', 'triwings']],
   ];
   for (const [name, words] of routines) {
     if (!d.items.some((x) => words.some((w) => norm(x.name).includes(w)))) {
@@ -84,6 +84,7 @@ export function applyEstimatedPointsV2() {
 function effectDelayMonths(name) {
   const n = norm(name);
   if (n.includes('greffe')) return 12;
+  if (n.includes('moxi') || n.includes('bbl') || n.includes('exion')) return 11;
   if (n.includes('lenisna')) return 2;
   if (n.includes('juvelook')) return 1; // Juvelook et Rejuvelook
   return 0;
@@ -95,6 +96,27 @@ export function effectDate(it) {
   const [y, mo, d] = it.date.split('-').map(Number);
   const last = new Date(y, mo - 1 + m + 1, 0).getDate();
   return isoOf(new Date(y, mo - 1 + m, Math.min(d, last)));
+}
+
+// Correctif : le protocole « Tret-SPF-AA-Led » n'était pas reconnu (pas de points)
+// et une routine trétinoïne en double avait été créée. On met +6 au bon et on retire le doublon.
+const isTretRoutine = (name) => {
+  const n = norm(name);
+  return n.includes('tret') || n.includes('triwings') || (n.includes('spf') && n.includes('led'));
+};
+const DUPLICATE_ROUTINE = 'Routine trétinoïne + azélaïque + SPF50 + LED Triwings';
+
+export function fixTretRoutine() {
+  const d = load();
+  if (d.fixTretV1) return false;
+  const own = d.items.filter((x) => isTretRoutine(x.name) && x.name !== DUPLICATE_ROUTINE);
+  if (own.length) {
+    own.forEach((x) => { if (x.points == null) x.points = 6; });
+    d.items = d.items.filter((x) => x.name !== DUPLICATE_ROUTINE);
+  }
+  d.fixTretV1 = true;
+  save(d);
+  return own.length > 0;
 }
 
 export function scores() {
@@ -182,7 +204,7 @@ export function view() {
     ${edit || adding ? itemForm(edit) : '<button class="primary block" data-action="est-add">＋ Ajouter un traitement</button>'}
 
     ${planned.length ? `<section class="card"><h2>Prévus</h2><ul class="task-list">${planned.map(itemRow).join('')}</ul></section>` : ''}
-    ${s.hasBase && curve.length > 1 ? `<section class="card"><h2>Évolution prévue du score</h2><p class="hint">Chaque gain est placé à la date où l'effet est visible : Juvelook / Rejuvelook +1 mois, Lenisna +2 mois, greffe +1 an.</p>${lineChart(curve, { unit: ' / 100' })}</section>` : ''}
+    ${s.hasBase && curve.length > 1 ? `<section class="card"><h2>Évolution prévue du score</h2><p class="hint">Chaque gain est placé à la date où l'effet est visible : Juvelook / Rejuvelook +1 mois, Lenisna +2 mois, Moxi-BBL-Exion +11 mois, greffe +1 an.</p>${lineChart(curve, { unit: ' / 100' })}</section>` : ''}
     ${done.length ? `<section class="card"><h2>Faits ✓</h2><ul class="task-list">${done.map(itemRow).join('')}</ul></section>` : ''}
     ${!items.length ? '<p class="hint center">Ajoute ton premier traitement prévu.</p>' : ''}
   `;
