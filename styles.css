@@ -260,3 +260,7 @@ button:active, .button-like:active { transform: scale(0.98); }
 .macros b.good { color: var(--good); }
 .macros b.mid { color: #f59e0b; }
 .macros b.warn { color: var(--warn); }
+
+.protein-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.protein-head span { font-weight: 600; }
+.protein-head b.good { color: var(--good); }

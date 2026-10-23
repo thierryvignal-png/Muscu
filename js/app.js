@@ -1,5 +1,5 @@
 import { store } from './store.js';
-import { lineChart, barChart, balanceChart, ring } from './charts.js';
+import { lineChart, barChart, balanceChart } from './charts.js';
 
 // ---------- Utilitaires ----------
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -150,12 +150,10 @@ const state = {
 
 // Dépense et bilan d'un jour. deficit > 0 = déficit, < 0 = excédent.
 function dayBalance(date) {
-  const s = store.settings();
   const t = dayTotals(date);
   const burn = store.get().burn.find((x) => x.date === date)?.kcal ?? null;
   const deficit = burn != null ? burn - t.kcal : null;
-  const target = burn != null ? burn - (s.deficitGoal || 0) : s.calorieGoal;
-  return { ...t, burn, deficit, target };
+  return { ...t, burn, deficit };
 }
 
 // Moyenne du déficit sur les n derniers jours où dépense ET repas sont notés
@@ -250,7 +248,8 @@ views.home = () => {
     return { label: dayLetter(x), value: bb.kcal > 0 ? bb.deficit : null };
   });
 
-  const remaining = b.target - b.kcal;
+  const required = goalProjection().required;
+  const protRatio = Math.min(1, (b.protein || 0) / s.proteinGoal);
 
   return `
     <header class="page-head"><h1>${isToday ? "Aujourd'hui" : 'Bilan'}</h1></header>
@@ -278,17 +277,10 @@ views.home = () => {
 
     ${goalCard()}
 
-    <section class="card rings two">
-      ${ring(b.kcal / b.target, fr(b.kcal), `/ ${fr(b.target)} kcal`)}
-      ${ring((b.protein || 0) / s.proteinGoal, fr(b.protein) + ' g', `/ ${s.proteinGoal} g prot.`)}
+    <section class="card protein">
+      <div class="protein-head"><span>Protéines</span><b class="${protRatio >= 1 ? 'good' : ''}">${fr(b.protein)} / ${s.proteinGoal} g</b></div>
+      <div class="progress"><div style="width:${(protRatio * 100).toFixed(0)}%"></div></div>
     </section>
-    <p class="hint center">${
-      b.burn == null
-        ? `Objectif par défaut ${fr(s.calorieGoal)} kcal — saisis ta dépense pour viser un déficit de ${fr(s.deficitGoal)} kcal`
-        : remaining >= 0
-          ? `Encore <b>${fr(remaining)} kcal</b> pour un déficit de ${fr(s.deficitGoal)}`
-          : `<b>${fr(-remaining)} kcal</b> au-dessus de l'objectif de déficit`
-    }</p>
 
     <div class="quick three">
       <button data-go="food">＋ Repas</button>
@@ -319,7 +311,7 @@ views.home = () => {
       </section>
     </div>
 
-    ${card('Déficit — 14 derniers jours', balanceChart(bars, { goal: s.deficitGoal }) + '<p class="hint legend"><i class="lg good"></i> déficit <i class="lg warn"></i> excédent <i class="lg goal"></i> objectif</p>')}
+    ${card('Déficit — 14 derniers jours', balanceChart(bars, { goal: required > 0 ? Math.round(required) : null }) + `<p class="hint legend"><i class="lg good"></i> déficit <i class="lg warn"></i> excédent${required > 0 ? ' <i class="lg goal"></i> déficit nécessaire' : ''}</p>`)}
 
     ${card(
       'Dernière séance',
@@ -370,10 +362,10 @@ views.food = () => {
       ${favs.length ? `<div class="chips">${favs.map((f) => `<button class="chip" data-action="fav-meal" data-id="${f.m.id}">${esc(f.m.name)} <small>${fr(f.m.kcal)}</small></button>`).join('')}</div>` : ''}`
     )}
     ${card(
-      `${fmtDate(d)} — ${fr(t.kcal)} / ${fr(t.target)} kcal`,
+      `${fmtDate(d)} — ${fr(t.kcal)} kcal mangées`,
       `<div class="macros two">
          <div><b>${fr(t.protein)} g</b><span>protéines (obj. ${s.proteinGoal})</span></div>
-         <div><b>${fr(t.target - t.kcal)}</b><span>kcal restantes</span></div>
+         <div><b class="${balanceCls(t.deficit)}">${t.deficit == null ? '–' : signed(t.deficit)}</b><span>${t.deficit == null ? 'dépense non saisie' : balanceLabel(t.deficit) + ' du jour'}</span></div>
        </div>
        ${t.meals.length ? `<ul class="list">${t.meals.map((m) => `
          <li><div><b>${esc(m.name)}</b><small>${fr(m.kcal)} kcal${m.protein != null ? ` · P ${fr(m.protein)}` : ''}</small></div>${delBtn('meals', m.id)}</li>`).join('')}</ul>`
@@ -559,13 +551,10 @@ views.more = () => {
     ${card(
       'Objectifs',
       `<form data-form="settings" class="form">
-        ${input('deficitGoal', 'Déficit visé (kcal/j)', { numeric: true, value: s.deficitGoal })}
         ${input('proteinGoal', 'Protéines (g/j)', { numeric: true, value: s.proteinGoal })}
-        ${input('calorieGoal', 'Calories par défaut', { numeric: true, value: s.calorieGoal })}
         ${input('weightGoal', 'Poids cible (kg)', { decimal: true, value: s.weightGoal ?? 75 })}
         ${input('targetDate', 'Date cible', { type: 'date', value: s.targetDate || '2026-12-31' })}
         ${input('heightCm', 'Taille (cm, pour l\'IMC)', { numeric: true, value: s.heightCm ?? '' })}
-        <p class="hint full">« Calories par défaut » sert d'objectif les jours où tu n'as pas encore saisi ta dépense.</p>
         <button class="primary full">Enregistrer</button>
       </form>`
     )}
@@ -621,9 +610,7 @@ const forms = {
   },
   settings(f) {
     store.setSettings({
-      deficitGoal: num(f.deficitGoal) ?? 500,
       proteinGoal: num(f.proteinGoal) || 150,
-      calorieGoal: num(f.calorieGoal) || 2200,
       weightGoal: num(f.weightGoal),
       targetDate: f.targetDate || '2026-12-31',
       heightCm: num(f.heightCm),
