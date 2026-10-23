@@ -435,6 +435,15 @@ views.home = () => {
       <button data-go="body">＋ Pesée</button>
     </div>
 
+    ${(() => {
+      const { last, prev } = visbody();
+      return last ? `<section class="card stat vb-stat" data-action="open-muscu" data-mtab="body">
+        <h3>🧬 Body fat (Visbody)</h3>
+        <strong>${fr(last.bodyfat, 1)} % ${vbDelta(last, prev, 'bodyfat', ' pt', true)}</strong>
+        <span>relevé du ${fmtDate(last.date)}${last.smm != null ? ` · muscle ${fr(last.smm, 1)} kg ${vbDelta(last, prev, 'smm', ' kg', false)}` : ''}</span>
+      </section>` : '';
+    })()}
+
     <div class="grid2">
       <section class="card stat">
         <h3>Déficit moyen 7 j</h3>
@@ -624,71 +633,84 @@ function gymEditor() {
   `;
 }
 
+// Relevés Visbody (salle On Air) : body fat %, masse grasse, masse musculaire squelettique
+function visbody() {
+  const list = [...store.get().visbody].sort(byDate);
+  return { list, last: list[list.length - 1] || null, prev: list[list.length - 2] || null };
+}
+// Écart avec le relevé précédent. lowerIsBetter : vert si ça baisse
+function vbDelta(cur, prev, key, unit, lowerIsBetter) {
+  if (!cur || !prev || cur[key] == null || prev[key] == null) return '';
+  const d = cur[key] - prev[key];
+  if (Math.abs(d) < 0.05) return `<small class="hint">=</small>`;
+  const good = lowerIsBetter ? d < 0 : d > 0;
+  return `<small class="${good ? 'good' : 'warn'}">${d > 0 ? '+' : '−'}${fr(Math.abs(d), 1)}${unit}</small>`;
+}
+function bodyfatLine() {
+  const { last, prev } = visbody();
+  if (!last) return '';
+  return `🧬 Body fat <b>${fr(last.bodyfat, 1)} %</b> ${vbDelta(last, prev, 'bodyfat', ' pt', true)} <span class="hint">· Visbody ${fmtDay(last.date)}</span>`;
+}
+
 views.body = () => {
   const s = store.settings();
   const { raw, trend } = weightSeries();
-  const bf = store.get().body.filter((b) => b.bodyfat != null).sort(byDate).map((b) => ({ date: b.date, value: b.bodyfat }));
-  const waist = store.get().body.filter((b) => b.waist != null).sort(byDate).map((b) => ({ date: b.date, value: b.waist }));
-  const entries = [...store.get().body].sort(byDate).reverse();
-  const last = entries.find((e) => e.weight != null && e.bodyfat != null);
-  const lastWeight = entries.find((e) => e.weight != null)?.weight;
+  const vb = visbody();
+  const { last, prev } = vb;
+  const weights = [...store.get().body].filter((e) => e.weight != null).sort(byDate).reverse();
   const slope = weightSlope();
-  const bmi = s.heightCm && lastWeight ? lastWeight / (s.heightCm / 100) ** 2 : null;
-
-  let eta = '';
-  if (s.weightGoal && slope && slope < 0 && trend.length) {
-    const cur = trend[trend.length - 1].value;
-    if (cur > s.weightGoal) {
-      const weeks = (cur - s.weightGoal) / -slope;
-      eta = `<p class="hint">D'après ta courbe de poids seule (28 j), ${fr(s.weightGoal, 1)} kg vers le <b>${fmtDate(addDays(today(), Math.round(weeks * 7)))}</b> (${fr(weeks, 0)} sem.)</p>`;
-    }
-  }
 
   return `
     <header class="page-head"><h1>Corps</h1></header>
+
+    <section class="card vb-hero">
+      <h2>🧬 Body fat · Visbody</h2>
+      ${last ? `
+        <div class="vb-main">
+          <strong>${fr(last.bodyfat, 1)} %</strong>
+          ${vbDelta(last, prev, 'bodyfat', ' pt', true)}
+        </div>
+        <p class="hint">Relevé du ${fmtDate(last.date)}${prev ? ` · vs ${fmtDay(prev.date)} : ${fr(prev.bodyfat, 1)} %` : ''}</p>
+        <div class="macros">
+          <div><b>${last.fatMass != null ? fr(last.fatMass, 1) + ' kg' : '–'}</b><span>masse grasse ${vbDelta(last, prev, 'fatMass', ' kg', true)}</span></div>
+          <div><b>${last.smm != null ? fr(last.smm, 1) + ' kg' : '–'}</b><span>muscle squelettique ${vbDelta(last, prev, 'smm', ' kg', false)}</span></div>
+          <div><b>${last.weight != null ? fr(last.weight, 1) + ' kg' : '–'}</b><span>poids Visbody</span></div>
+        </div>
+        ${vb.list.length > 1 ? lineChart(vb.list.map((x) => ({ date: x.date, value: x.bodyfat })), { unit: ' %' }) : ''}`
+      : '<p class="hint">Ajoute ton premier relevé Visbody ci-dessous.</p>'}
+    </section>
+
     ${card(
-      'Nouvelle mesure',
-      `<form data-form="body" class="form">
-        ${input('date', 'Date', { type: 'date', value: today() })}
-        ${input('weight', 'Poids (kg)', { decimal: true })}
-        ${input('bodyfat', 'Body fat (%)', { decimal: true })}
-        ${input('waist', 'Tour de taille (cm)', { decimal: true })}
-        <button class="primary full">Enregistrer</button>
+      'Nouveau relevé Visbody',
+      `<form data-form="visbody" class="form">
+        ${input('date', 'Date du scan', { type: 'date', value: today() })}
+        ${input('bodyfat', 'Body fat (TGC %)', { decimal: true, required: true })}
+        ${input('fatMass', 'Masse grasse (kg)', { decimal: true })}
+        ${input('smm', 'Muscle squelettique (MMS kg)', { decimal: true })}
+        ${input('weight', 'Poids Visbody (kg)', { decimal: true })}
+        <p class="hint full">Seul le body fat est obligatoire. Le poids Visbody n'entre pas dans ta courbe de pesées.</p>
+        <button class="primary full">Enregistrer le relevé</button>
       </form>`
     )}
+
+    ${vb.list.length ? card(
+      'Historique Visbody',
+      `<ul class="list">${[...vb.list].reverse().map((x) => `
+        <li><div><b>${fmtDate(x.date)} · ${fr(x.bodyfat, 1)} %</b><small>${[x.fatMass != null && `gras ${fr(x.fatMass, 1)} kg`, x.smm != null && `muscle ${fr(x.smm, 1)} kg`, x.weight != null && `${fr(x.weight, 1)} kg`].filter(Boolean).join(' · ')}</small></div>${delBtn('visbody', x.id)}</li>`).join('')}</ul>`
+    ) : ''}
+
     ${card(
-      'Poids',
-      `${lineChart(raw, { trend, goal: s.weightGoal, unit: ' kg' })}
-       <p class="hint legend"><i class="lg raw"></i> pesées <i class="lg trend"></i> moyenne 7 j</p>
-       <div class="macros">
-         <div><b>${trend.length ? fr(trend[trend.length - 1].value, 1) : '–'} kg</b><span>tendance</span></div>
-         <div><b class="${slope == null ? '' : slope < 0 ? 'good' : 'warn'}">${slope == null ? '–' : (slope > 0 ? '+' : '') + fr(slope, 2)}</b><span>kg / semaine</span></div>
-         <div><b>${bmi ? fr(bmi, 1) : '–'}</b><span>IMC</span></div>
-       </div>
-       ${eta}
-       ${(() => {
-         const c = calibration();
-         return c.ready
-           ? `<p class="hint">Sur ${c.span} j : déficit noté <b>${signed(c.noted)} kcal/j</b>, déficit réel d'après ta balance <b>${signed(c.real)} kcal/j</b>.</p><p class="hint">${calibrationText(c)}</p>`
-           : `<p class="hint">${calibrationText(c)}</p>`;
-       })()}`
-    )}
-    ${card(
-      'Body fat',
-      `${lineChart(bf, { unit: ' %' })}
-       ${last ? `<div class="macros">
-         <div><b>${fr(last.bodyfat, 1)} %</b><span>body fat</span></div>
-         <div><b>${fr(last.weight * (1 - last.bodyfat / 100), 1)} kg</b><span>masse maigre</span></div>
-         <div><b>${fr((last.weight * last.bodyfat) / 100, 1)} kg</b><span>masse grasse</span></div>
-       </div>` : '<p class="hint">Note poids + body fat le même jour pour voir masse maigre / grasse.</p>'}`
-    )}
-    ${waist.length ? card('Tour de taille', lineChart(waist, { unit: ' cm' })) : ''}
-    ${card(
-      'Historique',
-      entries.length
-        ? `<ul class="list">${entries.slice(0, 30).map((e) => `
-          <li><div><b>${fmtDate(e.date)}</b><small>${[e.weight != null && fr(e.weight, 1) + ' kg', e.bodyfat != null && fr(e.bodyfat, 1) + ' %', e.waist != null && fr(e.waist, 1) + ' cm'].filter(Boolean).join(' · ')}</small></div>${delBtn('body', e.id)}</li>`).join('')}</ul>`
-        : '<p class="hint">Aucune mesure.</p>'
+      'Pesée',
+      `<form data-form="body" class="burn-form">
+        <input type="hidden" name="date" value="${today()}">
+        <input name="weight" inputmode="decimal" placeholder="Poids du jour (kg)" autocomplete="off">
+        <button class="primary">OK</button>
+      </form>
+      ${lineChart(raw, { trend, goal: s.weightGoal, unit: ' kg' })}
+      <p class="hint legend"><i class="lg raw"></i> pesées <i class="lg trend"></i> moyenne 7 j</p>
+      <p class="hint">Tendance : <b>${trend.length ? fr(trend[trend.length - 1].value, 1) + ' kg' : '–'}</b>${slope == null ? '' : ` · ${slope > 0 ? '+' : '−'}${fr(Math.abs(slope), 2)} kg/sem`}</p>
+      <p class="hint">${calibrationText(calibration())}</p>
+      ${weights.length ? `<ul class="list">${weights.slice(0, 10).map((e) => `<li><div><b>${fmtDate(e.date)}</b><small>${fr(e.weight, 1)} kg</small></div>${delBtn('body', e.id)}</li>`).join('')}</ul>` : ''}`
     )}
   `;
 };
@@ -752,10 +774,19 @@ const forms = {
     toast('Repas ajouté');
   },
   body(f) {
-    const weight = num(f.weight), bodyfat = num(f.bodyfat), waist = num(f.waist);
-    if (weight == null && bodyfat == null && waist == null) return toast('Rien à enregistrer');
-    store.add('body', { date: f.date || today(), weight, bodyfat, waist });
-    toast('Mesure enregistrée');
+    const weight = num(f.weight);
+    if (weight == null) return toast('Entre ton poids');
+    store.add('body', { date: f.date || today(), weight });
+    toast('Pesée enregistrée');
+  },
+  visbody(f) {
+    const bodyfat = num(f.bodyfat);
+    if (bodyfat == null) return toast('Entre ton body fat %');
+    const date = f.date || today();
+    // Un relevé par jour : on remplace s'il existe déjà
+    store.get().visbody.filter((x) => x.date === date).forEach((x) => store.remove('visbody', x.id));
+    store.add('visbody', { date, bodyfat, fatMass: num(f.fatMass), smm: num(f.smm), weight: num(f.weight) });
+    toast('Relevé Visbody enregistré');
   },
   clinicLink(f) {
     clinic.setLink(f.link);
@@ -1006,6 +1037,7 @@ function journeeView() {
         <div>⚖️ ${lastW ? `<b>${fr(lastW.value, 1)} kg</b> <span class="hint">moy. 7 j${slope == null ? '' : ` · ${slope > 0 ? '+' : '−'}${fr(Math.abs(slope), 2)} kg/sem`}</span>` : '<span class="hint">pas encore de pesée</span>'}
           <button class="chip" data-action="open-muscu" data-mtab="body">＋ Pesée</button></div>
         <div>🎯 ${goalLine}</div>
+        ${bodyfatLine() ? `<div>${bodyfatLine()} <button class="chip" data-action="open-muscu" data-mtab="body">＋ Visbody</button></div>` : ''}
       </div>
 
       <div class="alcohol">

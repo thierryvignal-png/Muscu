@@ -424,3 +424,12 @@ b.warn { color: var(--warn); }
 .est-done { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); }
 .est-plan { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(45deg, var(--good), var(--good) 4px, color-mix(in srgb, var(--good) 50%, transparent) 4px, color-mix(in srgb, var(--good) 50%, transparent) 8px); }
 .est-hero .burn-form { margin-top: 12px; }
+
+/* Visbody */
+.vb-main { display: flex; align-items: baseline; gap: 10px; }
+.vb-main strong { font-size: 44px; letter-spacing: -0.02em; }
+.vb-main small, .vb-stat small { font-size: 15px; font-weight: 700; }
+small.good { color: var(--good); }
+small.warn { color: var(--warn); }
+.macros span small { font-size: 11px; display: block; }
+.vb-stat { margin-bottom: 12px; cursor: pointer; }

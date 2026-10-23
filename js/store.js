@@ -17,7 +17,8 @@ const DEFAULT = {
   steps: [],    // {id, date, steps}  (une entrée par jour)
   rides: [],    // {id, date, minutes, km, kcal, notes}
   workouts: [], // {id, date, name, exercises: [{name, sets: [{reps, weight}]}], notes}
-  body: [],     // {id, date, weight, bodyfat, waist}
+  body: [],     // {id, date, weight}  pesées (anciennes entrées : bodyfat, waist)
+  visbody: [],  // {id, date, bodyfat, fatMass, smm, weight}  relevés Visbody
   labs: [],     // (ancienne section Labo, conservée pour ne pas perdre de données)
 };
 
