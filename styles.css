@@ -451,3 +451,13 @@ small.warn { color: var(--warn); }
 .deal-form-actions button { padding: 9px 4px; font-size: 14px; }
 .deal-add { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; }
 .deal-add button { padding: 10px 14px; }
+
+/* Graphiques : toucher pour voir date + valeur */
+.chart-wrap { position: relative; cursor: pointer; -webkit-user-select: none; user-select: none; }
+.chart-tip {
+  position: absolute; top: 0; transform: translateX(-50%);
+  background: var(--text); color: var(--bg); font-size: 12px; font-weight: 600;
+  padding: 4px 8px; border-radius: 8px; white-space: nowrap; pointer-events: none;
+}
+.chart .tip-line { stroke: var(--muted); stroke-dasharray: 3 3; stroke-width: 1; }
+.chart .tip-dot { fill: var(--bg); stroke: var(--accent); stroke-width: 2.5; }

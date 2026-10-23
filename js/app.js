@@ -376,7 +376,7 @@ views.home = () => {
   const bars = Array.from({ length: 14 }, (_, i) => {
     const x = addDays(today(), i - 13);
     const bb = dayBalance(x);
-    return { label: dayLetter(x), value: bb.kcal > 0 ? bb.deficit : null };
+    return { label: dayLetter(x), date: x, value: bb.kcal > 0 ? bb.deficit : null };
   });
 
   const gp = goalProjection();
@@ -485,7 +485,7 @@ views.food = () => {
   const d = state.mealDate;
   const t = dayBalance(d);
   const last14 = Array.from({ length: 14 }, (_, i) => addDays(today(), i - 13));
-  const bars = last14.map((x) => ({ label: dayLetter(x), value: dayTotals(x).kcal }));
+  const bars = last14.map((x) => ({ label: dayLetter(x), date: x, value: dayTotals(x).kcal }));
   const logged = last14.map((x) => dayTotals(x).kcal).filter((k) => k > 0);
   const avg = logged.length ? sum(logged, (k) => k) / logged.length : null;
 

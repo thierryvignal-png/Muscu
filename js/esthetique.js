@@ -204,7 +204,7 @@ export function view() {
     ${edit || adding ? itemForm(edit) : '<button class="primary block" data-action="est-add">＋ Ajouter un traitement</button>'}
 
     ${planned.length ? `<section class="card"><h2>Prévus</h2><ul class="task-list">${planned.map(itemRow).join('')}</ul></section>` : ''}
-    ${s.hasBase && curve.length > 1 ? `<section class="card"><h2>Évolution prévue du score</h2><p class="hint">Chaque gain est placé à la date où l'effet est visible : Juvelook / Rejuvelook +1 mois, Lenisna +2 mois, Moxi-BBL-Exion +11 mois, greffe +1 an.</p>${lineChart(curve, { unit: ' / 100' })}</section>` : ''}
+    ${s.hasBase && curve.length > 1 ? `<section class="card"><h2>Évolution prévue du score</h2><p class="hint">Chaque gain est placé à la date où l'effet est visible : Juvelook / Rejuvelook +1 mois, Lenisna +2 mois, Moxi-BBL-Exion +11 mois, greffe +1 an.</p>${lineChart(curve, { unit: ' / 100', step: true })}</section>` : ''}
     ${done.length ? `<section class="card"><h2>Faits ✓</h2><ul class="task-list">${done.map(itemRow).join('')}</ul></section>` : ''}
     ${!items.length ? '<p class="hint center">Ajoute ton premier traitement prévu.</p>' : ''}
   `;
