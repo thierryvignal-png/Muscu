@@ -4,6 +4,7 @@ import * as goodnews from './goodnews.js';
 import * as goals from './goals.js';
 import * as todo from './todo.js';
 import * as esthetique from './esthetique.js';
+import * as atom from './atom.js';
 import { lineChart, barChart, balanceChart } from './charts.js';
 
 // ---------- Utilitaires ----------
@@ -731,7 +732,7 @@ views.more = () => {
     )}
     ${card(
       'Sauvegarde',
-      `<p class="hint">Tes données restent sur ce téléphone. Exporte-les régulièrement pour ne rien perdre : la sauvegarde contient tous tes espaces (Muscu, Todo, Good news, Objectifs, Esthétique, Clinique).</p>
+      `<p class="hint">Tes données restent sur ce téléphone. Exporte-les régulièrement pour ne rien perdre : la sauvegarde contient tous tes espaces (Muscu, Todo, Atom, Good news, Objectifs, Esthétique, Clinique).</p>
        <div class="form">
          <button class="full" data-action="export">⬇︎ Exporter (JSON)</button>
          <label class="full button-like">⬆︎ Importer<input type="file" accept="application/json,.json" id="importFile" hidden></label>
@@ -1013,6 +1014,7 @@ function journeeView() {
   const news = goodnews.upcomingList(3);
   const gs = goals.summary();
   const es = esthetique.scores();
+  const atomDue = atom.dueSteps();
   const head = (title, spaceKey, label = 'Tout voir ›') =>
     `<div class="j-head"><h2>${title}</h2><button class="chip" data-action="space" data-space="${spaceKey}">${label}</button></div>`;
 
@@ -1062,6 +1064,11 @@ function journeeView() {
       ${tasks.length ? `<ul class="task-list">${tasks.slice(0, 8).map((x) => todo.row(x, true)).join('')}</ul>${tasks.length > 8 ? `<p class="hint">+ ${tasks.length - 8} autres</p>` : ''}` : '<p class="hint">Rien de prévu aujourd\'hui 🙌</p>'}
     </section>
 
+    ${atomDue.length ? `<section class="card">
+      ${head(`⚛️ Atom · next steps <small class="hint">${atomDue.length}</small>`, 'atom')}
+      <ul class="task-list">${atomDue.slice(0, 6).map((d) => atom.nextRow(d, true)).join('')}</ul>
+    </section>` : ''}
+
     <section class="card">
       ${head('🎉 Good news à venir', 'goodnews')}
       ${news.length ? `<ul class="gn-list">${news.map((it) => `
@@ -1092,6 +1099,13 @@ function journeeView() {
 spaceViews.today = journeeView;
 spaceViews.todo = todo.view;
 spaceViews.esthetique = esthetique.view;
+// Atom : next steps des deals + tâches Todo de la catégorie Atom
+spaceViews.atom = () => {
+  const tasks = todo.openByCat('atom');
+  return atom.view(tasks.length
+    ? `<section class="card"><div class="j-head"><h2>Tâches Atom (Todo)</h2><button class="chip" data-action="space" data-space="todo">Todo ›</button></div><ul class="task-list">${tasks.slice(0, 10).map((t) => todo.row(t, true)).join('')}</ul></section>`
+    : '');
+};
 spaceViews.goodnews = goodnews.view;
 spaceViews.goals = goals.view;
 function wrapSpace(handlers) {
@@ -1102,8 +1116,8 @@ function wrapSpace(handlers) {
     render();
   }]));
 }
-Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions), wrapSpace(todo.actions), wrapSpace(esthetique.actions));
-Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms), wrapSpace(todo.forms), wrapSpace(esthetique.forms));
+Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions), wrapSpace(todo.actions), wrapSpace(esthetique.actions), wrapSpace(atom.actions));
+Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms), wrapSpace(todo.forms), wrapSpace(esthetique.forms), wrapSpace(atom.forms));
 
 // ---------- Événements (délégation) ----------
 document.addEventListener('click', (e) => {

@@ -63,6 +63,11 @@ export function row(t, compact = false) {
     </li>`;
 }
 
+// Tâches ouvertes d'une catégorie (ex : Atom), les plus urgentes d'abord
+export function openByCat(cat) {
+  return load().tasks.filter((t) => !t.done && t.cat === cat).sort(byUrgency);
+}
+
 // Tâches à faire aujourd'hui (en retard + du jour), pour l'écran « Ma journée »
 export function todayList() {
   return load().tasks.filter((t) => !t.done && t.due && t.due <= today()).sort(byUrgency);

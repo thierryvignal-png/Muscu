@@ -1,6 +1,6 @@
 // Service worker : met l'app en cache pour qu'elle marche sans réseau.
 // Incrémente VERSION à chaque mise à jour des fichiers.
-const VERSION = 'muscu-v17';
+const VERSION = 'muscu-v18';
 const FILES = [
   './',
   './index.html',
@@ -15,6 +15,7 @@ const FILES = [
   './js/goals.js',
   './js/todo.js',
   './js/esthetique.js',
+  './js/atom.js',
   './icons/icon.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',

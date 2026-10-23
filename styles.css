@@ -436,3 +436,22 @@ small.warn { color: var(--warn); }
 .vb-stat { margin-bottom: 12px; cursor: pointer; }
 
 .app-version { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+
+/* Atom */
+.atom-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; }
+.atom-sum b { display: block; font-size: 17px; }
+.atom-sum span { font-size: 11px; color: var(--muted); }
+.deal-head { display: flex; align-items: flex-start; gap: 8px; }
+.deal-head > div { flex: 1; min-width: 0; }
+.deal-head b { display: block; font-size: 16px; }
+.deal-head small { color: var(--muted); font-size: 13px; }
+.stages { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0 6px; }
+.stage { font-size: 11px; font-weight: 600; padding: 5px 8px; border-radius: 999px; background: var(--input); color: var(--muted); }
+.stage.past { color: var(--text); }
+.stage.on { background: var(--accent); color: #fff; }
+.deal.won .stage.on { background: var(--good); }
+.deal.lost { opacity: .6; }
+.deal.lost .stage.on { background: var(--warn); }
+.deal-next { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; font-weight: 600; padding-top: 8px; border-top: 1px solid var(--line); }
+p.warn { color: var(--warn); }
+.deal-next .chip { white-space: nowrap; flex: none; }

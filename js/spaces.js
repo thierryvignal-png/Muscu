@@ -5,6 +5,7 @@ export const SPACES = [
   { key: 'today', icon: '🏠', name: 'Ma journée', desc: 'Tout l\'essentiel en un écran' },
   { key: 'muscu', icon: '💪', name: 'Muscu', desc: 'Déficit, repas, salle, poids' },
   { key: 'todo', icon: '✅', name: 'Todo', desc: 'Perso, Clinique, Atom' },
+  { key: 'atom', icon: '⚛️', name: 'Atom', desc: 'Deals transaction, location, next steps' },
   { key: 'goodnews', icon: '🎉', name: 'Good news', desc: 'Tout ce qui t\'attend de cool' },
   { key: 'goals', icon: '🎯', name: 'Objectifs de vie', desc: 'Suis-je dans les temps ?' },
   { key: 'esthetique', icon: '✨', name: 'Roadmap esthétique', desc: 'Traitements prévus et score /100' },
@@ -38,7 +39,7 @@ export function spaceSwitch(current) {
 }
 
 // À changer à chaque mise à jour (comme VERSION dans sw.js) : affiché en bas du menu
-export const APP_VERSION = 'v17';
+export const APP_VERSION = 'v18';
 
 export function spaceMenu(current) {
   return `
@@ -90,6 +91,6 @@ function clinique() {
 }
 
 // Clés de stockage des espaces autres que Muscu (pour la sauvegarde complète)
-export const SPACE_KEYS = ['todo.data.v1', 'goodnews.data.v1', 'goals.data.v1', 'esthetique.data.v1', CLINIC_KEY];
+export const SPACE_KEYS = ['todo.data.v1', 'atom.data.v1', 'goodnews.data.v1', 'goals.data.v1', 'esthetique.data.v1', CLINIC_KEY];
 
 export const spaceViews = { clinique };
