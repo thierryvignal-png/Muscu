@@ -4,6 +4,8 @@ App de musculation & sèche — suivi perso, installable sur iPhone/Android, qui
 ## Espaces (super app)
 Un bouton en haut de l'écran permet de passer d'un espace à l'autre. Chaque espace a son propre code et ses propres données (clé de stockage séparée) :
 - **💪 Muscu** — décrit ci-dessous.
+- **🎉 Good news** — tout ce qui t'attend de cool (livraison, voyage, anniversaire…) avec compte à rebours ; dates estimées (≈) et événements annuels.
+- **🎯 Objectifs de vie** — progression en % ou chiffrée (ex : 0 → 50 000 €), comparée à la progression attendue selon le temps écoulé entre le début et l'échéance : dans les temps / presque / en retard.
 - **✨ Roadmap esthétique** — à construire.
 - **🏥 Clinique Singulier** — modèle financier à construire ; en attendant, raccourci vers un fichier existant (lien gardé sur le téléphone). Le dépôt étant public, aucun chiffre de la clinique ne doit être écrit dans le code : tout se saisit dans l'app.
 
@@ -18,7 +20,7 @@ Un bouton en haut de l'écran permet de passer d'un espace à l'autre. Chaque es
 - **Séries** : jours complets d'affilée (dépense + repas notés) et jours sans alcool.
 
 ## Données
-Tout est stocké **localement sur le téléphone** (aucun serveur, aucun compte). Pense à faire **Réglages → Exporter** de temps en temps pour garder une sauvegarde (fichier JSON réimportable).
+Tout est stocké **localement sur le téléphone** (aucun serveur, aucun compte). La sauvegarde (**Muscu → Réglages → Exporter**) contient tous les espaces ; pense à la faire de temps en temps (fichier JSON réimportable).
 
 ## Utiliser l'app
 C'est un site statique (HTML/CSS/JS, aucune dépendance, pas de build).
@@ -36,4 +38,6 @@ C'est un site statique (HTML/CSS/JS, aucune dépendance, pas de build).
 - `js/store.js` — stockage local, export/import
 - `js/charts.js` — graphiques SVG
 - `js/spaces.js` — sélecteur d'espaces et espaces Esthétique / Clinique
+- `js/goodnews.js`, `js/goals.js` — espaces Good news et Objectifs de vie
+- `js/util.js` — outils partagés (dates, nombres, stockage)
 - `sw.js`, `manifest.webmanifest`, `icons/` — installation et mode hors ligne (incrémenter `VERSION` dans `sw.js` à chaque mise à jour)

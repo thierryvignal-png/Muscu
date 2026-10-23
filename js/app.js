@@ -1,5 +1,7 @@
 import { store } from './store.js';
-import { getSpace, setSpace, spaceSwitch, spaceMenu, spaceViews, clinic } from './spaces.js';
+import { getSpace, setSpace, spaceSwitch, spaceMenu, spaceViews, clinic, SPACE_KEYS } from './spaces.js';
+import * as goodnews from './goodnews.js';
+import * as goals from './goals.js';
 import { lineChart, barChart, balanceChart } from './charts.js';
 
 // ---------- Utilitaires ----------
@@ -705,7 +707,7 @@ views.more = () => {
     )}
     ${card(
       'Sauvegarde',
-      `<p class="hint">Tes données restent sur ce téléphone. Exporte-les régulièrement pour ne rien perdre.</p>
+      `<p class="hint">Tes données restent sur ce téléphone. Exporte-les régulièrement pour ne rien perdre : la sauvegarde contient tous tes espaces (Muscu, Good news, Objectifs, Clinique).</p>
        <div class="form">
          <button class="full" data-action="export">⬇︎ Exporter (JSON)</button>
          <label class="full button-like">⬆︎ Importer<input type="file" accept="application/json,.json" id="importFile" hidden></label>
@@ -894,8 +896,14 @@ const actions = {
     render();
   },
   async export() {
-    const json = store.exportJSON();
-    const name = `muscu-sauvegarde-${today()}.json`;
+    // Sauvegarde complète : Muscu + tous les autres espaces
+    const all = JSON.parse(store.exportJSON());
+    all.spaces = {};
+    for (const k of SPACE_KEYS) {
+      try { const v = localStorage.getItem(k); if (v) all.spaces[k] = JSON.parse(v); } catch {}
+    }
+    const json = JSON.stringify(all, null, 2);
+    const name = `sauvegarde-${today()}.json`;
     const file = new File([json], name, { type: 'application/json' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try { await navigator.share({ files: [file], title: name }); return; } catch (e) { if (e.name === 'AbortError') return; }
@@ -913,6 +921,21 @@ const actions = {
     toast('Données effacées');
   },
 };
+
+// ---------- Espaces Good news / Objectifs ----------
+// Chaque espace gère ses données ; ici on rafraîchit l'écran et on affiche son message.
+spaceViews.goodnews = goodnews.view;
+spaceViews.goals = goals.view;
+function wrapSpace(handlers) {
+  return Object.fromEntries(Object.entries(handlers).map(([k, fn]) => [k, (arg) => {
+    const res = fn(arg);
+    if (res === false) return;
+    if (typeof res === 'string') toast(res);
+    render();
+  }]));
+}
+Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions));
+Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms));
 
 // ---------- Événements (délégation) ----------
 document.addEventListener('click', (e) => {
@@ -956,7 +979,13 @@ document.addEventListener('change', (e) => {
   if (el.id === 'importFile' && el.files[0]) {
     el.files[0].text().then((txt) => {
       if (!confirm('Remplacer les données actuelles par ce fichier ?')) return;
-      try { store.importJSON(txt); toast('Import réussi'); } catch (err) { alert('Import impossible : ' + err.message); }
+      try {
+        store.importJSON(txt);
+        const spaces = JSON.parse(txt).spaces || {};
+        for (const k of SPACE_KEYS) if (spaces[k]) localStorage.setItem(k, JSON.stringify(spaces[k]));
+        render();
+        toast('Import réussi');
+      } catch (err) { alert('Import impossible : ' + err.message); }
     });
   }
   // Champs date/nom de l'éditeur de séance

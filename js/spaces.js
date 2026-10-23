@@ -3,6 +3,8 @@
 
 export const SPACES = [
   { key: 'muscu', icon: '💪', name: 'Muscu', desc: 'Déficit, repas, salle, poids' },
+  { key: 'goodnews', icon: '🎉', name: 'Good news', desc: 'Tout ce qui t\'attend de cool' },
+  { key: 'goals', icon: '🎯', name: 'Objectifs de vie', desc: 'Suis-je dans les temps ?' },
   { key: 'esthetique', icon: '✨', name: 'Roadmap esthétique', desc: 'Bientôt' },
   { key: 'clinique', icon: '🏥', name: 'Clinique Singulier', desc: 'Modèle financier · bientôt' },
 ];
@@ -88,5 +90,8 @@ function clinique() {
       ${link ? `<a class="button-like block-link" href="${esc(link)}" target="_blank" rel="noopener">Ouvrir mon modèle ↗</a>` : ''}
     </section>`;
 }
+
+// Clés de stockage des espaces autres que Muscu (pour la sauvegarde complète)
+export const SPACE_KEYS = ['goodnews.data.v1', 'goals.data.v1', CLINIC_KEY];
 
 export const spaceViews = { esthetique, clinique };
