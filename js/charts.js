@@ -47,7 +47,7 @@ export function lineChart(points, opts = {}) {
   let svg = `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img">`;
   for (const t of ticks) {
     svg += `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${y(t)}" y2="${y(t)}" class="grid"/>`;
-    svg += `<text x="${PAD.l - 4}" y="${y(t) + 3}" class="axis" text-anchor="end">${t.toFixed(dec)}</text>`;
+    svg += `<text x="${PAD.l - 4}" y="${y(t) + 3}" class="axis" text-anchor="end">${t.toFixed(dec).replace('.', ',')}</text>`;
   }
   svg += `<text x="${PAD.l}" y="${H - 6}" class="axis">${fmtShort(points[0].date)}</text>`;
   if (points.length > 1)

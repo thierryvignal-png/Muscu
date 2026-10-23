@@ -264,3 +264,35 @@ button:active, .button-like:active { transform: scale(0.98); }
 .protein-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
 .protein-head span { font-weight: 600; }
 .protein-head b.good { color: var(--good); }
+
+/* Séries */
+.streaks { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.streak { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 13px; color: var(--muted); }
+.streak b { color: var(--text); }
+
+/* Alcool */
+.alcohol { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.seg { font-size: 14px; padding: 10px; border: 1px solid transparent; }
+.seg.on.good { background: color-mix(in srgb, var(--good) 18%, transparent); border-color: var(--good); color: var(--good); }
+.seg.on.good.soft { border-style: dashed; }
+.seg.on.warn { background: color-mix(in srgb, var(--warn) 18%, transparent); border-color: var(--warn); color: var(--warn); }
+
+.calib { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+
+/* Carte semaine */
+.msg { border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-size: 14px; background: var(--input); }
+.msg.good { background: color-mix(in srgb, var(--good) 15%, transparent); }
+.msg.warn { background: color-mix(in srgb, var(--warn) 15%, transparent); }
+.week-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.week-table th { font-size: 11px; color: var(--muted); font-weight: 600; text-align: right; padding: 4px 0; }
+.week-table td { padding: 7px 0; border-top: 1px solid var(--line); text-align: right; font-weight: 600; }
+.week-table td:first-child { text-align: left; color: var(--muted); font-weight: 400; }
+.week-table td.good { color: var(--good); }
+.week-table td.warn { color: var(--warn); }
+.week-table small { font-weight: 400; }
+.weeks-strip { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; text-align: center; }
+.wk span { display: block; height: 22px; border-radius: 6px; background: var(--line); }
+.wk.ok span { background: var(--good); }
+.wk.bad span { background: var(--warn); }
+.wk.current span { outline: 2px solid var(--text); outline-offset: 1px; }
+.wk small { font-size: 9px; color: var(--muted); }

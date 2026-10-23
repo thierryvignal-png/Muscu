@@ -13,6 +13,7 @@ const DEFAULT = {
   },
   meals: [],    // {id, date, name, kcal, protein}
   burn: [],     // {id, date, kcal}  dépense totale du jour (une entrée par jour)
+  alcohol: [],  // {id, date, value}  true = alcool, false = sans (saisie manuelle)
   steps: [],    // {id, date, steps}  (une entrée par jour)
   rides: [],    // {id, date, minutes, km, kcal, notes}
   workouts: [], // {id, date, name, exercises: [{name, sets: [{reps, weight}]}], notes}
@@ -82,6 +83,11 @@ export const store = {
   setBurn(date, kcal) {
     data.burn = data.burn.filter((x) => x.date !== date);
     if (kcal != null) data.burn.push({ id: uid(), date, kcal });
+    save();
+  },
+  setAlcohol(date, value) {
+    data.alcohol = data.alcohol.filter((x) => x.date !== date);
+    if (value != null) data.alcohol.push({ id: uid(), date, value });
     save();
   },
   setSettings(patch) {

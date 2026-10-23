@@ -99,22 +99,6 @@ function weightSlope(days = 28) {
   return deno ? (nume / deno) * 7 : null; // kg / semaine
 }
 
-// Dépense estimée (TDEE) = apports moyens − variation de poids × 7700 kcal/kg
-function estimatedTDEE() {
-  const slope = weightSlope(28);
-  if (slope == null) return null;
-  const end = today();
-  const days = [];
-  for (let i = 1; i <= 28; i++) {
-    const d = addDays(end, -i);
-    const t = dayTotals(d);
-    if (t.kcal > 0) days.push(t.kcal);
-  }
-  if (days.length < 10) return null;
-  const avg = sum(days, (x) => x) / days.length;
-  return { tdee: avg - (slope / 7) * 7700, avgIntake: avg, slope, n: days.length };
-}
-
 function exerciseNames() {
   const names = new Set();
   store.get().workouts.forEach((w) => w.exercises.forEach((e) => e.name && names.add(e.name)));
@@ -189,9 +173,11 @@ function goalProjection() {
   }
   if (!stats) return { goal, target, missing: 'Note ta dépense et tes repas pour voir tes projections.' };
 
+  const cal = calibration();
+  const avg = cal.ready ? stats.avg - cal.bias : stats.avg; // déficit corrigé avec la balance
   const cur = trend[trend.length - 1].value; // poids moyen 7 j
   const start = raw[0].value;
-  const perDay = stats.avg / KCAL_PER_KG; // kg perdus par jour
+  const perDay = avg / KCAL_PER_KG; // kg perdus par jour
   const daysLeft = Math.max(1, daysBetween(today(), target));
   const projected = cur - perDay * daysLeft;
   const toLose = cur - goal;
@@ -199,7 +185,7 @@ function goalProjection() {
   const required = toLose > 0 ? (toLose * KCAL_PER_KG) / daysLeft : 0;
   const margin = goal - projected; // > 0 = en avance
   const progress = start > goal ? Math.max(0, Math.min(1, (start - cur) / (start - goal))) : 1;
-  return { goal, target, cur, start, avg: stats.avg, basis, daysLeft, projected, eta, required, margin, progress, toLose };
+  return { goal, target, cur, start, avg, cal, basis, daysLeft, projected, eta, required, margin, progress, toLose };
 }
 
 function goalCard() {
@@ -225,8 +211,147 @@ function goalCard() {
       <div><b class="${pace >= 1 ? 'good' : pace >= 0.8 ? 'mid' : 'warn'}">${fr(pace * 100)} %</b><span>du rythme nécessaire</span></div>
     </div>
     <p class="hint">${g.toLose > 0
-      ? `Il te faut un déficit moyen de <b>${fr(g.required)} kcal/j</b> d'ici le ${fmtDay(g.target)} (${g.daysLeft} j). Ton rythme actuel : <b>${g.avg >= 0 ? `déficit de ${fr(g.avg)}` : `excédent de ${fr(-g.avg)}`} kcal/j</b> (moy. ${g.basis}).`
+      ? `Il te faut un déficit moyen de <b>${fr(g.required)} kcal/j</b> d'ici le ${fmtDay(g.target)} (${g.daysLeft} j). Ton rythme actuel : <b>${g.avg >= 0 ? `déficit de ${fr(g.avg)}` : `excédent de ${fr(-g.avg)}`} kcal/j</b> (moy. ${g.basis}${g.cal.ready ? ', corrigé' : ''}).`
       : 'Tu es sous ton objectif, garde le cap !'}</p>
+    <p class="hint calib">${calibrationText(g.cal)}</p>
+  `);
+}
+
+const avgOf = (arr) => (arr.length ? sum(arr, (x) => x) / arr.length : null);
+
+// Pente d'une série {date, value} en unité/jour (régression linéaire)
+function slopePerDay(pts) {
+  if (pts.length < 2) return null;
+  const xs = pts.map((p) => daysBetween(pts[0].date, p.date));
+  const ys = pts.map((p) => p.value);
+  const mx = avgOf(xs), my = avgOf(ys);
+  let nume = 0, deno = 0;
+  xs.forEach((x, i) => { nume += (x - mx) * (ys[i] - my); deno += (x - mx) ** 2; });
+  return deno ? nume / deno : null;
+}
+
+const isComplete = (date) => { const b = dayBalance(date); return b.burn != null && b.kcal > 0; };
+
+// ---------- Calibration avec la balance ----------
+// Compare la perte théorique (déficit noté / 7 700) à la perte réelle (pente du poids sur 28 j).
+// bias > 0 : l'IA surestime ta dépense, ton vrai déficit est plus petit que celui noté.
+function calibration() {
+  const { raw } = weightSeries();
+  const pts = raw.filter((p) => p.date >= addDays(today(), -28));
+  const span = pts.length ? daysBetween(pts[0].date, pts[pts.length - 1].date) : 0;
+  const defs = [];
+  if (pts.length) {
+    for (let d = pts[0].date; d <= pts[pts.length - 1].date; d = addDays(d, 1)) {
+      if (isComplete(d)) defs.push(dayBalance(d).deficit);
+    }
+  }
+  const need = [];
+  if (pts.length < 5) need.push(`${5 - pts.length} pesée${5 - pts.length > 1 ? 's' : ''}`);
+  if (span < 14) need.push(`${14 - span} j d'historique de poids`);
+  if (defs.length < 10) need.push(`${10 - defs.length} jour${10 - defs.length > 1 ? 's' : ''} complet${10 - defs.length > 1 ? 's' : ''}`);
+  if (need.length) return { ready: false, need };
+  const noted = avgOf(defs);
+  const real = -slopePerDay(pts) * KCAL_PER_KG;
+  return { ready: true, noted, real, bias: noted - real, span, n: defs.length, reliable: span >= 21 };
+}
+
+function calibrationText(cal) {
+  if (!cal.ready) return `⚖️ Calibration avec ta balance : encore ${cal.need.join(', ')}.`;
+  const conf = cal.reliable ? '' : ' · à confirmer';
+  if (Math.abs(cal.bias) < 100)
+    return `⚖️ Calibré sur ta balance (${cal.span} j${conf}) : tes chiffres collent à la réalité 👌`;
+  return `⚖️ Calibré sur ta balance (${cal.span} j${conf}) : ton IA ${cal.bias > 0 ? 'surestime' : 'sous-estime'} ta dépense d'environ <b>${fr(Math.abs(cal.bias))} kcal/j</b>. Projections corrigées.`;
+}
+
+// ---------- Alcool ----------
+const ALCOHOL_RE = /(^|[^a-zà-ÿ])(bi[eè]res?|vins?|ros[ée]|champagne|prosecco|cr[ée]mant|whisky|vodka|rhum|gin|tequila|cocktails?|ap[ée]ro|spritz|mojito|pastis|cidre|sak[ée]|pintes?|ti.?punch|liqueur|cognac|armagnac|calvados|limoncello|martini|margarita|alcool)($|[^a-zà-ÿ])/i;
+
+// value: true (alcool), false (sans), null (pas de données ce jour-là)
+function alcoholDay(date) {
+  const manual = store.get().alcohol.find((x) => x.date === date);
+  if (manual) return { value: manual.value, source: 'manual' };
+  const meal = store.get().meals.find((m) => m.date === date && ALCOHOL_RE.test(m.name));
+  if (meal) return { value: true, source: 'repas', name: meal.name };
+  const hasData = store.get().meals.some((m) => m.date === date) || store.get().burn.some((x) => x.date === date);
+  return { value: hasData ? false : null, source: 'auto' };
+}
+
+function firstDataDate() {
+  const g = store.get();
+  const dates = [...g.meals, ...g.burn, ...g.body, ...g.alcohol].map((x) => x.date).sort();
+  return dates[0] || today();
+}
+
+// ---------- Séries ----------
+function completeStreak() {
+  let d = today();
+  if (!isComplete(d)) d = addDays(d, -1); // la journée en cours n'est pas encore finie
+  let n = 0;
+  while (isComplete(d)) { n++; d = addDays(d, -1); }
+  return n;
+}
+
+function soberStreak() {
+  const first = firstDataDate();
+  let d = today(), n = 0;
+  while (d >= first && alcoholDay(d).value !== true) { n++; d = addDays(d, -1); }
+  return n;
+}
+
+// ---------- Semaines (lundi → dimanche) ----------
+const mondayOf = (iso) => addDays(iso, -((new Date(iso + 'T12:00:00').getDay() + 6) % 7));
+
+function weekSummary(mon) {
+  const days = Array.from({ length: 7 }, (_, i) => addDays(mon, i)).filter((d) => d <= today());
+  const defs = days.filter(isComplete).map((d) => dayBalance(d).deficit);
+  const alc = days.filter((d) => alcoholDay(d).value === true);
+  const hasData = days.some((d) => alcoholDay(d).value != null);
+  const w = weightSeries().raw.filter((p) => p.date >= mon && p.date <= addDays(mon, 6)).map((p) => p.value);
+  return { mon, elapsed: days.length, complete: defs.length, avg: avgOf(defs), alc, hasData, weight: avgOf(w) };
+}
+
+function weekCard() {
+  const thisMon = mondayOf(today());
+  const cur = weekSummary(thisMon);
+  const prev = weekSummary(addDays(thisMon, -7));
+
+  // 8 dernières semaines : vert = sans alcool, rouge = avec, gris = pas de données
+  const weeks = Array.from({ length: 8 }, (_, i) => weekSummary(addDays(thisMon, -7 * (7 - i))));
+  let cleanWeeks = 0;
+  for (let i = weeks.length - 2; i >= 0; i--) { // semaines terminées seulement
+    if (weeks[i].hasData && !weeks[i].alc.length) cleanWeeks++;
+    else break;
+  }
+
+  const dayNames = (list) => list.map((d) => new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'short' })).join(', ');
+  const dW = cur.weight != null && prev.weight != null ? cur.weight - prev.weight : null;
+  const better = cur.avg != null && prev.avg != null ? cur.avg >= prev.avg : null;
+
+  const msgs = [];
+  if (cur.alc.length) {
+    msgs.push(`<div class="msg warn">🍷 <b>${cur.alc.length} jour${cur.alc.length > 1 ? 's' : ''} avec alcool cette semaine</b> (${dayNames(cur.alc)}). Ton corps brûle l'alcool en priorité : pendant ce temps, le gras attend. ${cleanWeeks ? `Et ta série de ${cleanWeeks} semaine${cleanWeeks > 1 ? 's' : ''} sans alcool s'arrête là… 😬` : 'Encore une semaine sans alcool de ratée…'}</div>`);
+  } else if (cur.hasData) {
+    msgs.push(`<div class="msg good">🟢 <b>Zéro alcool depuis lundi.</b> ${cleanWeeks ? `Et déjà ${cleanWeeks} semaine${cleanWeeks > 1 ? 's' : ''} clean d'affilée avant celle-ci 🏆` : 'Tiens bon jusqu\'à dimanche !'}</div>`);
+  }
+  if (prev.alc.length && !cur.alc.length && cur.hasData) {
+    msgs.push(`<div class="msg">La semaine dernière : ${prev.alc.length} jour${prev.alc.length > 1 ? 's' : ''} avec alcool. Celle-ci rattrape le coup 💪</div>`);
+  }
+
+  const cell = (v, cls = '') => `<td class="${cls}">${v}</td>`;
+  return card('Semaine', `
+    ${msgs.join('')}
+    <table class="week-table">
+      <tr><th></th><th>Sem. dernière</th><th>Cette semaine</th></tr>
+      <tr><td>Déficit moyen</td>${cell(prev.avg != null ? signed(prev.avg) : '–', balanceCls(prev.avg))}${cell(cur.avg != null ? signed(cur.avg) + (better == null ? '' : better ? ' ↑' : ' ↓') : '–', balanceCls(cur.avg))}</tr>
+      <tr><td>Jours complets</td>${cell(`${prev.complete}/7`)}${cell(`${cur.complete}/${cur.elapsed}`)}</tr>
+      <tr><td>Poids moyen</td>${cell(prev.weight != null ? fr(prev.weight, 1) : '–')}${cell(cur.weight != null ? fr(cur.weight, 1) + (dW == null ? '' : ` <small>(${dW > 0 ? '+' : '−'}${fr(Math.abs(dW), 1)})</small>`) : '–', dW == null ? '' : dW <= 0 ? 'good' : 'warn')}</tr>
+      <tr><td>Alcool</td>${cell(prev.hasData ? (prev.alc.length ? `🍷 ${prev.alc.length} j` : '🟢 0') : '–', prev.alc.length ? 'warn' : '')}${cell(cur.hasData ? (cur.alc.length ? `🍷 ${cur.alc.length} j` : '🟢 0') : '–', cur.alc.length ? 'warn' : '')}</tr>
+    </table>
+    <p class="hint">Alcool, 8 dernières semaines :</p>
+    <div class="weeks-strip">${weeks.map((w, i) => `
+      <div class="wk ${!w.hasData ? 'none' : w.alc.length ? 'bad' : 'ok'} ${i === 7 ? 'current' : ''}">
+        <span></span><small>${i === 7 ? 'auj.' : fmtDay(w.mon).replace('.', '')}</small>
+      </div>`).join('')}</div>
   `);
 }
 
@@ -248,7 +373,12 @@ views.home = () => {
     return { label: dayLetter(x), value: bb.kcal > 0 ? bb.deficit : null };
   });
 
-  const required = goalProjection().required;
+  const gp = goalProjection();
+  const required = gp.required;
+  const cal = gp.cal || calibration();
+  const alc = alcoholDay(d);
+  const streak = completeStreak();
+  const sober = soberStreak();
   const protRatio = Math.min(1, (b.protein || 0) / s.proteinGoal);
 
   return `
@@ -257,6 +387,10 @@ views.home = () => {
       <button data-action="home-day" data-delta="-1">‹</button>
       <input type="date" id="homeDate" value="${d}" max="${today()}">
       <button data-action="home-day" data-delta="1" ${isToday ? 'disabled' : ''}>›</button>
+    </div>
+    <div class="streaks">
+      <span class="streak">🔥 <b>${streak}</b> j complet${streak > 1 ? 's' : ''} d'affilée</span>
+      <span class="streak">🧊 <b>${sober}</b> j sans alcool</span>
     </div>
 
     <section class="card hero">
@@ -269,10 +403,16 @@ views.home = () => {
         <div class="op">−</div>
         <div><span>Dépensé</span><b>${b.burn == null ? '?' : fr(b.burn)}</b></div>
       </div>
+      ${cal.ready && b.deficit != null && Math.abs(cal.bias) >= 100 ? `<p class="hint">≈ ${signed(b.deficit - cal.bias)} kcal après correction balance</p>` : ''}
       <form data-form="burn" class="burn-form">
         <input name="kcal" inputmode="numeric" placeholder="Dépense totale du jour (kcal)" value="${b.burn ?? ''}" autocomplete="off">
         <button class="primary">OK</button>
       </form>
+      <div class="alcohol">
+        <button class="seg ${alc.value === false ? 'on good' : ''} ${alc.source === 'auto' ? 'soft' : ''}" data-action="alcohol" data-v="0">🚫 Sans alcool</button>
+        <button class="seg ${alc.value === true ? 'on warn' : ''}" data-action="alcohol" data-v="1">🍷 Alcool</button>
+      </div>
+      ${alc.source === 'repas' ? `<p class="hint">Détecté dans tes repas : « ${esc(alc.name)} »</p>` : ''}
     </section>
 
     ${goalCard()}
@@ -281,6 +421,8 @@ views.home = () => {
       <div class="protein-head"><span>Protéines</span><b class="${protRatio >= 1 ? 'good' : ''}">${fr(b.protein)} / ${s.proteinGoal} g</b></div>
       <div class="progress"><div style="width:${(protRatio * 100).toFixed(0)}%"></div></div>
     </section>
+
+    ${weekCard()}
 
     <div class="quick three">
       <button data-go="food">＋ Repas</button>
@@ -302,7 +444,7 @@ views.home = () => {
       <section class="card stat">
         <h3>Cumul 30 j</h3>
         <strong class="${balanceCls(w30?.total)}">${w30 ? signed(w30.total) : '–'}</strong>
-        <span>${w30 ? `≈ ${fr(w30.total / 7700, 2)} kg de gras` : 'kcal'}</span>
+        <span>${w30 ? `≈ ${fr((w30.total - (cal.ready ? cal.bias * w30.n : 0)) / KCAL_PER_KG, 2)} kg de gras${cal.ready ? ' (corrigé)' : ''}` : 'kcal'}</span>
       </section>
       <section class="card stat">
         <h3>Poids (moy. 7 j)</h3>
@@ -493,7 +635,7 @@ views.body = () => {
     const cur = trend[trend.length - 1].value;
     if (cur > s.weightGoal) {
       const weeks = (cur - s.weightGoal) / -slope;
-      eta = `<p class="hint">À ce rythme, objectif ${fr(s.weightGoal, 1)} kg vers le <b>${fmtDate(addDays(today(), Math.round(weeks * 7)))}</b> (${fr(weeks, 0)} sem.)</p>`;
+      eta = `<p class="hint">D'après ta courbe de poids seule (28 j), ${fr(s.weightGoal, 1)} kg vers le <b>${fmtDate(addDays(today(), Math.round(weeks * 7)))}</b> (${fr(weeks, 0)} sem.)</p>`;
     }
   }
 
@@ -520,8 +662,10 @@ views.body = () => {
        </div>
        ${eta}
        ${(() => {
-         const t = estimatedTDEE();
-         return t ? `<p class="hint">Dépense réelle estimée d'après ton poids et tes repas (28 j) : <b>${fr(Math.round(t.tdee / 10) * 10)} kcal/j</b>. Compare avec les chiffres de l'IA.</p>` : '';
+         const c = calibration();
+         return c.ready
+           ? `<p class="hint">Sur ${c.span} j : déficit noté <b>${signed(c.noted)} kcal/j</b>, déficit réel d'après ta balance <b>${signed(c.real)} kcal/j</b>.</p><p class="hint">${calibrationText(c)}</p>`
+           : `<p class="hint">${calibrationText(c)}</p>`;
        })()}`
     )}
     ${card(
@@ -643,6 +787,12 @@ const actions = {
   delete(el) {
     if (!confirm('Supprimer cette entrée ?')) return;
     store.remove(el.dataset.col, el.dataset.id);
+  },
+  alcohol(el) {
+    const v = el.dataset.v === '1';
+    const manual = store.get().alcohol.find((x) => x.date === state.homeDate);
+    // Re-toucher le choix actif l'annule (retour à la détection auto)
+    store.setAlcohol(state.homeDate, manual && manual.value === v ? null : v);
   },
   'home-day'(el) {
     const d = addDays(state.homeDate, +el.dataset.delta);

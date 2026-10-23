@@ -6,7 +6,10 @@ App de musculation & sèche — suivi perso, installable sur iPhone/Android, qui
 - **Repas** : calories + protéines, repas fréquents en 1 tap, graphique 14 jours.
 - **Salle** : séances (exercices, séries, reps × kg), « refaire » une séance, perf de la dernière fois affichée pendant la saisie, progression par exercice (1RM estimé, records). Le brouillon de séance est gardé si l'app se ferme.
 - **Corps** : poids avec moyenne glissante 7 jours, kg/semaine, date estimée d'atteinte de l'objectif, body fat %, masse maigre / grasse, tour de taille, IMC.
-- **Contrôle de la dépense** : dans Corps, l'app estime ta dépense réelle d'après tes repas et l'évolution de ton poids (après ~2 semaines), pour vérifier les chiffres de l'IA.
+- **Calibration avec la balance** : après ~2 semaines (5 pesées, 10 jours complets), l'app compare la perte théorique (déficit noté / 7 700) à la perte réelle de ta courbe de poids, affiche de combien l'IA surestime ou sous-estime ta dépense, et corrige les projections.
+- **Carte Semaine** : semaine en cours vs semaine dernière (déficit moyen, jours complets, poids moyen, alcool), historique des semaines sans alcool sur 8 semaines, messages d'encouragement… ou de rappel à l'ordre.
+- **Alcool** : bouton « Sans alcool / Alcool » par jour sur l'accueil, avec détection automatique dans les repas (bière, vin, cocktail…).
+- **Séries** : jours complets d'affilée (dépense + repas notés) et jours sans alcool.
 
 ## Données
 Tout est stocké **localement sur le téléphone** (aucun serveur, aucun compte). Pense à faire **Réglages → Exporter** de temps en temps pour garder une sauvegarde (fichier JSON réimportable).
