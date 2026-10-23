@@ -1082,7 +1082,7 @@ function journeeView() {
     ${es.hasBase || es.next ? `<section class="card">
       ${head('✨ Roadmap esthétique', 'esthetique')}
       ${es.hasBase ? `<p>Score <b>${fr(es.current, 1)}</b> → <b class="good">${fr(es.projected, 1)}</b> <span class="hint">/ 100 après la roadmap</span></p>` : ''}
-      ${es.next ? `<p class="hint">Prochain : <b>${esc(es.next.name)}</b> · ≈ ${new Date(es.next.date + 'T12:00:00').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })} · +${fr(es.next.points, es.next.points % 1 ? 1 : 0)} pts</p>` : ''}
+      ${es.next ? `<p class="hint">Prochain : <b>${esc(es.next.name)}</b> · ≈ ${new Date(es.next.date + 'T12:00:00').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })} · ${esthetique.pts(es.next.points)}</p>` : ''}
     </section>` : ''}
   `;
 }
@@ -1162,6 +1162,9 @@ document.addEventListener('change', (e) => {
     saveDraft();
   }
 });
+
+// Traitements esthétiques notés dans Good news → Roadmap esthétique (une seule fois)
+esthetique.importFromGoodnews();
 
 // Premiers relevés Visbody (salle On Air), ajoutés une seule fois.
 // S'ils sont supprimés ensuite, ils ne reviennent pas.

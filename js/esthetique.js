@@ -13,9 +13,31 @@ let adding = false;
 
 const monthText = (iso) =>
   new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-const pts = (p) => `${p >= 0 ? '+' : '−'}${fr(Math.abs(p), p % 1 ? 1 : 0)} pt${Math.abs(p) > 1 ? 's' : ''}`;
+// Points pas encore estimés (null) : affichés « ? pts »
+export const pts = (p) => (p == null ? '? pts' : `${p >= 0 ? '+' : '−'}${fr(Math.abs(p), p % 1 ? 1 : 0)} pt${Math.abs(p) > 1 ? 's' : ''}`);
 const sumPts = (list) => list.reduce((s, x) => s + (x.points || 0), 0);
 const clamp100 = (v) => Math.min(100, v);
+
+// Copie unique des traitements esthétiques déjà notés dans Good news
+// (même nom, même date ; points à estimer plus tard).
+const TREATMENT_WORDS = ['rejuvelook', 'lenisna', 'greffe', 'retouche body', 'em face', 'emface', 'radiesse', 'juvelook'];
+const norm = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+export function importFromGoodnews() {
+  const d = load();
+  if (d.importedFromGoodnews) return 0;
+  const gn = read('goodnews.data.v1', { items: [] }).items;
+  let n = 0;
+  for (const it of gn) {
+    if (!TREATMENT_WORDS.some((w) => norm(it.title).includes(w))) continue;
+    if (d.items.some((x) => norm(x.name) === norm(it.title) && x.date === it.date)) continue;
+    d.items.push({ id: uid(), name: it.title, date: it.date, points: null, done: false });
+    n++;
+  }
+  d.importedFromGoodnews = true;
+  save(d);
+  return n;
+}
 
 export function scores() {
   const d = load();
@@ -38,7 +60,7 @@ function itemRow(it) {
     <li class="task ${it.done ? 'done' : ''}">
       <button class="tick ${it.done ? 'on' : ''}" data-action="est-toggle" data-id="${it.id}" aria-label="${it.done ? 'Marquer prévu' : 'Marquer fait'}">✓</button>
       <div><b>${esc(it.name)}</b><small>≈ ${monthText(it.date)}${when ? ` · ${when}` : ''}</small></div>
-      <span class="gn-badge soon">${pts(it.points)}</span>
+      <span class="gn-badge ${it.points == null ? '' : 'soon'}">${pts(it.points)}</span>
       <button class="icon-btn" data-action="est-edit" data-id="${it.id}" aria-label="Modifier">✎</button>
     </li>`;
 }
@@ -52,7 +74,7 @@ function itemForm(it) {
           <input name="name" required placeholder="ex : Greffe de cheveux, facettes, laser…" value="${esc(it?.name || '')}" autocomplete="off">
         </label>
         <label class="field"><span>Date approximative</span><input name="date" type="date" required value="${esc(it?.date || '')}"></label>
-        <label class="field"><span>Points ajoutés</span><input name="points" inputmode="decimal" required placeholder="ex : 4" value="${it?.points ?? ''}"></label>
+        <label class="field"><span>Points ajoutés</span><input name="points" inputmode="decimal" placeholder="à estimer plus tard" value="${it?.points ?? ''}"></label>
         <p class="hint full">Demande à ton IA : « Combien de points ce traitement ajouterait-il à mon score esthétique sur 100 ? »</p>
         <button class="primary full">${it ? 'Enregistrer' : 'Ajouter'}</button>
         <button type="button" class="full" data-action="est-cancel">Annuler</button>
@@ -115,7 +137,7 @@ export const forms = {
   est(f) {
     const name = (f.name || '').trim();
     const points = num(f.points);
-    if (!name || !f.date || points == null) return 'Traitement, date et points requis';
+    if (!name || !f.date) return 'Traitement et date requis';
     const d = load();
     if (editing) {
       Object.assign(d.items.find((x) => x.id === editing) || {}, { name, date: f.date, points });
