@@ -39,6 +39,34 @@ export function importFromGoodnews() {
   return n;
 }
 
+// Points estimés par l'IA (oct. 2026), appliqués une seule fois aux traitements
+// sans points, d'après leur nom et leur numéro de séance.
+function estimatedPoints(name) {
+  const n = norm(name);
+  const num = Number((n.match(/\d+/g) || []).pop()) || null;
+  if (n.includes('greffe')) return 18;
+  if (n.includes('radiesse')) return 6;
+  if (n.includes('em face') || n.includes('emface')) return 3;
+  if (n.includes('retouche')) return num === 2 ? 2 : 6;
+  if (n.includes('juvelook')) return { 2: 4, 3: 3, 4: 2, 5: 1 }[num] ?? null; // Juvelook 2 puis Rejuvelook 3, 4, 5
+  if (n.includes('lenisna')) return { 2: 3, 3: 2 }[num] ?? null;
+  return null;
+}
+
+export function applyEstimatedPoints() {
+  const d = load();
+  if (d.pointsV1) return 0;
+  let n = 0;
+  for (const it of d.items) {
+    if (it.points != null) continue; // ne touche pas aux points déjà saisis
+    const p = estimatedPoints(it.name);
+    if (p != null) { it.points = p; n++; }
+  }
+  d.pointsV1 = true;
+  save(d);
+  return n;
+}
+
 export function scores() {
   const d = load();
   const base = d.base ?? 0;
