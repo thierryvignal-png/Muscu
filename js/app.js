@@ -248,7 +248,7 @@ function calibration() {
   const need = [];
   if (pts.length < 5) need.push(`${5 - pts.length} pesée${5 - pts.length > 1 ? 's' : ''}`);
   if (span < 14) need.push(`${14 - span} j d'historique de poids`);
-  if (defs.length < 10) need.push(`${10 - defs.length} jour${10 - defs.length > 1 ? 's' : ''} complet${10 - defs.length > 1 ? 's' : ''}`);
+  if (defs.length < 10) need.push(`${10 - defs.length} jour${10 - defs.length > 1 ? 's' : ''} avec repas + dépense notés`);
   if (need.length) return { ready: false, need };
   const noted = avgOf(defs);
   const real = -slopePerDay(pts) * KCAL_PER_KG;
@@ -343,7 +343,7 @@ function weekCard() {
     <table class="week-table">
       <tr><th></th><th>Sem. dernière</th><th>Cette semaine</th></tr>
       <tr><td>Déficit moyen</td>${cell(prev.avg != null ? signed(prev.avg) : '–', balanceCls(prev.avg))}${cell(cur.avg != null ? signed(cur.avg) + (better == null ? '' : better ? ' ↑' : ' ↓') : '–', balanceCls(cur.avg))}</tr>
-      <tr><td>Jours complets</td>${cell(`${prev.complete}/7`)}${cell(`${cur.complete}/${cur.elapsed}`)}</tr>
+      <tr><td>Jours suivis</td>${cell(`${prev.complete}/7`)}${cell(`${cur.complete}/${cur.elapsed}`)}</tr>
       <tr><td>Poids moyen</td>${cell(prev.weight != null ? fr(prev.weight, 1) : '–')}${cell(cur.weight != null ? fr(cur.weight, 1) + (dW == null ? '' : ` <small>(${dW > 0 ? '+' : '−'}${fr(Math.abs(dW), 1)})</small>`) : '–', dW == null ? '' : dW <= 0 ? 'good' : 'warn')}</tr>
       <tr><td>Alcool</td>${cell(prev.hasData ? (prev.alc.length ? `🍷 ${prev.alc.length} j` : '🟢 0') : '–', prev.alc.length ? 'warn' : '')}${cell(cur.hasData ? (cur.alc.length ? `🍷 ${cur.alc.length} j` : '🟢 0') : '–', cur.alc.length ? 'warn' : '')}</tr>
     </table>
@@ -389,7 +389,7 @@ views.home = () => {
       <button data-action="home-day" data-delta="1" ${isToday ? 'disabled' : ''}>›</button>
     </div>
     <div class="streaks">
-      <span class="streak">🔥 <b>${streak}</b> j complet${streak > 1 ? 's' : ''} d'affilée</span>
+      <span class="streak">🔥 <b>${streak}</b> j de suivi d'affilée <small>(repas + dépense)</small></span>
       <span class="streak">🧊 <b>${sober}</b> j sans alcool</span>
     </div>
 
@@ -434,12 +434,12 @@ views.home = () => {
       <section class="card stat">
         <h3>Déficit moyen 7 j</h3>
         <strong class="${balanceCls(w7?.avg)}">${w7 ? signed(w7.avg) : '–'}</strong>
-        <span>${w7 ? `kcal/j · ${w7.n} j notés` : 'aucun jour complet'}</span>
+        <span>${w7 ? `kcal/j · ${w7.n} j notés` : 'aucun jour avec repas + dépense'}</span>
       </section>
       <section class="card stat">
         <h3>Déficit moyen 30 j</h3>
         <strong class="${balanceCls(w30?.avg)}">${w30 ? signed(w30.avg) : '–'}</strong>
-        <span>${w30 ? `kcal/j · ${w30.n} j notés` : 'aucun jour complet'}</span>
+        <span>${w30 ? `kcal/j · ${w30.n} j notés` : 'aucun jour avec repas + dépense'}</span>
       </section>
       <section class="card stat">
         <h3>Cumul 30 j</h3>

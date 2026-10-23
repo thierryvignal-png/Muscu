@@ -296,3 +296,4 @@ button:active, .button-like:active { transform: scale(0.98); }
 .wk.bad span { background: var(--warn); }
 .wk.current span { outline: 2px solid var(--text); outline-offset: 1px; }
 .wk small { font-size: 9px; color: var(--muted); }
+.streak small { font-size: 11px; }
