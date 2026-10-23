@@ -1,6 +1,6 @@
 // Service worker : met l'app en cache pour qu'elle marche sans réseau.
 // Incrémente VERSION à chaque mise à jour des fichiers.
-const VERSION = 'muscu-v15';
+const VERSION = 'muscu-v16';
 const FILES = [
   './',
   './index.html',
@@ -22,7 +22,7 @@ const FILES = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {

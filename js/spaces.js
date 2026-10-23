@@ -37,6 +37,9 @@ export function spaceSwitch(current) {
   return `<button class="space-switch" data-action="space-menu">${s.icon} ${esc(s.name)} <span>▾</span></button>`;
 }
 
+// À changer à chaque mise à jour (comme VERSION dans sw.js) : affiché en bas du menu
+export const APP_VERSION = 'v16';
+
 export function spaceMenu(current) {
   return `
     <div class="sheet-backdrop" data-action="space-close"></div>
@@ -47,6 +50,10 @@ export function spaceMenu(current) {
           <span class="space-icon">${s.icon}</span>
           <span><b>${esc(s.name)}</b><small>${esc(s.desc)}</small></span>
         </button>`).join('')}
+      <div class="app-version">
+        <span class="hint">Version ${APP_VERSION}</span>
+        <button class="chip" data-action="force-update">↻ Forcer la mise à jour</button>
+      </div>
     </div>`;
 }
 

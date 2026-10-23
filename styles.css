@@ -434,3 +434,5 @@ small.good { color: var(--good); }
 small.warn { color: var(--warn); }
 .macros span small { font-size: 11px; display: block; }
 .vb-stat { margin-bottom: 12px; cursor: pointer; }
+
+.app-version { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }

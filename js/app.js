@@ -854,6 +854,17 @@ const actions = {
     sheet.innerHTML = spaceMenu(space);
     sheet.hidden = false;
   },
+  // Vide le cache de l'app et recharge la dernière version (les données ne sont pas touchées)
+  async 'force-update'() {
+    toast('Mise à jour…');
+    try {
+      const regs = (await navigator.serviceWorker?.getRegistrations()) || [];
+      await Promise.all(regs.map((r) => r.unregister()));
+      const keys = (await caches?.keys()) || [];
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    } catch {}
+    location.replace(location.pathname + '?u=' + Date.now());
+  },
   'space-close'() {
     $('#sheet').hidden = true;
   },
