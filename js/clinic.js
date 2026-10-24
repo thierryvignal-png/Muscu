@@ -132,6 +132,13 @@ export function view() {
     <header class="page-head"><h1>Clinique Singulier</h1><p>Modèle financier</p></header>
     ${cashCard(d.cash, 'clinicCash')}
     ${cashCard(d.capex, 'clinicCapex', { title: '🏗️ Capex restant', placeholder: 'Montant restant (€)', colored: false, sign: false })}
+    ${(() => {
+      // Solde disponible pour le ramp-up = trésorerie − capex restant
+      const cash = d.cash?.amount, capex = d.capex?.amount;
+      if (cash == null) return '';
+      const left = cash - (capex || 0);
+      return `<section class="card fin-net"><span>🚀 Solde pour le ramp-up</span><b class="${left >= 0 ? 'good' : 'warn'}">${euros(left)}</b></section>`;
+    })()}
 
     <section class="card clinic-sum">
       <div class="scn-pick">
