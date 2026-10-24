@@ -85,11 +85,12 @@ function effectDelayMonths(name) {
   const n = norm(name);
   if (n.includes('greffe')) return 12;
   if (n.includes('moxi') || n.includes('bbl') || n.includes('exion')) return 11;
+  if (isTretRoutine(name)) return 12; // environ un an de régularité
   if (n.includes('lenisna')) return 2;
   if (n.includes('juvelook')) return 1; // Juvelook et Rejuvelook
   return 0;
 }
-// Date à laquelle les points du traitement comptent dans la courbe
+// Date à laquelle l'effet du traitement est complet (gain réparti linéairement jusque-là)
 export function effectDate(it) {
   const m = effectDelayMonths(it.name);
   if (!m) return it.date;
@@ -139,7 +140,7 @@ function itemRow(it) {
   return `
     <li class="task ${it.done ? 'done' : ''}">
       <button class="tick ${it.done ? 'on' : ''}" data-action="est-toggle" data-id="${it.id}" aria-label="${it.done ? 'Marquer prévu' : 'Marquer fait'}">✓</button>
-      <div><b>${esc(it.name)}</b><small>≈ ${monthText(it.date)}${when ? ` · ${when}` : ''}${effectDate(it) !== it.date ? ` · effet ≈ ${monthText(effectDate(it))}` : ''}</small></div>
+      <div><b>${esc(it.name)}</b><small>≈ ${monthText(it.date)}${when ? ` · ${when}` : ''}${effectDate(it) !== it.date ? ` · effet progressif jusqu'à ≈ ${monthText(effectDate(it))}${it.points ? ` (≈ +${fr(it.points / effectDelayMonths(it.name), 1)}/mois)` : ''}` : ''}</small></div>
       <span class="gn-badge ${it.points == null ? '' : 'soon'}">${pts(it.points)}</span>
       <button class="icon-btn" data-action="est-edit" data-id="${it.id}" aria-label="Modifier">✎</button>
     </li>`;
@@ -171,13 +172,35 @@ export function view() {
   const planned = items.filter((x) => !x.done);
   const done = items.filter((x) => x.done);
 
-  // Évolution du score : départ aujourd'hui, puis + points à chaque traitement prévu
-  // Chaque gain de points est placé à la date où l'effet est visible (séance + délai)
-  let run = s.current;
-  const effects = planned
-    .map((x) => ({ date: effectDate(x) < today() ? today() : effectDate(x), points: x.points || 0 }))
-    .sort((a, b) => (a.date < b.date ? -1 : 1));
-  const curve = [{ date: today(), value: run }, ...effects.map((x) => ({ date: x.date, value: (run = clamp100(run + x.points)) }))];
+  // Évolution du score : chaque traitement à délai répartit ses points linéairement
+  // de la séance à la date d'effet complet ; les autres ajoutent leurs points d'un coup.
+  const t0 = today();
+  const ms = (iso) => new Date(iso + 'T12:00:00').getTime();
+  const gain = (x, iso, before) => {
+    const p = x.points || 0;
+    const end = effectDate(x);
+    if (end === x.date) return iso > x.date || (iso === x.date && !before) ? p : 0;
+    const f = (ms(iso) - ms(x.date)) / (ms(end) - ms(x.date));
+    return p * Math.max(0, Math.min(1, f));
+  };
+  // Déjà acquis aujourd'hui sur les traitements prévus dont l'effet a commencé
+  const startGain = planned.reduce((sum, x) => sum + gain(x, t0, false), 0);
+  const scoreAt = (iso, before = false) =>
+    clamp100(s.current + planned.reduce((sum, x) => sum + gain(x, iso, before), 0) - startGain);
+  const breaks0 = planned.flatMap((x) => [x.date, effectDate(x)]).filter((iso) => iso > t0).sort();
+  // + un point tous les 15 jours pour qu'un tap donne le score à n'importe quelle date
+  const samples = [];
+  if (breaks0.length) {
+    for (let t = ms(t0) + 15 * 864e5; t < ms(breaks0[breaks0.length - 1]); t += 15 * 864e5) samples.push(isoOf(new Date(t)));
+  }
+  const breaks = [...new Set([...breaks0, ...samples])].sort();
+  const curve = [{ date: t0, value: s.current }];
+  for (const iso of breaks) {
+    const before = scoreAt(iso, true);
+    const after = scoreAt(iso);
+    if (Math.abs(after - before) > 1e-9) curve.push({ date: iso, value: +before.toFixed(2) }); // marche d'un gain immédiat
+    curve.push({ date: iso, value: +after.toFixed(2) });
+  }
 
   return `
     <header class="page-head"><h1>Roadmap esthétique</h1></header>
@@ -204,7 +227,7 @@ export function view() {
     ${edit || adding ? itemForm(edit) : '<button class="primary block" data-action="est-add">＋ Ajouter un traitement</button>'}
 
     ${planned.length ? `<section class="card"><h2>Prévus</h2><ul class="task-list">${planned.map(itemRow).join('')}</ul></section>` : ''}
-    ${s.hasBase && curve.length > 1 ? `<section class="card"><h2>Évolution prévue du score</h2><p class="hint">Chaque gain est placé à la date où l'effet est visible : Juvelook / Rejuvelook +1 mois, Lenisna +2 mois, Moxi-BBL-Exion +11 mois, greffe +1 an.</p>${lineChart(curve, { unit: ' / 100', step: true })}</section>` : ''}
+    ${s.hasBase && curve.length > 1 ? `<section class="card"><h2>Évolution prévue du score</h2><p class="hint">Gain progressif et linéaire à partir de la séance : Juvelook / Rejuvelook sur 1 mois, Lenisna sur 2 mois, Moxi-BBL-Exion sur 11 mois, greffe et protocole Tret sur 12 mois. Les autres traitements comptent d'un coup.</p>${lineChart(curve, { unit: ' / 100', dots: false })}</section>` : ''}
     ${done.length ? `<section class="card"><h2>Faits ✓</h2><ul class="task-list">${done.map(itemRow).join('')}</ul></section>` : ''}
     ${!items.length ? '<p class="hint center">Ajoute ton premier traitement prévu.</p>' : ''}
   `;

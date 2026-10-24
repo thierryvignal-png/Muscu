@@ -139,7 +139,7 @@ export function lineChart(points, opts = {}) {
     svg += `<path d="${path(opts.trend)}" class="line trend"/>`;
   }
   if (points.length > 1) svg += `<path d="${path(points)}" class="line ${opts.trend ? 'raw' : ''}"/>`;
-  for (const p of points) {
+  for (const p of opts.dots === false ? [] : points) {
     svg += `<circle cx="${x(p.date)}" cy="${y(p.value)}" r="${points.length > 40 ? 1.5 : 3}" class="dot"/>`;
   }
   svg += '</svg>';
