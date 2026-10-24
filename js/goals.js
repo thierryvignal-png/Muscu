@@ -169,6 +169,7 @@ export const actions = {
     const input = el.parentElement.querySelector('input');
     const v = input.value.trim();
     input.value = v.startsWith('-') ? v.slice(1) : '-' + (v || '');
+    input.dispatchEvent(new Event('input', { bubbles: true })); // met à jour les totaux affichés
     input.focus();
     return false;
   },

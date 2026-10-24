@@ -5,6 +5,7 @@ import * as goals from './goals.js';
 import * as todo from './todo.js';
 import * as esthetique from './esthetique.js';
 import * as atom from './atom.js';
+import * as finance from './finance.js';
 import { lineChart, barChart, balanceChart } from './charts.js';
 
 // ---------- Utilitaires ----------
@@ -732,7 +733,7 @@ views.more = () => {
     )}
     ${card(
       'Sauvegarde',
-      `<p class="hint">Tes données restent sur ce téléphone. Exporte-les régulièrement pour ne rien perdre : la sauvegarde contient tous tes espaces (Muscu, Todo, Atom, Good news, Objectifs, Esthétique, Clinique).</p>
+      `<p class="hint">Tes données restent sur ce téléphone. Exporte-les régulièrement pour ne rien perdre : la sauvegarde contient tous tes espaces (Muscu, Todo, Atom, Good news, Objectifs et finances, Esthétique, Clinique).</p>
        <div class="form">
          <button class="full" data-action="export">⬇︎ Exporter (JSON)</button>
          <label class="full button-like">⬆︎ Importer<input type="file" accept="application/json,.json" id="importFile" hidden></label>
@@ -1095,7 +1096,8 @@ spaceViews.todo = todo.view;
 spaceViews.esthetique = esthetique.view;
 spaceViews.atom = atom.view;
 spaceViews.goodnews = goodnews.view;
-spaceViews.goals = goals.view;
+// Objectifs de vie + suivi financier en bas
+spaceViews.goals = () => goals.view() + finance.view();
 function wrapSpace(handlers) {
   return Object.fromEntries(Object.entries(handlers).map(([k, fn]) => [k, (arg) => {
     const res = fn(arg);
@@ -1104,8 +1106,8 @@ function wrapSpace(handlers) {
     render();
   }]));
 }
-Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions), wrapSpace(todo.actions), wrapSpace(esthetique.actions), wrapSpace(atom.actions));
-Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms), wrapSpace(todo.forms), wrapSpace(esthetique.forms), wrapSpace(atom.forms));
+Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions), wrapSpace(todo.actions), wrapSpace(esthetique.actions), wrapSpace(atom.actions), wrapSpace(finance.actions));
+Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms), wrapSpace(todo.forms), wrapSpace(esthetique.forms), wrapSpace(atom.forms), wrapSpace(finance.forms));
 
 // ---------- Événements (délégation) ----------
 document.addEventListener('click', (e) => {

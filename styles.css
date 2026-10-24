@@ -478,3 +478,17 @@ small.warn { color: var(--warn); }
 .deal-total b { font-size: 18px; }
 .deal-total.sub { border-top: 0; padding-top: 0; font-size: 14px; }
 .deal-total.sub b { font-size: 15px; color: var(--good); }
+
+/* Suivi financier */
+.fin-head, .fin-row, .fin-total { display: grid; grid-template-columns: 1.1fr 1.4fr 1fr 28px; gap: 6px; align-items: center; }
+.fin-head.two, .fin-row.two, .fin-total.two { grid-template-columns: 1.1fr 1.6fr 28px; }
+.fin-head { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.fin-row { margin-bottom: 6px; }
+.fin-row input { padding: 9px 8px; font-size: 15px; }
+.fin-row .sign-btn { width: 34px; font-size: 15px; }
+.fin-row .icon-btn { padding: 4px; }
+.fin-year { font-size: 13px; color: var(--muted); text-align: right; white-space: nowrap; }
+.fin-total { padding: 10px 0; border-top: 2px solid var(--line); margin-top: 4px; }
+.fin-total b { text-align: right; white-space: nowrap; }
+.fin-total b:first-of-type { text-align: left; padding-left: 8px; }
+.fin .block { margin: 6px 0 12px; }

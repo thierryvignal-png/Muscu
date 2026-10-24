@@ -8,7 +8,7 @@ Un bouton en haut de l'écran permet de passer d'un espace à l'autre. Chaque es
 - **✅ Todo** — tâches avec échéance, priorité, catégorie (Perso / Clinique / Atom) et répétition (jour / semaine / mois) ; vue en retard / aujourd'hui / à venir / sans date.
 - **⚛️ Atom** — deals transaction, deals location, deals location à venir (valeur en € par deal, commission par défaut appliquée aux deals sans valeur, total par rubrique) et next steps (prochains grands projets) ; collage de liste.
 - **🎉 Good news** — tout ce qui t'attend de cool (livraison, voyage, anniversaire…) avec compte à rebours ; dates estimées (≈) et événements annuels.
-- **🎯 Objectifs de vie** — progression en % ou chiffrée (ex : 0 → 50 000 €), comparée à la progression attendue selon le temps écoulé entre le début et l'échéance : dans les temps / presque / en retard.
+- **🎯 Objectifs de vie** — progression en % ou chiffrée (ex : 0 → 50 000 €), comparée à la progression attendue selon le temps écoulé entre le début et l'échéance : dans les temps / presque / en retard. En bas : suivi financier — flux mensuels (annuel ×12, totaux) et portefeuille (valorisations, total).
 - **✨ Roadmap esthétique** — traitements prévus avec date approximative et points ajoutés au score esthétique /100 (estimés par l'IA) ; score actuel, score après la roadmap, courbe d'évolution prévue.
 - **🏥 Clinique Singulier** — modèle financier à construire ; en attendant, raccourci vers un fichier existant (lien gardé sur le téléphone). Le dépôt étant public, aucun chiffre de la clinique ne doit être écrit dans le code : tout se saisit dans l'app.
 
