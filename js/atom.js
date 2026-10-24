@@ -1,6 +1,6 @@
 // Espace « Atom » : deals transaction, deals location, deals location à venir, next steps (grands projets).
 // Chaque deal a une valeur en € ; sans valeur propre, il prend la commission par défaut.
-import { esc, uid, read, write, num, fr } from './util.js';
+import { esc, uid, read, write, num, fr, today, cashCard } from './util.js';
 
 export const KEY = 'atom.data.v1';
 // {feeTx, feeLoc, deals: [{id, kind: 'tx'|'loc'|'locSoon'|'proj', name, amount|null}]}
@@ -64,6 +64,7 @@ export function view() {
   const { deals } = data;
   return `
     <header class="page-head"><h1>Atom</h1></header>
+    ${cashCard(data.cash, 'atomCash')}
     <section class="card">
       <h2>💶 Commission par défaut</h2>
       <form data-form="atomDefault" class="form">
@@ -104,6 +105,12 @@ export function view() {
 }
 
 export const forms = {
+  atomCash(f) {
+    const d = load();
+    d.cash = { amount: num(f.cash), date: today() };
+    save(d);
+    return 'Trésorerie mise à jour';
+  },
   atomDefault(f) {
     const d = load();
     d.feeTx = num(f.feeTx);

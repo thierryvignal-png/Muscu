@@ -542,3 +542,10 @@ small.warn { color: var(--warn); }
 .scn.four .seg { font-size: 13px; padding: 8px 2px; }
 .scn.targets { grid-template-columns: repeat(5, 1fr); gap: 4px; }
 .scn.targets .seg { font-size: 12px; padding: 9px 1px; letter-spacing: -0.02em; }
+
+.cash-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.cash-head span { font-weight: 700; font-size: 16px; }
+.cash-head b { font-size: 24px; }
+.cash-head b.good { color: var(--good); }
+.cash-head b.warn { color: var(--warn); }
+.cash .hint { margin: 6px 0 0; }

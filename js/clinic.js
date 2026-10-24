@@ -1,7 +1,7 @@
 // Espace « Clinique Singulier » : modèle financier simple (revenus, coûts par business unit, résultat).
 // Chaque hypothèse a une valeur min et max ; on choisit le scénario (revenus min/max, coûts min/max).
 // Tous les chiffres sont saisis dans l'app et restent sur le téléphone (rien dans le code).
-import { esc, uid, read, write, num, fr } from './util.js';
+import { esc, uid, read, write, num, fr, today, cashCard } from './util.js';
 
 export const KEY = 'clinique.data.v1';
 
@@ -130,6 +130,7 @@ export function view() {
 
   return `
     <header class="page-head"><h1>Clinique Singulier</h1><p>Modèle financier</p></header>
+    ${cashCard(d.cash, 'clinicCash')}
 
     <section class="card clinic-sum">
       <div class="scn-pick">
@@ -228,6 +229,12 @@ export function view() {
 }
 
 export const forms = {
+  clinicCash(f) {
+    const d = load();
+    d.cash = { amount: num(f.cash), date: today() };
+    save(d);
+    return 'Trésorerie mise à jour';
+  },
   clinicRev(f) {
     const d = load();
     d.days = num(f.days);
