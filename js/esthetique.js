@@ -266,6 +266,8 @@ export const actions = {
     const d = load();
     const it = d.items.find((x) => x.id === el.dataset.id);
     if (!it) return false;
+    // Confirmation avant de marquer fait (évite les taps accidentels) ; décocher reste immédiat
+    if (!it.done && !confirm(`Marquer « ${it.name} » comme fait ?`)) return false;
     it.done = !it.done;
     save(d);
     return it.done ? `Fait ✓ ${pts(it.points)} au score` : 'Remis en prévu';
