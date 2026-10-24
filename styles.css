@@ -522,3 +522,7 @@ small.warn { color: var(--warn); }
 .cost-max { grid-area: max; }
 .cost-min span, .cost-max span { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
 .cost-row input { padding: 9px 8px; font-size: 15px; }
+
+.scn.three { grid-template-columns: 1fr 1fr 1fr; }
+.clinic-impl { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--accent-soft); font-size: 14px; line-height: 1.5; }
+.clinic-impl small { color: var(--muted); font-size: 12px; display: block; }

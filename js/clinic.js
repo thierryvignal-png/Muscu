@@ -27,12 +27,15 @@ const load = () => {
   for (const r of REVENUES) {
     const l = (d.rev[r.key] ??= { count: null, bu: r.bu });
     // Anciennes valeurs uniques → min = max
-    l.toMin ??= l.to ?? null; l.toMax ??= l.to ?? null;
+    // Taux d'occupation unique : reprend l'ancien TO max (ou min) s'il existait
+    if (l.to == null) l.to = l.toMax ?? l.toMin ?? null;
+    l.priceMin ??= null; l.priceMax ??= null; // prix moyen par acte (devices, bilans)
     l.caMin ??= l.ca ?? null; l.caMax ??= l.ca ?? null;
   }
   d.costs ??= [];
   d.costs.forEach((c) => { c.min ??= c.monthly ?? null; c.max ??= c.monthly ?? null; });
   d.scn ??= { rev: 'min', cost: 'max' }; // scénario prudent par défaut
+  d.etpDays ??= 200; // jours travaillés par an par un praticien à temps plein
   return d;
 };
 const save = (d) => write(KEY, d);
@@ -42,13 +45,14 @@ const pick = (o, base, which) => o[base + (which === 'max' ? 'Max' : 'Min')];
 
 // CA annuel d'une ligne de revenus pour un scénario (null si un paramètre manque)
 function revenueYear(r, line, days, which) {
-  const to = pick(line, 'to', which);
+  const to = line.to;
   const ca = pick(line, 'ca', which);
   const count = r.offices ? line.count : 1;
   if (days == null || to == null || ca == null || count == null) return null;
   return count * (to / 100) * ca * days;
 }
-const costMonth = (c, which) => (which === 'max' ? c.max : c.min) || 0;
+// Coût mensuel selon le scénario : min, max, ou mid (moyenne des deux)
+const costMonth = (c, which) => (which === 'max' ? c.max : which === 'mid' ? ((c.min || 0) + (c.max || 0)) / 2 : c.min) || 0;
 
 function model(d) {
   const { rev, cost } = d.scn;
@@ -75,8 +79,9 @@ const field = (name, label, value, placeholder = '') =>
   `<label class="field"><span>${label}</span><input name="${name}" inputmode="decimal" value="${value ?? ''}" placeholder="${placeholder}" autocomplete="off"></label>`;
 
 const seg = (kind, value) => `
-  <div class="alcohol scn">
+  <div class="alcohol scn ${kind === 'cost' ? 'three' : ''}">
     <button class="seg ${value === 'min' ? 'on good' : ''}" data-action="clinic-scn" data-kind="${kind}" data-v="min">Min</button>
+    ${kind === 'cost' ? `<button class="seg ${value === 'mid' ? 'on good' : ''}" data-action="clinic-scn" data-kind="${kind}" data-v="mid">Mid</button>` : ''}
     <button class="seg ${value === 'max' ? 'on good' : ''}" data-action="clinic-scn" data-kind="${kind}" data-v="max">Max</button>
   </div>`;
 
@@ -111,20 +116,45 @@ export function view() {
     <h2 class="section-title">📈 Revenus</h2>
     <form data-form="clinicRev">
       <section class="card">
-        <div class="form">${field('days', "Jours d'ouverture / an", d.days, 'ex : 300')}</div>
+        <div class="form">
+          ${field('days', "Jours d'ouverture / an", d.days, 'ex : 300')}
+          ${field('etpDays', 'Jours travaillés / an par ETP', d.etpDays, 'ex : 200')}
+        </div>
       </section>
-      ${m.lines.map(({ r, line, min, max }) => `
+      ${m.lines.map(({ r, line, min, max }) => {
+        // Ce que ça implique : ETP pour les bureaux, actes / jour pour devices et bilans
+        let impl = '';
+        if (r.offices && line.count != null && line.to != null && d.days != null && d.etpDays) {
+          const etp = (line.count * (line.to / 100) * d.days) / d.etpDays;
+          impl = `👩‍⚕️ ≈ <b>${fr(etp, 1)} ${r.key === 'med' ? 'médecins' : 'praticiens'} ETP</b> à recruter <small>(${fr(line.count)} bureaux × ${fr(line.to)} % × ${fr(d.days)} j ÷ ${fr(d.etpDays)} j/ETP)</small>`;
+        }
+        if (!r.offices && line.to != null) {
+          const ca = pick(line, 'ca', d.scn.rev);
+          const acts = (price) => (ca != null && price ? (ca * (line.to / 100)) / price : null);
+          const a1 = acts(line.priceMin), a2 = acts(line.priceMax);
+          if (a1 != null || a2 != null) {
+            const parts = [[line.priceMin, a1], [line.priceMax, a2]].filter(([p, a]) => a != null && p)
+              .map(([p, a]) => `<b>${fr(a, 1)} actes / jour</b> à ${fr(p)} €`);
+            impl = `🔢 ${parts.join(' · ')} <small>(CA / jour ${d.scn.rev} × TO ÷ prix ; ≈ ${fr(((a1 ?? a2) * (d.days || 0)), 0)} actes / an)</small>`;
+          }
+        }
+        return `
         <section class="card">
           <h2>${r.label} <small class="hint">${range(min, max)} / an</small></h2>
           <div class="form">
             ${r.offices ? field(`${r.key}_count`, 'Nombre de bureaux', line.count) : ''}
             <label class="field ${r.offices ? '' : 'full'}"><span>Business unit</span>${buSelect(`${r.key}_bu`, line.bu || r.bu)}</label>
-            ${field(`${r.key}_toMin`, 'TO min (%)', line.toMin, 'ex : 50')}
-            ${field(`${r.key}_toMax`, 'TO max (%)', line.toMax, 'ex : 80')}
+            ${field(`${r.key}_to`, "Taux d'occupation (%)", line.to, 'ex : 70')}
+            <span></span>
             ${field(`${r.key}_caMin`, r.offices ? 'CA/bureau/jour min (€)' : 'CA / jour min (€)', line.caMin)}
             ${field(`${r.key}_caMax`, r.offices ? 'CA/bureau/jour max (€)' : 'CA / jour max (€)', line.caMax)}
+            ${r.offices ? '' : `
+              ${field(`${r.key}_priceMin`, 'Prix / acte min (€)', line.priceMin, 'ex : 150')}
+              ${field(`${r.key}_priceMax`, 'Prix / acte max (€)', line.priceMax, 'ex : 200')}`}
           </div>
-        </section>`).join('')}
+          ${impl ? `<p class="clinic-impl">${impl}</p>` : ''}
+        </section>`;
+      }).join('')}
       <button class="primary block">Enregistrer les revenus</button>
     </form>
 
@@ -157,13 +187,15 @@ export const forms = {
   clinicRev(f) {
     const d = load();
     d.days = num(f.days);
+    d.etpDays = num(f.etpDays) || 200;
     for (const r of REVENUES) {
       const line = d.rev[r.key];
       if (r.offices) line.count = num(f[`${r.key}_count`]);
-      for (const k of ['toMin', 'toMax', 'caMin', 'caMax']) line[k] = num(f[`${r.key}_${k}`]);
+      line.to = num(f[`${r.key}_to`]);
+      for (const k of ['caMin', 'caMax', 'priceMin', 'priceMax']) if (`${r.key}_${k}` in f) line[k] = num(f[`${r.key}_${k}`]);
       // Un seul des deux rempli → on l'utilise pour les deux
-      line.toMax ??= line.toMin; line.toMin ??= line.toMax;
       line.caMax ??= line.caMin; line.caMin ??= line.caMax;
+      line.priceMax ??= line.priceMin; line.priceMin ??= line.priceMax;
       line.bu = f[`${r.key}_bu`] || r.bu;
     }
     save(d);
