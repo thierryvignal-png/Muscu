@@ -13,6 +13,7 @@ const LISTS = [
 ];
 
 let editing = null;
+let pasting = null; // liste en cours de collage
 
 function row(d) {
   if (editing === d.id) {
@@ -53,12 +54,39 @@ export function view() {
             <input name="name" required placeholder="${placeholder}" autocomplete="off">
             <button class="primary" aria-label="Ajouter">＋</button>
           </form>
+          ${pasting === kind ? `
+            <form data-form="atomPaste" class="deal-paste">
+              <input type="hidden" name="kind" value="${kind}">
+              <textarea name="list" rows="6" placeholder="Un élément par ligne"></textarea>
+              <div class="deal-form-actions two">
+                <button class="primary">Ajouter la liste</button>
+                <button type="button" data-action="atom-paste" data-kind="">Annuler</button>
+              </div>
+            </form>`
+          : `<button class="chip paste-btn" data-action="atom-paste" data-kind="${kind}">📋 Coller une liste</button>`}
         </section>`;
     }).join('')}
   `;
 }
 
 export const forms = {
+  // Une ligne = un élément (numéros « 1. », « 2) », puces « - » et doublons ignorés)
+  atomPaste(f) {
+    const d = load();
+    const norm = (s) => s.trim().toLowerCase();
+    const names = String(f.list || '').split('\n')
+      .map((l) => l.replace(/^\s*(\d+[.)-]?|[-•*])\s*/, '').trim())
+      .filter(Boolean);
+    let n = 0;
+    for (const name of names) {
+      if (d.deals.some((x) => x.kind === f.kind && norm(x.name) === norm(name))) continue;
+      d.deals.push({ id: uid(), kind: f.kind, name });
+      n++;
+    }
+    pasting = null;
+    save(d);
+    return `${n} ajouté${n > 1 ? 's' : ''}`;
+  },
   atomDeal(f) {
     const name = (f.name || '').trim();
     if (!name) return false;
@@ -72,6 +100,7 @@ export const forms = {
 };
 
 export const actions = {
+  'atom-paste'(el) { pasting = el.dataset.kind || null; },
   'atom-edit'(el) { editing = el.dataset.id; },
   'atom-cancel'() { editing = null; },
   'atom-delete'(el) {

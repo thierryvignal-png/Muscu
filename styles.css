@@ -466,3 +466,7 @@ small.warn { color: var(--warn); }
 .signed-input { display: flex; gap: 6px; flex: 1; min-width: 0; }
 .signed-input input { flex: 1; min-width: 0; }
 .sign-btn { flex: none; width: 44px; padding: 8px 0; font-size: 18px; }
+
+.paste-btn { margin-top: 10px; }
+.deal-paste { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.deal-form-actions.two { grid-template-columns: 1fr 1fr; }
