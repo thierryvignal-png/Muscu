@@ -476,3 +476,5 @@ small.warn { color: var(--warn); }
 .deal-total { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 0 2px; margin-bottom: 8px; border-top: 2px solid var(--line); font-size: 15px; }
 .deal-total span { color: var(--muted); }
 .deal-total b { font-size: 18px; }
+.deal-total.sub { border-top: 0; padding-top: 0; font-size: 14px; }
+.deal-total.sub b { font-size: 15px; color: var(--good); }

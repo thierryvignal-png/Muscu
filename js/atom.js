@@ -3,8 +3,17 @@
 import { esc, uid, read, write, num, fr } from './util.js';
 
 export const KEY = 'atom.data.v1';
-// {defaultFee, deals: [{id, kind: 'tx'|'loc'|'locSoon'|'proj', name, amount|null}]}
-const load = () => read(KEY, { defaultFee: null, deals: [] });
+// {feeTx, feeLoc, deals: [{id, kind: 'tx'|'loc'|'locSoon'|'proj', name, amount|null}]}
+// (ancienne commission unique « defaultFee » : reprise pour les deux au premier chargement)
+const load = () => {
+  const d = read(KEY, { deals: [] });
+  if (d.feeTx === undefined) d.feeTx = d.defaultFee ?? null;
+  if (d.feeLoc === undefined) d.feeLoc = d.defaultFee ?? null;
+  return d;
+};
+// Commission par défaut selon la rubrique : transaction, ou location (en cours et à venir)
+const feeFor = (d, kind) => (kind === 'tx' ? d.feeTx : d.feeLoc);
+const TX_MONTHS = 6; // total transaction encaissable sur 6 mois
 const save = (d) => write(KEY, d);
 
 const LISTS = [
@@ -51,26 +60,29 @@ function row(d, def) {
 }
 
 export function view() {
-  const { deals, defaultFee: def } = load();
+  const data = load();
+  const { deals } = data;
   return `
     <header class="page-head"><h1>Atom</h1></header>
     <section class="card">
       <h2>💶 Commission par défaut</h2>
-      <form data-form="atomDefault" class="burn-form">
-        <input name="fee" inputmode="decimal" placeholder="ex : 8 900" value="${def ?? ''}" autocomplete="off">
-        <button class="primary">OK</button>
+      <form data-form="atomDefault" class="form">
+        <label class="field"><span>🏠 Transaction (€)</span><input name="feeTx" inputmode="decimal" placeholder="ex : 8 900" value="${data.feeTx ?? ''}" autocomplete="off"></label>
+        <label class="field"><span>🔑 Location (€)</span><input name="feeLoc" inputmode="decimal" placeholder="ex : 1 500" value="${data.feeLoc ?? ''}" autocomplete="off"></label>
+        <button class="primary full">Enregistrer</button>
       </form>
       <p class="hint">Appliquée à tous les deals sans valeur propre (affichée en gris). Touche un deal pour lui donner une autre valeur.</p>
     </section>
     ${LISTS.map(({ kind, title, placeholder, hint }) => {
       const list = deals.filter((d) => d.kind === kind);
+      const def = feeFor(data, kind);
       const total = list.reduce((s, d) => s + (valueOf(d, def) || 0), 0);
       return `
         <section class="card">
           <h2>${title} <small class="hint">${list.length || ''}</small></h2>
           ${hint ? `<p class="hint">${hint}</p>` : ''}
           ${list.length ? `<ul class="deal-list">${list.map((d) => row(d, def)).join('')}</ul>` : ''}
-          ${hasValue(kind) && list.length ? `<div class="deal-total"><span>Total · ${list.length} deal${list.length > 1 ? 's' : ''}</span><b>${euros(total)}</b></div>` : ''}
+          ${hasValue(kind) && list.length ? `<div class="deal-total"><span>Total · ${list.length} deal${list.length > 1 ? 's' : ''}</span><b>${euros(total)}</b></div>${kind === 'tx' ? `<div class="deal-total sub"><span>÷ ${TX_MONTHS} · encaissable par mois</span><b>${euros(Math.round(total / TX_MONTHS))}</b></div>` : ''}` : ''}
           <form data-form="atomDeal" class="deal-add">
             <input type="hidden" name="kind" value="${kind}">
             <input name="name" required placeholder="${placeholder}" autocomplete="off">
@@ -94,9 +106,10 @@ export function view() {
 export const forms = {
   atomDefault(f) {
     const d = load();
-    d.defaultFee = num(f.fee);
+    d.feeTx = num(f.feeTx);
+    d.feeLoc = num(f.feeLoc);
     save(d);
-    return d.defaultFee == null ? 'Commission par défaut effacée' : `Commission par défaut : ${euros(d.defaultFee)}`;
+    return 'Commissions par défaut enregistrées';
   },
   // Une ligne = un élément (numéros « 1. », « 2) », puces « - » et doublons ignorés)
   atomPaste(f) {
