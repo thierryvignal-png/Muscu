@@ -38,16 +38,17 @@ export function write(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { alert("Impossible d'enregistrer : " + e.message); }
 }
 
-// Carte « Trésorerie » (solde + date de mise à jour), partagée par Clinique et Atom.
+// Carte « montant + date de mise à jour » (trésorerie, capex restant…), partagée par Clinique et Atom.
 // cash : {amount, date} ; formName : nom du formulaire qui l'enregistre.
-export function cashCard(cash, formName) {
+export function cashCard(cash, formName, opts = {}) {
+  const { title = '💰 Trésorerie', placeholder = 'Solde actuel (€)', colored = true, sign = true } = opts;
   const a = cash?.amount;
-  const cls = a == null ? '' : a >= 0 ? 'good' : 'warn';
+  const cls = !colored || a == null ? '' : a >= 0 ? 'good' : 'warn';
   return `
     <section class="card cash">
-      <div class="cash-head"><span>💰 Trésorerie</span><b class="${cls}">${a == null ? '–' : `${fr(a)} €`}</b></div>
+      <div class="cash-head"><span>${title}</span><b class="${cls}">${a == null ? '–' : `${fr(a)} €`}</b></div>
       <form data-form="${formName}" class="burn-form">
-        <span class="signed-input"><input name="cash" inputmode="decimal" placeholder="Solde actuel (€)" value="${a ?? ''}" autocomplete="off"><button type="button" class="sign-btn" data-action="goal-sign" aria-label="Changer le signe">±</button></span>
+        <span class="signed-input"><input name="cash" inputmode="decimal" placeholder="${placeholder}" value="${a ?? ''}" autocomplete="off">${sign ? '<button type="button" class="sign-btn" data-action="goal-sign" aria-label="Changer le signe">±</button>' : ''}</span>
         <button class="primary">OK</button>
       </form>
       ${cash?.date ? `<p class="hint">Mise à jour le ${fmtDate(cash.date, false)}</p>` : ''}

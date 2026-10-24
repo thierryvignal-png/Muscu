@@ -131,6 +131,7 @@ export function view() {
   return `
     <header class="page-head"><h1>Clinique Singulier</h1><p>Modèle financier</p></header>
     ${cashCard(d.cash, 'clinicCash')}
+    ${cashCard(d.capex, 'clinicCapex', { title: '🏗️ Capex restant', placeholder: 'Montant restant (€)', colored: false, sign: false })}
 
     <section class="card clinic-sum">
       <div class="scn-pick">
@@ -229,6 +230,12 @@ export function view() {
 }
 
 export const forms = {
+  clinicCapex(f) {
+    const d = load();
+    d.capex = { amount: num(f.cash), date: today() };
+    save(d);
+    return 'Capex restant mis à jour';
+  },
   clinicCash(f) {
     const d = load();
     d.cash = { amount: num(f.cash), date: today() };
