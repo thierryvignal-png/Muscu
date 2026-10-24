@@ -552,12 +552,15 @@ function saveDraft() {
 const BIG_THREE = [
   { label: 'Squat', re: /squat/i },
   { label: 'RDL', re: /\brdl\b|roumain|romanian/i },
-  { label: 'Bench press', re: /bench|d[ée]velopp[ée].?couch[ée]/i },
+  { label: 'Bench', re: /bench|d[ée]velopp[ée].?couch[ée]/i },
 ];
 function bigThreeCard() {
   const ws = store.get().workouts;
+  const manual = store.settings().big3 || {}; // dates saisies à la main : {Squat: '2026-10-20', …}
   const rows = BIG_THREE.map((b) => {
-    const last = ws.filter((w) => w.exercises.some((e) => b.re.test(e.name))).map((w) => w.date).sort().pop();
+    const dates = ws.filter((w) => w.exercises.some((e) => b.re.test(e.name))).map((w) => w.date);
+    if (manual[b.label]) dates.push(manual[b.label]);
+    const last = dates.sort().pop();
     return { ...b, last, ago: last ? daysBetween(last, today()) : null };
   });
   const latest = rows.map((r) => r.last).filter(Boolean).sort().pop();
@@ -565,9 +568,21 @@ function bigThreeCard() {
   return `
     <section class="card big3">
       <div class="big3-head"><span>🏋️ Dernier big three</span><b>${latest ? `${fmtDate(latest)} · ${agoTxt(daysBetween(latest, today()))}` : 'jamais'}</b></div>
-      ${rows.map((r) => `<div class="big3-row"><span>${r.label}</span><span class="${r.ago == null || r.ago > 7 ? 'warn' : ''}">${r.last ? `${fmtDate(r.last)} · ${agoTxt(r.ago)}` : '–'}</span></div>`).join('')}
+      ${rows.map((r) => `
+        <label class="big3-row">
+          <span>${r.label}</span>
+          <span class="big3-ago ${r.ago == null || r.ago > 7 ? 'warn' : ''}">${r.last ? agoTxt(r.ago) : 'touche la date →'}</span>
+          <input type="date" data-big3="${r.label}" value="${r.last || ''}" max="${today()}">
+        </label>`).join('')}
+      <p class="hint">Touche une date pour la changer. Les séances enregistrées la mettent à jour toutes seules.</p>
     </section>`;
 }
+// Date d'un big three saisie à la main
+document.addEventListener('change', (e) => {
+  const k = e.target.dataset?.big3;
+  if (!k) return;
+  store.setSettings({ big3: { ...(store.settings().big3 || {}), [k]: e.target.value || null } });
+});
 
 views.gym = () => {
   if (state.draft) return gymEditor();

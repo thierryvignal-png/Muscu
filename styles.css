@@ -596,6 +596,7 @@ small.warn { color: var(--warn); }
 .big3-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
 .big3-head span { font-weight: 700; }
 .big3-head b { font-size: 15px; color: var(--accent); white-space: nowrap; }
-.big3-row { display: flex; justify-content: space-between; padding: 5px 0; border-top: 1px solid var(--line); font-size: 14px; }
-.big3-row span:last-child { color: var(--muted); }
-.big3-row span.warn { color: var(--warn); }
+.big3-row { display: grid; grid-template-columns: 1fr auto 140px; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.big3-ago { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.big3-ago.warn { color: var(--warn); }
+.big3-row input[type=date] { margin: 0; padding: 7px 8px; font-size: 14px; }
