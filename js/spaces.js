@@ -5,7 +5,7 @@ export const SPACES = [
   { key: 'today', icon: '🏠', name: 'Ma journée', desc: 'Tout l\'essentiel en un écran' },
   { key: 'muscu', icon: '💪', name: 'Muscu', desc: 'Déficit, repas, salle, poids' },
   { key: 'todo', icon: '✅', name: 'Todo', desc: 'Perso, Clinique, Atom' },
-  { key: 'atom', icon: '⚛️', name: 'Atom', desc: 'Deals et next steps' },
+  { key: 'atom', icon: '⚛️', name: 'Atom', desc: 'Deals et grands projets' },
   { key: 'goodnews', icon: '🎉', name: 'Good news', desc: 'Tout ce qui t\'attend de cool' },
   { key: 'goals', icon: '🎯', name: 'Objectifs de vie', desc: 'Suis-je dans les temps ?' },
   { key: 'esthetique', icon: '✨', name: 'Roadmap esthétique', desc: 'Traitements prévus et score /100' },
@@ -39,7 +39,7 @@ export function spaceSwitch(current) {
 }
 
 // À changer à chaque mise à jour (comme VERSION dans sw.js) : affiché en bas du menu
-export const APP_VERSION = 'v27';
+export const APP_VERSION = 'v28';
 
 export function spaceMenu(current) {
   return `

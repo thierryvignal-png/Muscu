@@ -449,7 +449,7 @@ small.warn { color: var(--warn); }
 .deal-form { display: flex; flex-direction: column; gap: 6px; width: 100%; cursor: auto; }
 .deal-form-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
 .deal-form-actions button { padding: 9px 4px; font-size: 14px; }
-.deal-add { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; }
+.deal-add { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
 .deal-add button { padding: 10px 14px; }
 
 /* Graphiques : toucher pour voir date + valeur */
