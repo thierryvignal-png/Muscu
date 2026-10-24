@@ -470,3 +470,9 @@ small.warn { color: var(--warn); }
 .paste-btn { margin-top: 10px; }
 .deal-paste { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .deal-form-actions.two { grid-template-columns: 1fr 1fr; }
+
+.deal-value { font-weight: 700; font-size: 14px; white-space: nowrap; }
+.deal-value.is-default { color: var(--muted); font-weight: 500; }
+.deal-total { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 0 2px; margin-bottom: 8px; border-top: 2px solid var(--line); font-size: 15px; }
+.deal-total span { color: var(--muted); }
+.deal-total b { font-size: 18px; }
