@@ -54,3 +54,42 @@ export function cashCard(cash, formName, opts = {}) {
       ${cash?.date ? `<p class="hint">Mise à jour le ${fmtDate(cash.date, false)}</p>` : ''}
     </section>`;
 }
+
+// ---------- Séparateur de milliers dans les champs chiffrés ----------
+// « 2000000 » s'affiche « 2 000 000 » (y compris pendant la frappe) ; num() ignore les espaces.
+const NUM_INPUT = 'input[inputmode="decimal"], input[inputmode="numeric"]';
+
+function groupValue(raw) {
+  const neg = /^\s*-/.test(raw);
+  const clean = raw.replace(/[^\d.,]/g, '');
+  const i = clean.search(/[.,]/);
+  const int = (i === -1 ? clean : clean.slice(0, i)).replace(/[.,]/g, '');
+  const dec = i === -1 ? null : clean.slice(i + 1).replace(/[.,]/g, '');
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return (neg ? '-' : '') + grouped + (dec === null ? '' : ',' + dec);
+}
+
+export function formatNumberInput(input) {
+  const before = input.value;
+  const after = groupValue(before);
+  if (after === before) return;
+  // Garde le curseur après le même nombre de chiffres
+  const pos = input.selectionStart ?? before.length;
+  const digitsBefore = before.slice(0, pos).replace(/[^\d,.-]/g, '').length;
+  input.value = after;
+  if (document.activeElement === input) {
+    let n = 0, p = 0;
+    while (p < after.length && n < digitsBefore) { if (/[\d,.-]/.test(after[p])) n++; p++; }
+    try { input.setSelectionRange(p, p); } catch {}
+  }
+}
+
+export function formatNumberInputs(root = document) {
+  root.querySelectorAll(NUM_INPUT).forEach(formatNumberInput);
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('input', (e) => {
+    if (e.target.matches?.(NUM_INPUT)) formatNumberInput(e.target);
+  }, true);
+}

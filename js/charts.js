@@ -116,7 +116,7 @@ export function lineChart(points, opts = {}) {
   let svg = `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img">`;
   for (const t of ticks) {
     svg += `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${y(t)}" y2="${y(t)}" class="grid"/>`;
-    svg += `<text x="${PAD.l - 4}" y="${y(t) + 3}" class="axis" text-anchor="end">${t.toFixed(dec).replace('.', ',')}</text>`;
+    svg += `<text x="${PAD.l - 4}" y="${y(t) + 3}" class="axis" text-anchor="end">${Number(t.toFixed(dec)).toLocaleString('fr-FR', { minimumFractionDigits: dec, maximumFractionDigits: dec })}</text>`;
   }
   for (const t of dateTicks(points[0].date, points[points.length - 1].date, x)) {
     const tx = t.anchor === 'middle' ? Math.min(W - PAD.r - 12, Math.max(PAD.l + 12, t.x)) : t.x;
@@ -158,7 +158,7 @@ export function barChart(bars, opts = {}) {
 
   let svg = `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img">`;
   svg += `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${y(0)}" y2="${y(0)}" class="grid"/>`;
-  svg += `<text x="${PAD.l - 4}" y="${y(max / 1.1) + 3}" class="axis" text-anchor="end">${Math.round(max / 1.1)}</text>`;
+  svg += `<text x="${PAD.l - 4}" y="${y(max / 1.1) + 3}" class="axis" text-anchor="end">${fmtNum(Math.round(max / 1.1))}</text>`;
   const tips = [];
   bars.forEach((b, i) => {
     const bx = PAD.l + i * bw + bw * 0.15;
@@ -208,7 +208,7 @@ export function balanceChart(bars, opts = {}) {
   svg += `<text x="${PAD.l - 4}" y="${y(0) + 3}" class="axis" text-anchor="end">0</text>`;
   if (opts.goal) {
     svg += `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${y(opts.goal)}" y2="${y(opts.goal)}" class="goal neutral"/>`;
-    svg += `<text x="${PAD.l - 4}" y="${y(opts.goal) + 3}" class="axis" text-anchor="end">${opts.goal}</text>`;
+    svg += `<text x="${PAD.l - 4}" y="${y(opts.goal) + 3}" class="axis" text-anchor="end">${fmtNum(opts.goal)}</text>`;
   }
   const tips = [];
   bars.forEach((b, i) => {

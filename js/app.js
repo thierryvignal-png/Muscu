@@ -1,6 +1,7 @@
 import { store } from './store.js';
 import { setSpace, spaceSwitch, spaceMenu, spaceViews, SPACE_KEYS } from './spaces.js';
 import * as clinic from './clinic.js';
+import { formatNumberInputs } from './util.js';
 import * as goodnews from './goodnews.js';
 import * as goals from './goals.js';
 import * as todo from './todo.js';
@@ -752,6 +753,7 @@ function render() {
   const y = window.scrollY;
   const page = space === 'muscu' ? views[current]() : spaceViews[space]();
   main.innerHTML = spaceSwitch(space) + page;
+  formatNumberInputs(main); // espaces entre les milliers dans les champs
   document.body.classList.toggle('no-tabbar', space !== 'muscu');
   document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.tab === current));
   window.scrollTo(0, y);
