@@ -423,12 +423,12 @@ views.home = () => {
       ${alc.source === 'repas' ? `<p class="hint">Détecté dans tes repas : « ${esc(alc.name)} »</p>` : ''}
     </section>
 
-    ${goalCard()}
-
     <section class="card protein">
       <div class="protein-head"><span>Protéines</span><b class="${protRatio >= 1 ? 'good' : ''}">${fr(b.protein)} / ${s.proteinGoal} g</b></div>
       <div class="progress"><div style="width:${(protRatio * 100).toFixed(0)}%"></div></div>
     </section>
+
+    ${goalCard()}
 
     ${weekCard()}
 
