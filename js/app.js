@@ -989,6 +989,9 @@ function favMeals(n) {
   return Object.values(freq).sort((a, b) => b.n - a.n).slice(0, n).map((f) => f.m);
 }
 
+// Budget kcal du jour quand la dépense n'est pas saisie
+const DEFAULT_BURN = 2300;
+
 function journeeView() {
   const s = store.settings();
   const t = today();
@@ -999,6 +1002,9 @@ function journeeView() {
   const slope = weightSlope();
   const protRatio = Math.min(1, (b.protein || 0) / s.proteinGoal);
   const alc = alcoholDay(t);
+  // Reste à manger : dépense saisie (sinon 2 300 par défaut) − mangé
+  const budget = b.burn ?? DEFAULT_BURN;
+  const left = budget - (b.kcal || 0);
 
   let goalLine;
   if (g.missing) goalLine = `<span class="hint">${g.missing}</span>`;
@@ -1018,14 +1024,14 @@ function journeeView() {
     <header class="page-head"><h1>Ma journée</h1><p>${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</p></header>
 
     <section class="card j-muscu">
-      <div class="j-head"><h2>💪 Déficit du jour</h2><button class="chip" data-action="open-muscu" data-mtab="home">Muscu ›</button></div>
+      <div class="j-head"><h2>🍽️ Reste à manger</h2><button class="chip" data-action="open-muscu" data-mtab="home">Muscu ›</button></div>
       <div class="j-deficit">
-        <strong class="${balanceCls(b.deficit)}">${b.deficit == null ? '–' : signed(b.deficit) + ' kcal'}</strong>
-        <span class="hint">${b.deficit == null ? 'saisis ta dépense du jour' : balanceLabel(b.deficit)} · mangé ${fr(b.kcal)} − dépensé ${b.burn == null ? '?' : fr(b.burn)}</span>
+        <strong class="${left >= 0 ? 'good' : 'warn'}">${left >= 0 ? `${fr(left)} kcal` : `dépassé de ${fr(-left)} kcal`}</strong>
+        <span class="hint">budget ${fr(budget)}${b.burn == null ? ' (par défaut)' : ''} − mangé ${fr(b.kcal || 0)}</span>
       </div>
       <form data-form="burn" class="burn-form">
         <input type="hidden" name="date" value="${t}">
-        <input name="kcal" inputmode="numeric" placeholder="Dépense totale du jour (kcal)" value="${b.burn ?? ''}" autocomplete="off">
+        <input name="kcal" inputmode="numeric" placeholder="Dépense du jour (défaut ${fr(DEFAULT_BURN)})" value="${b.burn ?? ''}" autocomplete="off">
         <button class="primary">OK</button>
       </form>
 
