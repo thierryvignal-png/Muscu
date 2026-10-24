@@ -252,20 +252,27 @@ const DOC_STATUS = [
 const options = (list, value) => list.map((t) => `<option value="${t.key}" ${t.key === value ? 'selected' : ''}>${t.label}</option>`).join('');
 const docSelect = (attrs, value) => `<select ${attrs}>${options(DOC_TYPES, value)}</select>`;
 const statusSelect = (attrs, value) => `<select ${attrs}>${options(DOC_STATUS, value)}</select>`;
-// « 3 candidats · Singulier (esthétique) 2 · 5 j/sem · CM28 (médical) 1 · 2 j/sem » puis « ✅ Sûr 1 · 🤔 En réflexion 1 · 🔭 Prospectif 1 »
+// Jours-médecins par semaine pondérés par la probabilité de venir
+const DOC_WEIGHT = { sur: 0.9, reflexion: 0.5, prospectif: 0.1 };
+const docStatus = (x) => x.status || 'prospectif';
+const weightedDays = (docs, type) =>
+  docs.filter((x) => x.type === type).reduce((s, x) => s + (x.days || 0) * DOC_WEIGHT[docStatus(x)], 0);
+const docDays = (docs) => DOC_TYPES.map((t) => {
+  const v = Math.round(weightedDays(docs, t.key) * 10) / 10;
+  return `<div><span>${t.label} · ${t.desc}</span><b>${fr(v, v % 1 ? 1 : 0)}</b><small>jours-médecins / sem</small></div>`;
+}).join('');
+// « 10 candidats · ✅ Sûr 7 · 🤔 En réflexion 3 · 🔭 Prospectif 0 »
 const docCount = (docs) => `${docs.length} candidat${docs.length > 1 ? 's' : ''} · ` +
-  DOC_TYPES.map((t) => {
-    const list = docs.filter((x) => x.type === t.key);
-    const days = list.reduce((s, x) => s + (x.days || 0), 0);
-    return `${t.label} (${t.desc}) ${list.length}${days ? ` · ${fr(days, days % 1 ? 1 : 0)} j/sem` : ''}`;
-  }).join(' · ') + '<br>' +
-  DOC_STATUS.map((t) => `${t.label} ${docs.filter((x) => (x.status || 'prospectif') === t.key).length}`).join(' · ');
+  DOC_STATUS.map((t) => `${t.label} ${docs.filter((x) => docStatus(x) === t.key).length}`).join(' · ');
 
 function doctorsCard(docs) {
   return `
     <h2 class="section-title">🩺 Médecins candidats</h2>
     <section class="card">
-      ${docs.length ? `<p class="hint" data-doc-count>${docCount(docs)}</p>` : ''}
+      ${docs.length ? `
+        <div class="doc-days" data-doc-days>${docDays(docs)}</div>
+        <p class="hint center">Pondéré : sûr 90 % · réflexion 50 % · prospectif 10 %</p>
+        <p class="hint" data-doc-count>${docCount(docs)}</p>` : ''}
       ${docs.map((x) => `
         <div class="doc-row">
           <input class="doc-name" data-doc="name" data-id="${x.id}" value="${esc(x.name)}" autocomplete="off">
@@ -299,7 +306,9 @@ if (typeof document !== 'undefined') {
     else x.type = e.target.value;
     save(d);
     const c = document.querySelector('[data-doc-count]');
-    if (c) c.innerHTML = docCount(d.doctors);
+    if (c) c.textContent = docCount(d.doctors);
+    const days = document.querySelector('[data-doc-days]');
+    if (days) days.innerHTML = docDays(d.doctors);
   };
   document.addEventListener('input', onDoc);
   document.addEventListener('change', onDoc);
