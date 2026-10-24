@@ -512,7 +512,8 @@ small.warn { color: var(--warn); }
 .doc-days > div { background: var(--input); border-radius: var(--radius); padding: 12px 6px; }
 .doc-days span { display: block; font-size: 13px; color: var(--muted); }
 .doc-days b { display: block; font-size: 38px; line-height: 1.15; color: var(--accent); }
-.doc-days small { font-size: 11px; color: var(--muted); }
+.doc-days small { display: block; font-size: 11px; color: var(--muted); }
+.doc-days em { display: block; font-style: normal; font-weight: 700; font-size: 20px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
 .doc-row { display: grid; grid-template-columns: 56px 1fr 1.1fr 28px; gap: 6px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .doc-row .doc-name { grid-column: 1 / 4; }
 .doc-row input { padding: 9px 8px; font-size: 15px; margin: 0; }

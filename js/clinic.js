@@ -235,7 +235,7 @@ export function view() {
       <p class="hint">🔒 Tes chiffres restent sur ce téléphone (et dans ta sauvegarde), jamais dans le code public.</p>
     </section>
 
-    ${doctorsCard(d.doctors)}
+    ${doctorsCard(d.doctors, d.etpDays)}
   `;
 }
 
@@ -257,21 +257,25 @@ const DOC_WEIGHT = { sur: 0.9, reflexion: 0.5, prospectif: 0.1 };
 const docStatus = (x) => x.status || 'prospectif';
 const weightedDays = (docs, type) =>
   docs.filter((x) => x.type === type).reduce((s, x) => s + (x.days || 0) * DOC_WEIGHT[docStatus(x)], 0);
-const docDays = (docs) => DOC_TYPES.map((t) => {
+// Équivalent temps plein : un ETP = 5 j/sem sur (jours / an par ETP ÷ 5) semaines travaillées,
+// donc j/sem × semaines ÷ jours par ETP = j/sem ÷ 5 (même base que les ETP du modèle plus haut)
+const docDays = (docs, etpDays) => DOC_TYPES.map((t) => {
   const v = Math.round(weightedDays(docs, t.key) * 10) / 10;
-  return `<div><span>${t.label} · ${t.desc}</span><b>${fr(v, v % 1 ? 1 : 0)}</b><small>jours-médecins / sem</small></div>`;
+  const perYear = v * (etpDays / 5);
+  return `<div><span>${t.label} · ${t.desc}</span><b>${fr(v, v % 1 ? 1 : 0)}</b><small>jours-médecins / sem</small>
+    <em>≈ ${fr(perYear / etpDays, 1)} ETP</em><small>${fr(perYear)} j / an</small></div>`;
 }).join('');
 // « 10 candidats · ✅ Sûr 7 · 🤔 En réflexion 3 · 🔭 Prospectif 0 »
 const docCount = (docs) => `${docs.length} candidat${docs.length > 1 ? 's' : ''} · ` +
   DOC_STATUS.map((t) => `${t.label} ${docs.filter((x) => docStatus(x) === t.key).length}`).join(' · ');
 
-function doctorsCard(docs) {
+function doctorsCard(docs, etpDays) {
   return `
     <h2 class="section-title">🩺 Médecins candidats</h2>
     <section class="card">
       ${docs.length ? `
-        <div class="doc-days" data-doc-days>${docDays(docs)}</div>
-        <p class="hint center">Pondéré : sûr 90 % · réflexion 50 % · prospectif 10 %</p>
+        <div class="doc-days" data-doc-days>${docDays(docs, etpDays)}</div>
+        <p class="hint center">Pondéré : sûr 90 % · réflexion 50 % · prospectif 10 %<br>1 ETP = 5 j/sem × ${fr(etpDays / 5)} semaines = ${fr(etpDays)} j/an</p>
         <p class="hint" data-doc-count>${docCount(docs)}</p>` : ''}
       ${docs.map((x) => `
         <div class="doc-row">
@@ -308,7 +312,7 @@ if (typeof document !== 'undefined') {
     const c = document.querySelector('[data-doc-count]');
     if (c) c.textContent = docCount(d.doctors);
     const days = document.querySelector('[data-doc-days]');
-    if (days) days.innerHTML = docDays(d.doctors);
+    if (days) days.innerHTML = docDays(d.doctors, d.etpDays);
   };
   document.addEventListener('input', onDoc);
   document.addEventListener('change', onDoc);
