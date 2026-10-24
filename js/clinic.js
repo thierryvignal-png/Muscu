@@ -36,7 +36,7 @@ const load = () => {
   d.costs.forEach((c) => { c.min ??= c.monthly ?? null; c.max ??= c.monthly ?? null; });
   d.scn ??= { rev: 'min', cost: 'max' }; // scénario prudent par défaut
   d.etpDays ??= 200; // jours travaillés par an par un praticien à temps plein
-  d.doctors ??= []; // médecins candidats : {id, name, type: 'singulier' | 'cm28'}
+  d.doctors ??= []; // médecins candidats : {id, name, type: 'singulier' | 'cm28', days: jours / semaine}
   return d;
 };
 const save = (d) => write(KEY, d);
@@ -246,8 +246,13 @@ const DOC_TYPES = [
 ];
 const docSelect = (attrs, value) =>
   `<select ${attrs}>${DOC_TYPES.map((t) => `<option value="${t.key}" ${t.key === value ? 'selected' : ''}>${t.label}</option>`).join('')}</select>`;
+// « 3 candidats · Singulier (esthétique) 2 · 5 j/sem · CM28 (médical) 1 · 2 j/sem »
 const docCount = (docs) => `${docs.length} candidat${docs.length > 1 ? 's' : ''} · ` +
-  DOC_TYPES.map((t) => `${t.label} (${t.desc}) ${docs.filter((x) => x.type === t.key).length}`).join(' · ');
+  DOC_TYPES.map((t) => {
+    const list = docs.filter((x) => x.type === t.key);
+    const days = list.reduce((s, x) => s + (x.days || 0), 0);
+    return `${t.label} (${t.desc}) ${list.length}${days ? ` · ${fr(days, days % 1 ? 1 : 0)} j/sem` : ''}`;
+  }).join(' · ');
 
 function doctorsCard(docs) {
   return `
@@ -257,11 +262,14 @@ function doctorsCard(docs) {
       ${docs.map((x) => `
         <div class="doc-row">
           <input data-doc="name" data-id="${x.id}" value="${esc(x.name)}" autocomplete="off">
+          <input data-doc="days" data-id="${x.id}" inputmode="decimal" value="${x.days ?? ''}" placeholder="j/sem" aria-label="Jours par semaine" autocomplete="off">
           ${docSelect(`data-doc="type" data-id="${x.id}"`, x.type)}
           <button type="button" class="icon-btn" data-action="clinic-doc-del" data-id="${x.id}" aria-label="Supprimer">✕</button>
         </div>`).join('')}
-      <form data-form="clinicDocAdd" class="clinic-add">
+      ${docs.length ? '' : '<p class="hint">Nom, jours par semaine et Singulier (esthétique) ou CM28 (médical).</p>'}
+      <form data-form="clinicDocAdd" class="clinic-add doc-add">
         <input name="name" required placeholder="Nouveau candidat" autocomplete="off">
+        <input name="days" inputmode="decimal" placeholder="j/sem" aria-label="Jours par semaine" autocomplete="off">
         ${docSelect('name="type"', 'singulier')}
         <button class="primary" aria-label="Ajouter">＋</button>
       </form>
@@ -277,6 +285,7 @@ if (typeof document !== 'undefined') {
     const x = d.doctors.find((y) => y.id === e.target.dataset.id);
     if (!x) return;
     if (field === 'name') { if (e.target.value.trim()) x.name = e.target.value.trim(); }
+    else if (field === 'days') x.days = num(e.target.value);
     else x.type = e.target.value;
     save(d);
     const c = document.querySelector('[data-doc-count]');
@@ -332,7 +341,7 @@ export const forms = {
     const name = (f.name || '').trim();
     if (!name) return false;
     const d = load();
-    d.doctors.push({ id: uid(), name, type: f.type === 'cm28' ? 'cm28' : 'singulier' });
+    d.doctors.push({ id: uid(), name, type: f.type === 'cm28' ? 'cm28' : 'singulier', days: num(f.days) });
     save(d);
     return 'Candidat ajouté';
   },
