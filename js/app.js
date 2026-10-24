@@ -221,7 +221,6 @@ function goalCard() {
     <p class="hint">${g.toLose > 0
       ? `Il te faut un déficit moyen de <b>${fr(g.required)} kcal/j</b> d'ici le ${fmtDay(g.target)} (${g.daysLeft} j). Ton rythme actuel : <b>${g.avg >= 0 ? `déficit de ${fr(g.avg)}` : `excédent de ${fr(-g.avg)}`} kcal/j</b> (moy. ${g.basis}${g.cal.ready ? ', corrigé' : ''}).`
       : 'Tu es sous ton objectif, garde le cap !'}</p>
-    <p class="hint calib">${calibrationText(g.cal)}</p>
   `);
 }
 
