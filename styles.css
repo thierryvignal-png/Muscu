@@ -540,3 +540,5 @@ small.warn { color: var(--warn); }
 .target-pick p.warn { color: var(--warn); margin: 6px 0 0; }
 .scn.four { grid-template-columns: repeat(4, 1fr); }
 .scn.four .seg { font-size: 13px; padding: 8px 2px; }
+.scn.targets { grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.scn.targets .seg { font-size: 12px; padding: 9px 1px; letter-spacing: -0.02em; }
