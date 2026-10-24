@@ -548,6 +548,27 @@ function saveDraft() {
   } catch {}
 }
 
+// Big three : dernière séance où chaque mouvement a été fait (reconnu dans le nom de l'exercice)
+const BIG_THREE = [
+  { label: 'Squat', re: /squat/i },
+  { label: 'RDL', re: /\brdl\b|roumain|romanian/i },
+  { label: 'Bench press', re: /bench|d[ée]velopp[ée].?couch[ée]/i },
+];
+function bigThreeCard() {
+  const ws = store.get().workouts;
+  const rows = BIG_THREE.map((b) => {
+    const last = ws.filter((w) => w.exercises.some((e) => b.re.test(e.name))).map((w) => w.date).sort().pop();
+    return { ...b, last, ago: last ? daysBetween(last, today()) : null };
+  });
+  const latest = rows.map((r) => r.last).filter(Boolean).sort().pop();
+  const agoTxt = (n) => (n === 0 ? "aujourd'hui" : n === 1 ? 'hier' : `il y a ${n} j`);
+  return `
+    <section class="card big3">
+      <div class="big3-head"><span>🏋️ Dernier big three</span><b>${latest ? `${fmtDate(latest)} · ${agoTxt(daysBetween(latest, today()))}` : 'jamais'}</b></div>
+      ${rows.map((r) => `<div class="big3-row"><span>${r.label}</span><span class="${r.ago == null || r.ago > 7 ? 'warn' : ''}">${r.last ? `${fmtDate(r.last)} · ${agoTxt(r.ago)}` : '–'}</span></div>`).join('')}
+    </section>`;
+}
+
 views.gym = () => {
   if (state.draft) return gymEditor();
   const workouts = [...store.get().workouts].sort(byDate).reverse();
@@ -560,6 +581,7 @@ views.gym = () => {
 
   return `
     <header class="page-head"><h1>Salle</h1></header>
+    ${bigThreeCard()}
     <button class="primary block" data-action="new-workout">＋ Nouvelle séance</button>
     ${names.length ? card(
       'Progression',
@@ -1052,6 +1074,13 @@ function journeeView() {
           <button class="chip" data-action="open-muscu" data-mtab="body">＋ Pesée</button></div>
         <div>🎯 ${goalLine}</div>
         ${bodyfatLine() ? `<div>${bodyfatLine()} <button class="chip" data-action="open-muscu" data-mtab="body">＋ Visbody</button></div>` : ''}
+        ${(() => {
+          const n = soberStreak();
+          const last = addDays(t, -n);
+          return alcoholDay(last).value === true
+            ? `<div>🧊 <b class="good">${n} j sans alcool</b> <span class="hint">· dernier verre ${fmtDate(last)}</span></div>`
+            : '';
+        })()}
       </div>
 
       <div class="alcohol">
@@ -1186,6 +1215,11 @@ if (!store.settings().visbodySeeded) {
     if (!store.get().visbody.some((v) => v.date === x.date)) store.add('visbody', x);
   }
   store.setSettings({ visbodySeeded: true });
+}
+// Dernier verre : jeudi 15 octobre 2026 → la série sans alcool part du 16
+if (!store.settings().lastDrinkSeeded) {
+  if (!store.get().alcohol.some((x) => x.date === '2026-10-15')) store.setAlcohol('2026-10-15', true);
+  store.setSettings({ lastDrinkSeeded: true });
 }
 
 store.onChange(render);

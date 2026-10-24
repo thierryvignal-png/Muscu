@@ -591,3 +591,11 @@ small.warn { color: var(--warn); }
 .cash-head b.good { color: var(--good); }
 .cash-head b.warn { color: var(--warn); }
 .cash .hint { margin: 6px 0 0; }
+
+/* Salle : dernier big three */
+.big3-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.big3-head span { font-weight: 700; }
+.big3-head b { font-size: 15px; color: var(--accent); white-space: nowrap; }
+.big3-row { display: flex; justify-content: space-between; padding: 5px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.big3-row span:last-child { color: var(--muted); }
+.big3-row span.warn { color: var(--warn); }
