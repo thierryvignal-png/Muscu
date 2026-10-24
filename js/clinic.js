@@ -135,9 +135,9 @@ export function view() {
     ${(() => {
       // Solde disponible pour le ramp-up = trésorerie − capex restant
       const cash = d.cash?.amount, capex = d.capex?.amount;
-      if (cash == null) return '';
-      const left = cash - (capex || 0);
-      return `<section class="card fin-net"><span>🚀 Solde pour le ramp-up</span><b class="${left >= 0 ? 'good' : 'warn'}">${euros(left)}</b></section>`;
+      const left = cash == null ? null : cash - (capex || 0);
+      const cls = left == null ? '' : left >= 0 ? 'good' : 'warn';
+      return `<section class="card fin-net"><span>🚀 Solde pour le ramp-up</span><b class="${cls}">${euros(left)}</b></section>`;
     })()}
 
     <section class="card clinic-sum">
