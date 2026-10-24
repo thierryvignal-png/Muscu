@@ -10,7 +10,7 @@ Un bouton en haut de l'écran permet de passer d'un espace à l'autre. Chaque es
 - **🎉 Good news** — tout ce qui t'attend de cool (livraison, voyage, anniversaire…) avec compte à rebours ; dates estimées (≈) et événements annuels.
 - **🎯 Objectifs de vie** — progression en % ou chiffrée (ex : 0 → 50 000 €), comparée à la progression attendue selon le temps écoulé entre le début et l'échéance : dans les temps / presque / en retard. En bas : suivi financier — flux mensuels (annuel ×12, totaux) et portefeuille (valorisations, total).
 - **✨ Roadmap esthétique** — traitements prévus avec date approximative et points ajoutés au score esthétique /100 (estimés par l'IA) ; score actuel, score après la roadmap, courbe d'évolution prévue.
-- **🏥 Clinique Singulier** — modèle financier à construire ; en attendant, raccourci vers un fichier existant (lien gardé sur le téléphone). Le dépôt étant public, aucun chiffre de la clinique ne doit être écrit dans le code : tout se saisit dans l'app.
+- **🏥 Clinique Singulier** — modèle financier : revenus (bureaux esthétiques / médicaux : nombre × taux d'occupation × CA par bureau par jour × jours d'ouverture ; cabine devices et bilans & vitamino : CA/jour × taux d'occupation × jours), coûts mensuels affectés à 4 business units (CM28, Singulier, Cabine devices, Bilans & vitamino), synthèse CA / coûts / résultat mensuelle, annuelle et par BU. Chiffres saisis dans l'app uniquement.
 
 ## Ce que l'espace Muscu suit
 - **Déficit calorique (accueil)** : tu saisis ta dépense totale du jour (estimée par une IA à partir de tes activités). L'app la compare à tes repas et calcule le déficit ou l'excédent du jour, la moyenne sur 7 et 30 jours, le cumul en kg de gras, un graphique sur 14 jours, et une carte objectif (date d'atteinte du poids cible, poids projeté à la date cible, indicateur « dans les temps / en retard », sur la base de 1 kg = 7 700 kcal).
@@ -40,7 +40,8 @@ C'est un site statique (HTML/CSS/JS, aucune dépendance, pas de build).
 - `js/app.js` — écrans et logique
 - `js/store.js` — stockage local, export/import
 - `js/charts.js` — graphiques SVG
-- `js/spaces.js` — sélecteur d'espaces et espace Clinique
+- `js/spaces.js` — sélecteur d'espaces
+- `js/clinic.js` — espace Clinique Singulier (modèle financier)
 - `js/goodnews.js`, `js/goals.js`, `js/todo.js`, `js/esthetique.js`, `js/atom.js` — espaces Good news, Objectifs de vie, Todo, Roadmap esthétique et Atom
 - `js/util.js` — outils partagés (dates, nombres, stockage)
 - `sw.js`, `manifest.webmanifest`, `icons/` — installation et mode hors ligne (incrémenter `VERSION` dans `sw.js` à chaque mise à jour)

@@ -1,5 +1,6 @@
 import { store } from './store.js';
-import { setSpace, spaceSwitch, spaceMenu, spaceViews, clinic, SPACE_KEYS } from './spaces.js';
+import { setSpace, spaceSwitch, spaceMenu, spaceViews, SPACE_KEYS } from './spaces.js';
+import * as clinic from './clinic.js';
 import * as goodnews from './goodnews.js';
 import * as goals from './goals.js';
 import * as todo from './todo.js';
@@ -790,11 +791,6 @@ const forms = {
     store.add('visbody', { date, bodyfat, fatMass: num(f.fatMass), smm: num(f.smm), weight: num(f.weight) });
     toast('Relevé Visbody enregistré');
   },
-  clinicLink(f) {
-    clinic.setLink(f.link);
-    render();
-    toast(f.link.trim() ? 'Lien enregistré' : 'Lien effacé');
-  },
   burn(f) {
     const n = num(f.kcal);
     store.setBurn(f.date || state.homeDate, n == null ? null : Math.round(n));
@@ -1096,6 +1092,7 @@ spaceViews.todo = todo.view;
 spaceViews.esthetique = esthetique.view;
 spaceViews.atom = atom.view;
 spaceViews.goodnews = goodnews.view;
+spaceViews.clinique = clinic.view;
 // Objectifs de vie + suivi financier en bas
 spaceViews.goals = () => goals.view() + finance.view();
 function wrapSpace(handlers) {
@@ -1106,8 +1103,8 @@ function wrapSpace(handlers) {
     render();
   }]));
 }
-Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions), wrapSpace(todo.actions), wrapSpace(esthetique.actions), wrapSpace(atom.actions), wrapSpace(finance.actions));
-Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms), wrapSpace(todo.forms), wrapSpace(esthetique.forms), wrapSpace(atom.forms), wrapSpace(finance.forms));
+Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions), wrapSpace(todo.actions), wrapSpace(esthetique.actions), wrapSpace(atom.actions), wrapSpace(finance.actions), wrapSpace(clinic.actions));
+Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms), wrapSpace(todo.forms), wrapSpace(esthetique.forms), wrapSpace(atom.forms), wrapSpace(finance.forms), wrapSpace(clinic.forms));
 
 // ---------- Événements (délégation) ----------
 document.addEventListener('click', (e) => {

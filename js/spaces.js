@@ -9,7 +9,7 @@ export const SPACES = [
   { key: 'goodnews', icon: '🎉', name: 'Good news', desc: 'Tout ce qui t\'attend de cool' },
   { key: 'goals', icon: '🎯', name: 'Objectifs de vie', desc: 'Objectifs, flux et portefeuille' },
   { key: 'esthetique', icon: '✨', name: 'Roadmap esthétique', desc: 'Traitements prévus et score /100' },
-  { key: 'clinique', icon: '🏥', name: 'Clinique Singulier', desc: 'Modèle financier · bientôt' },
+  { key: 'clinique', icon: '🏥', name: 'Clinique Singulier', desc: 'Revenus, coûts par BU, résultat' },
 ];
 
 const SPACE_KEY = 'hub.space';
@@ -39,7 +39,7 @@ export function spaceSwitch(current) {
 }
 
 // À changer à chaque mise à jour (comme VERSION dans sw.js) : affiché en bas du menu
-export const APP_VERSION = 'v32';
+export const APP_VERSION = 'v33';
 
 export function spaceMenu(current) {
   return `
@@ -58,39 +58,7 @@ export function spaceMenu(current) {
     </div>`;
 }
 
-// ---------- Espace Clinique Singulier (à construire) ----------
-export const clinic = {
-  get: () => read(CLINIC_KEY, { link: '' }),
-  setLink(link) {
-    let l = (link || '').trim();
-    if (l && !/^https?:\/\//i.test(l)) l = 'https://' + l; // n'accepte que des liens web
-    write(CLINIC_KEY, { ...clinic.get(), link: l });
-  },
-};
-
-function clinique() {
-  const { link } = clinic.get();
-  return `
-    <header class="page-head"><h1>Clinique Singulier</h1><p>Modèle financier</p></header>
-    <section class="card">
-      <h2>🏥 Espace prêt, module à construire</h2>
-      <p class="hint">Hypothèses, compte de résultat prévisionnel, trésorerie, scénarios… On le construit ensemble quand tu veux.</p>
-      <p class="hint">🔒 Confidentialité : le code de l'app est public sur GitHub. Tes chiffres seront saisis
-      dans l'app et resteront sur ton téléphone, jamais dans le code.</p>
-    </section>
-    <section class="card">
-      <h2>Raccourci vers un fichier existant</h2>
-      <p class="hint">Si ton modèle existe déjà (Google Sheets, Excel en ligne…), colle son lien ici pour l'ouvrir en un tap.
-      Le lien reste sur ce téléphone.</p>
-      <form data-form="clinicLink" class="burn-form">
-        <input name="link" type="text" inputmode="url" autocapitalize="off" placeholder="https://…" value="${esc(link)}" autocomplete="off">
-        <button class="primary">OK</button>
-      </form>
-      ${link ? `<a class="button-like block-link" href="${esc(link)}" target="_blank" rel="noopener">Ouvrir mon modèle ↗</a>` : ''}
-    </section>`;
-}
-
 // Clés de stockage des espaces autres que Muscu (pour la sauvegarde complète)
 export const SPACE_KEYS = ['todo.data.v1', 'atom.data.v1', 'goodnews.data.v1', 'goals.data.v1', 'finance.data.v1', 'esthetique.data.v1', CLINIC_KEY];
 
-export const spaceViews = { clinique };
+export const spaceViews = {};
