@@ -410,6 +410,7 @@ b.warn { color: var(--warn); }
 .prio-pill.p-high { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
 .prio-pill.p-normal { background: color-mix(in srgb, #f59e0b 18%, transparent); color: #d97706; }
 .prio-pill.p-low { background: color-mix(in srgb, #3b82f6 16%, transparent); color: #3b82f6; }
+.prio-pill.undo-pill { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 12px; padding: 6px 10px; }
 .prio-pick { margin-top: 8px; grid-template-columns: repeat(3, 1fr); }
 .prio-pick .seg { font-size: 13px; padding: 8px 4px; }
 .prio-pick .seg.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); }

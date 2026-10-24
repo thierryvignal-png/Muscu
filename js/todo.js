@@ -59,6 +59,7 @@ export function row(t, compact = false) {
     <li class="task prio-${t.prio} ${t.done ? 'done' : ''}">
       <button class="tick ${t.done ? 'on' : ''}" data-action="todo-toggle" data-id="${t.id}" aria-label="${t.done ? 'Marquer à faire' : 'Marquer fait'}">✓</button>
       <div><b>${esc(t.title)}</b>${meta ? `<small>${meta}</small>` : ''}</div>
+      ${t.done && !compact ? `<button class="prio-pill undo-pill" data-action="todo-toggle" data-id="${t.id}">↩︎ Remettre</button>` : ''}
       ${t.done ? '' : compact ? `<span class="prio-pill p-${t.prio}">${PRIOS[t.prio] || ''}</span>` : `<button class="prio-pill p-${t.prio}" data-action="todo-prio" data-id="${t.id}" aria-label="Changer la priorité">${PRIOS[t.prio] || ''}</button>`}
       ${compact || t.done ? '' : `<button class="icon-btn" data-action="todo-edit" data-id="${t.id}" aria-label="Modifier">✎</button>`}
       ${compact ? '' : `<button class="icon-btn" data-action="todo-delete" data-id="${t.id}" aria-label="Supprimer">✕</button>`}
