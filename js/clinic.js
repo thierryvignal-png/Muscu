@@ -56,6 +56,7 @@ const costMonth = (c, which) => (which === 'max' ? c.max : which === 'mid' ? ((c
 
 // Objectifs d'EBITDA annuel : les TO sont recalculés pour les atteindre
 const TARGETS = [
+  { v: -300000, label: '−300 k€' },
   { v: 0, label: 'Breakeven' },
   { v: 500000, label: '500 k€' },
   { v: 1000000, label: '1 M€' },
@@ -137,7 +138,7 @@ export function view() {
       <p class="hint center">Scénario <b>${scnName}</b></p>
       <div class="target-pick">
         <span class="hint">🎯 EBITDA visé</span>
-        <div class="alcohol scn three">${TARGETS.map((t) => `<button class="seg ${Math.abs(m.res - t.v) < 1000 ? 'on good' : ''}" data-action="clinic-target" data-v="${t.v}">${t.label}</button>`).join('')}</div>
+        <div class="alcohol scn four">${TARGETS.map((t) => `<button class="seg ${Math.abs(m.res - t.v) < 1000 ? 'on good' : ''}" data-action="clinic-target" data-v="${t.v}">${t.label}</button>`).join('')}</div>
         ${(() => {
           const over = REVENUES.filter((r) => d.rev[r.key].to > 100);
           return over.length ? `<p class="hint warn">⚠️ TO au-dessus de 100 % (${over.map((r) => r.label.replace(/^\S+ /, '')).join(', ')}) : objectif pas atteignable avec ces paramètres.</p>` : '';

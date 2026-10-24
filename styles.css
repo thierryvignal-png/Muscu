@@ -538,3 +538,5 @@ small.warn { color: var(--warn); }
 .target-pick { margin: 6px 0 12px; }
 .target-pick .scn { margin-top: 4px; }
 .target-pick p.warn { color: var(--warn); margin: 6px 0 0; }
+.scn.four { grid-template-columns: repeat(4, 1fr); }
+.scn.four .seg { font-size: 13px; padding: 8px 2px; }
