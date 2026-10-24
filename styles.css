@@ -404,7 +404,15 @@ b.warn { color: var(--warn); }
 .task { display: flex; align-items: center; gap: 10px; padding: 9px 0 9px 8px; border-top: 1px solid var(--line); border-left: 3px solid transparent; }
 .task:first-child { border-top-color: transparent; }
 .task.prio-high { border-left-color: var(--warn); }
-.task.prio-low { opacity: .75; }
+.task.prio-normal { border-left-color: #f59e0b; }
+.task.prio-low { border-left-color: #3b82f6; }
+.prio-pill { flex: none; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 999px; border: 0; white-space: nowrap; background: var(--input); color: var(--muted); }
+.prio-pill.p-high { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+.prio-pill.p-normal { background: color-mix(in srgb, #f59e0b 18%, transparent); color: #d97706; }
+.prio-pill.p-low { background: color-mix(in srgb, #3b82f6 16%, transparent); color: #3b82f6; }
+.prio-pick { margin-top: 8px; grid-template-columns: repeat(3, 1fr); }
+.prio-pick .seg { font-size: 13px; padding: 8px 4px; }
+.prio-pick .seg.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); }
 .task > div { flex: 1; min-width: 0; }
 .task b { display: block; font-size: 15px; font-weight: 500; }
 .task small { color: var(--muted); font-size: 12px; }

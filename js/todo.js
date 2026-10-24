@@ -2,7 +2,7 @@
 import { esc, today, addDays, daysBetween, fmtDate, isoOf, uid, read, write } from './util.js';
 
 export const KEY = 'todo.data.v1';
-// task: {id, title, due|null, prio: 'high'|'normal'|'low', cat, rec: ''|'daily'|'weekly'|'monthly', done, doneAt}
+// task: {id, title, due|null, prio: 'high' (urgent) | 'normal' (important) | 'low' (suivi), cat, rec: ''|'daily'|'weekly'|'monthly', done, doneAt}
 const load = () => read(KEY, { tasks: [] });
 const save = (d) => write(KEY, d);
 
@@ -11,7 +11,8 @@ export const CATS = [
   { key: 'clinique', label: 'Clinique', icon: '🏥' },
   { key: 'atom', label: 'Atom', icon: '⚛️' },
 ];
-const PRIOS = { high: 'Haute', normal: 'Normale', low: 'Basse' };
+const PRIOS = { high: '🔴 Urgent', normal: '🟠 Important', low: '🔵 Suivi' };
+const PRIO_NEXT = { high: 'normal', normal: 'low', low: 'high' }; // toucher la pastille fait tourner la priorité
 const PRIO_RANK = { high: 0, normal: 1, low: 2 };
 const RECS = { '': 'Pas de répétition', daily: 'Chaque jour', weekly: 'Chaque semaine', monthly: 'Chaque mois' };
 const REC_SHORT = { daily: 'chaque jour', weekly: 'chaque semaine', monthly: 'chaque mois' };
@@ -58,6 +59,7 @@ export function row(t, compact = false) {
     <li class="task prio-${t.prio} ${t.done ? 'done' : ''}">
       <button class="tick ${t.done ? 'on' : ''}" data-action="todo-toggle" data-id="${t.id}" aria-label="${t.done ? 'Marquer à faire' : 'Marquer fait'}">✓</button>
       <div><b>${esc(t.title)}</b>${meta ? `<small>${meta}</small>` : ''}</div>
+      ${t.done ? '' : compact ? `<span class="prio-pill p-${t.prio}">${PRIOS[t.prio] || ''}</span>` : `<button class="prio-pill p-${t.prio}" data-action="todo-prio" data-id="${t.id}" aria-label="Changer la priorité">${PRIOS[t.prio] || ''}</button>`}
       ${compact || t.done ? '' : `<button class="icon-btn" data-action="todo-edit" data-id="${t.id}" aria-label="Modifier">✎</button>`}
       ${compact ? '' : `<button class="icon-btn" data-action="todo-delete" data-id="${t.id}" aria-label="Supprimer">✕</button>`}
     </li>`;
@@ -79,7 +81,11 @@ function form(edit) {
         <input name="title" required placeholder="${edit ? '' : 'Nouvelle tâche…'}" value="${esc(edit?.title || '')}" autocomplete="off">
         <button class="primary">${edit ? 'OK' : '＋'}</button>
       </div>
-      <button type="button" class="opts-toggle" data-action="todo-opts">${edit ? '' : 'Date, catégorie, priorité ▾'}</button>
+      <input type="hidden" name="prio" value="${edit?.prio || 'normal'}">
+      <div class="alcohol prio-pick">
+        ${Object.entries(PRIOS).map(([k, v]) => `<button type="button" class="seg ${k === (edit?.prio || 'normal') ? 'on' : ''}" data-action="todo-prio-pick" data-v="${k}">${v}</button>`).join('')}
+      </div>
+      <button type="button" class="opts-toggle" data-action="todo-opts">${edit ? '' : 'Date, catégorie, répétition ▾'}</button>
       <div class="todo-opts">
         <div class="chips">
           <button type="button" class="chip" data-action="todo-date" data-date="${today()}">Aujourd'hui</button>
@@ -90,7 +96,6 @@ function form(edit) {
         <div class="todo-grid">
           <label class="field"><span>Échéance</span><input type="date" name="due" value="${esc(edit?.due || '')}"></label>
           <label class="field"><span>Catégorie</span>${sel('cat', Object.fromEntries(CATS.map((c) => [c.key, `${c.icon} ${c.label}`])), defCat)}</label>
-          <label class="field"><span>Priorité</span>${sel('prio', PRIOS, edit?.prio || 'normal')}</label>
           <label class="field"><span>Répétition</span>${sel('rec', RECS, edit?.rec || '')}</label>
         </div>
         ${edit ? '<button type="button" class="full" data-action="todo-cancel">Annuler</button>' : ''}
@@ -107,7 +112,7 @@ export function view() {
   const late = open.filter((t) => t.due && t.due < t0);
   const now = open.filter((t) => t.due === t0);
   const later = open.filter((t) => t.due && t.due > t0);
-  const nodate = open.filter((t) => !t.due).sort((a, b) => PRIO_RANK[a.prio] - PRIO_RANK[b.prio]);
+  const nodate = (p) => open.filter((t) => !t.due && t.prio === p);
   const done = tasks.filter((t) => t.done).sort((a, b) => ((a.doneAt || '') > (b.doneAt || '') ? -1 : 1));
 
   const group = (title, list, cls = '') =>
@@ -127,7 +132,7 @@ export function view() {
     ${group('⏰ En retard', late, 'late-card')}
     ${group("Aujourd'hui", now)}
     ${group('À venir', later)}
-    ${group('Sans date', nodate)}
+    ${Object.entries(PRIOS).map(([k, v]) => group(v, nodate(k))).join('')}
     ${!open.length ? '<p class="hint center">Aucune tâche à faire ici. Profite 😎</p>' : ''}
     ${done.length ? `
       <section class="card">
@@ -181,6 +186,20 @@ export const actions = {
     d.tasks = d.tasks.filter((t) => t.id !== el.dataset.id);
     if (editing === el.dataset.id) editing = null;
     save(d);
+  },
+  'todo-prio'(el) {
+    const d = load();
+    const t = d.tasks.find((x) => x.id === el.dataset.id);
+    if (!t) return false;
+    t.prio = PRIO_NEXT[t.prio] || 'high';
+    save(d);
+  },
+  // Choix de la priorité dans le formulaire (sans redessiner, pour garder le texte tapé)
+  'todo-prio-pick'(el) {
+    const f = el.closest('form');
+    f.elements.prio.value = el.dataset.v;
+    f.querySelectorAll('[data-action="todo-prio-pick"]').forEach((c) => c.classList.toggle('on', c === el));
+    return false;
   },
   'todo-filter'(el) { filter = el.dataset.cat; },
   'todo-done'() { showDone = !showDone; },
