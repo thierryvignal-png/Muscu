@@ -622,6 +622,7 @@ function gymEditor() {
   const names = exerciseNames();
   return `
     <header class="page-head"><h1>${d.id ? 'Modifier la séance' : 'Séance en cours'}</h1></header>
+    ${bigThreeCard()}
     <form data-form="workout" class="form" id="workoutForm">
       ${input('date', 'Date', { type: 'date', value: d.date })}
       ${input('name', 'Nom', { placeholder: 'ex : Push, Jambes…', value: d.name })}
