@@ -36,6 +36,7 @@ const load = () => {
   d.costs.forEach((c) => { c.min ??= c.monthly ?? null; c.max ??= c.monthly ?? null; });
   d.scn ??= { rev: 'min', cost: 'max' }; // scénario prudent par défaut
   d.etpDays ??= 200; // jours travaillés par an par un praticien à temps plein
+  d.doctors ??= []; // médecins candidats : {id, name, type: 'singulier' | 'cm28'}
   return d;
 };
 const save = (d) => write(KEY, d);
@@ -233,7 +234,56 @@ export function view() {
       </form>
       <p class="hint">🔒 Tes chiffres restent sur ce téléphone (et dans ta sauvegarde), jamais dans le code public.</p>
     </section>
+
+    ${doctorsCard(d.doctors)}
   `;
+}
+
+// ---------- Médecins candidats (nom + Singulier / CM28, modifiables directement) ----------
+const DOC_TYPES = [
+  { key: 'singulier', label: 'Singulier', desc: 'esthétique' },
+  { key: 'cm28', label: 'CM28', desc: 'médical' },
+];
+const docSelect = (attrs, value) =>
+  `<select ${attrs}>${DOC_TYPES.map((t) => `<option value="${t.key}" ${t.key === value ? 'selected' : ''}>${t.label}</option>`).join('')}</select>`;
+const docCount = (docs) => `${docs.length} candidat${docs.length > 1 ? 's' : ''} · ` +
+  DOC_TYPES.map((t) => `${t.label} (${t.desc}) ${docs.filter((x) => x.type === t.key).length}`).join(' · ');
+
+function doctorsCard(docs) {
+  return `
+    <h2 class="section-title">🩺 Médecins candidats</h2>
+    <section class="card">
+      ${docs.length ? `<p class="hint" data-doc-count>${docCount(docs)}</p>` : ''}
+      ${docs.map((x) => `
+        <div class="doc-row">
+          <input data-doc="name" data-id="${x.id}" value="${esc(x.name)}" autocomplete="off">
+          ${docSelect(`data-doc="type" data-id="${x.id}"`, x.type)}
+          <button type="button" class="icon-btn" data-action="clinic-doc-del" data-id="${x.id}" aria-label="Supprimer">✕</button>
+        </div>`).join('')}
+      <form data-form="clinicDocAdd" class="clinic-add">
+        <input name="name" required placeholder="Nouveau candidat" autocomplete="off">
+        ${docSelect('name="type"', 'singulier')}
+        <button class="primary" aria-label="Ajouter">＋</button>
+      </form>
+    </section>`;
+}
+
+// Enregistrement direct à la frappe / au choix
+if (typeof document !== 'undefined') {
+  const onDoc = (e) => {
+    const field = e.target.dataset?.doc;
+    if (!field) return;
+    const d = load();
+    const x = d.doctors.find((y) => y.id === e.target.dataset.id);
+    if (!x) return;
+    if (field === 'name') { if (e.target.value.trim()) x.name = e.target.value.trim(); }
+    else x.type = e.target.value;
+    save(d);
+    const c = document.querySelector('[data-doc-count]');
+    if (c) c.textContent = docCount(d.doctors);
+  };
+  document.addEventListener('input', onDoc);
+  document.addEventListener('change', onDoc);
 }
 
 export const forms = {
@@ -278,6 +328,14 @@ export const forms = {
     save(d);
     return 'Coûts enregistrés';
   },
+  clinicDocAdd(f) {
+    const name = (f.name || '').trim();
+    if (!name) return false;
+    const d = load();
+    d.doctors.push({ id: uid(), name, type: f.type === 'cm28' ? 'cm28' : 'singulier' });
+    save(d);
+    return 'Candidat ajouté';
+  },
   clinicCostAdd(f) {
     const name = (f.name || '').trim();
     if (!name) return false;
@@ -302,6 +360,12 @@ export const actions = {
   'clinic-scn'(el) {
     const d = load();
     d.scn[el.dataset.kind] = el.dataset.v;
+    save(d);
+  },
+  'clinic-doc-del'(el) {
+    if (!confirm('Supprimer ce candidat ?')) return false;
+    const d = load();
+    d.doctors = d.doctors.filter((x) => x.id !== el.dataset.id);
     save(d);
   },
   'clinic-cost-del'(el) {
