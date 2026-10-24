@@ -5,10 +5,11 @@ export const KEY = 'finance.data.v1';
 const DEFAULT = () => ({
   flows: ['Singulier', 'Airbnb', 'Atom', 'Accenture'].map((name) => ({ id: uid(), name, monthly: null })),
   assets: ['Atom', 'Singulier', 'MDB'].map((name) => ({ id: uid(), name, value: null })),
+  debts: [],
 });
 const load = () => {
   const d = read(KEY, null);
-  if (d) return d;
+  if (d) { d.debts ??= []; return d; } // dettes : {id, name, amount, kind: 'perso'|'pro'}
   const fresh = DEFAULT();
   write(KEY, fresh);
   return fresh;
@@ -19,7 +20,8 @@ const euros = (v) => (v == null ? '–' : `${fr(v, v % 1 ? 2 : 0)} €`);
 const SIGN = '<button type="button" class="sign-btn" data-action="goal-sign" aria-label="Changer le signe">±</button>';
 
 export function view() {
-  const { flows, assets } = load();
+  const { flows, assets, debts } = load();
+  const debt = (k) => debts.filter((x) => !k || x.kind === k).reduce((s, x) => s + (x.amount || 0), 0);
   const totalM = flows.reduce((s, f) => s + (f.monthly || 0), 0);
   const totalV = assets.reduce((s, a) => s + (a.value || 0), 0);
   return `
@@ -65,6 +67,34 @@ export function view() {
         <button class="primary" aria-label="Ajouter">＋</button>
       </form>
     </section>
+
+    <section class="card fin">
+      <h2>🏦 Dettes</h2>
+      ${debts.length ? `
+        <form data-form="finDebts">
+          <div class="fin-head debt"><span>Dette</span><span>Restant dû €</span><span>Type</span><span></span></div>
+          ${debts.map((x) => `
+            <div class="fin-row debt">
+              <input name="name_${x.id}" value="${esc(x.name)}" autocomplete="off">
+              <input name="a_${x.id}" inputmode="decimal" value="${x.amount ?? ''}" placeholder="0" autocomplete="off">
+              <select name="k_${x.id}"><option value="perso" ${x.kind === 'perso' ? 'selected' : ''}>Perso</option><option value="pro" ${x.kind === 'pro' ? 'selected' : ''}>Pro</option></select>
+              <button type="button" class="icon-btn" data-action="fin-del" data-list="debts" data-id="${x.id}" aria-label="Supprimer">✕</button>
+            </div>`).join('')}
+          <div class="fin-total two"><span>Total</span><b>${euros(debt())}</b><span></span></div>
+          <p class="hint debt-split">Perso ${euros(debt('perso'))} · Pro ${euros(debt('pro'))}</p>
+          <button class="primary block">Enregistrer</button>
+        </form>` : ''}
+      <form data-form="finAdd" class="clinic-add">
+        <input type="hidden" name="list" value="debts">
+        <input name="name" required placeholder="Nouvelle dette (ex : Prêt immo)" autocomplete="off">
+        <select name="kind"><option value="perso">Perso</option><option value="pro">Pro</option></select>
+        <button class="primary" aria-label="Ajouter">＋</button>
+      </form>
+    </section>
+
+    <section class="card fin-net">
+      <span>Net (portefeuille − dettes)</span><b class="${totalV - debt() >= 0 ? 'good' : 'warn'}">${euros(totalV - debt())}</b>
+    </section>
   `;
 }
 
@@ -101,11 +131,22 @@ export const forms = {
     save(d);
     return 'Portefeuille enregistré';
   },
+  finDebts(f) {
+    const d = load();
+    d.debts.forEach((x) => {
+      x.name = (f[`name_${x.id}`] || '').trim() || x.name;
+      x.amount = num(f[`a_${x.id}`]);
+      x.kind = f[`k_${x.id}`] || x.kind;
+    });
+    save(d);
+    return 'Dettes enregistrées';
+  },
   finAdd(f) {
     const name = (f.name || '').trim();
     if (!name) return false;
     const d = load();
     if (f.list === 'flows') d.flows.push({ id: uid(), name, monthly: null });
+    else if (f.list === 'debts') d.debts.push({ id: uid(), name, amount: null, kind: f.kind || 'perso' });
     else d.assets.push({ id: uid(), name, value: null });
     save(d);
     return 'Ajouté';

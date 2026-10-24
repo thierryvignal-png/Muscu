@@ -526,3 +526,11 @@ small.warn { color: var(--warn); }
 .scn.three { grid-template-columns: 1fr 1fr 1fr; }
 .clinic-impl { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--accent-soft); font-size: 14px; line-height: 1.5; }
 .clinic-impl small { color: var(--muted); font-size: 12px; display: block; }
+
+.fin-head.debt, .fin-row.debt { grid-template-columns: 1.2fr 1.2fr 0.9fr 28px; }
+.debt-split { margin: 0 0 4px; }
+.fin-net { display: flex; justify-content: space-between; align-items: baseline; }
+.fin-net span { color: var(--muted); font-size: 14px; }
+.fin-net b { font-size: 20px; }
+.fin-net b.good { color: var(--good); }
+.fin-net b.warn { color: var(--warn); }
