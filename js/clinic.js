@@ -36,7 +36,7 @@ const load = () => {
   d.costs.forEach((c) => { c.min ??= c.monthly ?? null; c.max ??= c.monthly ?? null; });
   d.scn ??= { rev: 'min', cost: 'max' }; // scénario prudent par défaut
   d.etpDays ??= 200; // jours travaillés par an par un praticien à temps plein
-  d.doctors ??= []; // médecins candidats : {id, name, type: 'singulier' | 'cm28', days: jours / semaine}
+  d.doctors ??= []; // médecins candidats : {id, name, type: 'singulier' | 'cm28', days: jours / semaine, status: 'sur' | 'reflexion' | 'prospectif'}
   return d;
 };
 const save = (d) => write(KEY, d);
@@ -239,20 +239,27 @@ export function view() {
   `;
 }
 
-// ---------- Médecins candidats (nom + Singulier / CM28, modifiables directement) ----------
+// ---------- Médecins candidats (nom, jours / semaine, Singulier / CM28, statut — modifiables directement) ----------
 const DOC_TYPES = [
   { key: 'singulier', label: 'Singulier', desc: 'esthétique' },
   { key: 'cm28', label: 'CM28', desc: 'médical' },
 ];
-const docSelect = (attrs, value) =>
-  `<select ${attrs}>${DOC_TYPES.map((t) => `<option value="${t.key}" ${t.key === value ? 'selected' : ''}>${t.label}</option>`).join('')}</select>`;
-// « 3 candidats · Singulier (esthétique) 2 · 5 j/sem · CM28 (médical) 1 · 2 j/sem »
+const DOC_STATUS = [
+  { key: 'sur', label: '✅ Sûr' },
+  { key: 'reflexion', label: '🤔 En réflexion' },
+  { key: 'prospectif', label: '🔭 Prospectif' },
+];
+const options = (list, value) => list.map((t) => `<option value="${t.key}" ${t.key === value ? 'selected' : ''}>${t.label}</option>`).join('');
+const docSelect = (attrs, value) => `<select ${attrs}>${options(DOC_TYPES, value)}</select>`;
+const statusSelect = (attrs, value) => `<select ${attrs}>${options(DOC_STATUS, value)}</select>`;
+// « 3 candidats · Singulier (esthétique) 2 · 5 j/sem · CM28 (médical) 1 · 2 j/sem » puis « ✅ Sûr 1 · 🤔 En réflexion 1 · 🔭 Prospectif 1 »
 const docCount = (docs) => `${docs.length} candidat${docs.length > 1 ? 's' : ''} · ` +
   DOC_TYPES.map((t) => {
     const list = docs.filter((x) => x.type === t.key);
     const days = list.reduce((s, x) => s + (x.days || 0), 0);
     return `${t.label} (${t.desc}) ${list.length}${days ? ` · ${fr(days, days % 1 ? 1 : 0)} j/sem` : ''}`;
-  }).join(' · ');
+  }).join(' · ') + '<br>' +
+  DOC_STATUS.map((t) => `${t.label} ${docs.filter((x) => (x.status || 'prospectif') === t.key).length}`).join(' · ');
 
 function doctorsCard(docs) {
   return `
@@ -261,17 +268,19 @@ function doctorsCard(docs) {
       ${docs.length ? `<p class="hint" data-doc-count>${docCount(docs)}</p>` : ''}
       ${docs.map((x) => `
         <div class="doc-row">
-          <input data-doc="name" data-id="${x.id}" value="${esc(x.name)}" autocomplete="off">
+          <input class="doc-name" data-doc="name" data-id="${x.id}" value="${esc(x.name)}" autocomplete="off">
+          <button type="button" class="icon-btn" data-action="clinic-doc-del" data-id="${x.id}" aria-label="Supprimer">✕</button>
           <input data-doc="days" data-id="${x.id}" inputmode="decimal" value="${x.days ?? ''}" placeholder="j/sem" aria-label="Jours par semaine" autocomplete="off">
           ${docSelect(`data-doc="type" data-id="${x.id}"`, x.type)}
-          <button type="button" class="icon-btn" data-action="clinic-doc-del" data-id="${x.id}" aria-label="Supprimer">✕</button>
+          ${statusSelect(`data-doc="status" data-id="${x.id}"`, x.status || 'prospectif')}
         </div>`).join('')}
-      ${docs.length ? '' : '<p class="hint">Nom, jours par semaine et Singulier (esthétique) ou CM28 (médical).</p>'}
-      <form data-form="clinicDocAdd" class="clinic-add doc-add">
-        <input name="name" required placeholder="Nouveau candidat" autocomplete="off">
+      ${docs.length ? '' : '<p class="hint">Nom, jours par semaine, Singulier (esthétique) ou CM28 (médical) et statut.</p>'}
+      <form data-form="clinicDocAdd" class="doc-row doc-add">
+        <input class="doc-name" name="name" required placeholder="Nouveau candidat" autocomplete="off">
+        <button class="primary" aria-label="Ajouter">＋</button>
         <input name="days" inputmode="decimal" placeholder="j/sem" aria-label="Jours par semaine" autocomplete="off">
         ${docSelect('name="type"', 'singulier')}
-        <button class="primary" aria-label="Ajouter">＋</button>
+        ${statusSelect('name="status"', 'prospectif')}
       </form>
     </section>`;
 }
@@ -286,10 +295,11 @@ if (typeof document !== 'undefined') {
     if (!x) return;
     if (field === 'name') { if (e.target.value.trim()) x.name = e.target.value.trim(); }
     else if (field === 'days') x.days = num(e.target.value);
+    else if (field === 'status') x.status = e.target.value;
     else x.type = e.target.value;
     save(d);
     const c = document.querySelector('[data-doc-count]');
-    if (c) c.textContent = docCount(d.doctors);
+    if (c) c.innerHTML = docCount(d.doctors);
   };
   document.addEventListener('input', onDoc);
   document.addEventListener('change', onDoc);
@@ -341,7 +351,8 @@ export const forms = {
     const name = (f.name || '').trim();
     if (!name) return false;
     const d = load();
-    d.doctors.push({ id: uid(), name, type: f.type === 'cm28' ? 'cm28' : 'singulier', days: num(f.days) });
+    d.doctors.push({ id: uid(), name, type: f.type === 'cm28' ? 'cm28' : 'singulier', days: num(f.days),
+      status: DOC_STATUS.some((t) => t.key === f.status) ? f.status : 'prospectif' });
     save(d);
     return 'Candidat ajouté';
   },
