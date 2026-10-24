@@ -36,6 +36,9 @@ const load = () => {
   d.costs.forEach((c) => { c.min ??= c.monthly ?? null; c.max ??= c.monthly ?? null; });
   d.scn ??= { rev: 'min', cost: 'max' }; // scénario prudent par défaut
   d.etpDays ??= 200; // jours travaillés par an par un praticien à temps plein
+  d.recruit ??= { open: '2027-02-01' }; // roadmap de recrutement : ouverture, point de départ
+  if (!d.recruit.start && d.doctors?.length) { d.recruit.start = today(); d.recruit.startDays = totalDays(d.doctors); write(KEY, d); }
+  d.recruit.start ??= today(); d.recruit.startDays ??= 0;
   d.doctors ??= []; // médecins candidats : {id, name, type: 'singulier' | 'cm28', days: jours / semaine, status: 'sur' | 'reflexion' | 'prospectif'}
   return d;
 };
@@ -269,7 +272,8 @@ const docDays = (docs, etpDays) => DOC_TYPES.map((t) => {
 // CA / jour = moyenne min-max, coûts « mid », devices et bilans à leur taux d'occupation actuel.
 const DOC_OFFICE = { singulier: 'esth', cm28: 'med' }; // Singulier → bureaux esthétiques, CM28 → bureaux médicaux
 const mid = (a, b) => (a == null ? b : b == null ? a : (a + b) / 2);
-function docBurn(d) {
+// Chiffres du modèle si les bureaux tournent avec ces médecins (ETP pondérés)
+function docFin(d) {
   const etpDays = d.etpDays || 200;
   const offices = DOC_TYPES.map((t) => {
     const r = REVENUES.find((x) => x.key === DOC_OFFICE[t.key]);
@@ -277,9 +281,9 @@ function docBurn(d) {
     const officeDays = (weightedDays(d.doctors, t.key) / 5) * etpDays; // jours-bureau / an
     const ca = mid(line.caMin, line.caMax);
     const cap = line.count != null && d.days ? line.count * d.days : null; // capacité à 100 % de TO
-    return { t, ca, year: ca == null ? null : officeDays * ca, to: cap ? (officeDays / cap) * 100 : null };
+    return { t, ca, cap, year: ca == null ? null : officeDays * ca, to: cap ? (officeDays / cap) * 100 : null };
   });
-  if (offices.some((o) => o.year == null)) return '<p class="hint">Renseigne le CA / bureau / jour des bureaux (plus haut) pour voir le burn.</p>';
+  if (offices.some((o) => o.year == null)) return null;
   const others = REVENUES.filter((r) => !r.offices).reduce((s, r) => {
     const line = d.rev[r.key];
     const ca = mid(line.caMin, line.caMax);
@@ -287,7 +291,13 @@ function docBurn(d) {
   }, 0);
   const caYear = offices.reduce((s, o) => s + o.year, 0) + others;
   const costYear = d.costs.reduce((s, c) => s + costMonth(c, 'mid') * 12, 0);
-  const res = caYear - costYear;
+  return { etpDays, offices, caYear, costYear, res: caYear - costYear };
+}
+
+function docBurn(d) {
+  const f = docFin(d);
+  if (!f) return '<p class="hint">Renseigne le CA / bureau / jour des bureaux (plus haut) pour voir le burn.</p>';
+  const { res, caYear, costYear, offices } = f;
   const tos = offices.filter((o) => o.to != null).map((o) => `${o.t.label} ${fr(o.to)} %`).join(' · ');
   const over = offices.some((o) => o.to > 100);
   return `
@@ -298,6 +308,64 @@ function docBurn(d) {
     </div>
     <p class="hint">Hypothèses moyennes : CA / jour moyen (min-max), coûts mid, devices et bilans à leur taux d'occupation actuel.${tos ? ` Taux d'occupation des bureaux correspondant : ${tos}.` : ''}</p>
     ${over ? '<p class="hint warn">⚠️ Plus de jours-médecins que de bureaux disponibles : il faut plus de bureaux.</p>' : ''}`;
+}
+
+// ---------- Roadmap de recrutement jusqu'à l'ouverture : burn 0 à l'ouverture ----------
+// Les jours manquants sont recrutés côté CM28 (Singulier est quasi bouclé).
+// Cadence linéaire entre le point de départ (date + jours pondérés enregistrés la 1re fois) et l'ouverture.
+const totalDays = (docs) => DOC_TYPES.reduce((s, t) => s + weightedDays(docs, t.key), 0);
+const r1 = (v) => Math.round(v * 10) / 10;
+const j = (v) => fr(r1(v), r1(v) % 1 ? 1 : 0);
+const dayDiff = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000);
+const shortDate = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+
+function docPlan(d) {
+  const f = docFin(d);
+  if (!f) return '';
+  const { open, start, startDays } = d.recruit;
+  const med = f.offices.find((o) => o.t.key === 'cm28');
+  const perDay = (f.etpDays / 5) * med.ca; // CA / an apporté par 1 jour-médecin / sem en CM28
+  const missing = f.res < 0 ? -f.res / perDay : 0; // jours-médecins / sem à ajouter
+  const now = totalDays(d.doctors);
+  const target = now + missing;
+  const t = today();
+  const left = dayDiff(t, open);
+  const span = Math.max(1, dayDiff(start, open));
+  const expected = startDays + (target - startDays) * Math.min(1, Math.max(0, dayDiff(start, t) / span));
+  const late = expected - now;
+  const months = Math.max(left / 30.4, 0.1);
+
+  // Jalons : le 1er de chaque mois jusqu'à l'ouverture
+  const steps = [];
+  const [oy, om] = open.split('-').map(Number);
+  for (let dt = new Date(+t.slice(0, 4), +t.slice(5, 7), 1); ; dt = new Date(dt.getFullYear(), dt.getMonth() + 1, 1)) {
+    const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-01`;
+    if (iso >= open || steps.length > 24) break;
+    steps.push(iso);
+  }
+  steps.push(open);
+  const goalAt = (iso) => startDays + (target - startDays) * Math.min(1, dayDiff(start, iso) / span);
+  const capWarn = med.cap && ((f.etpDays / 5) * (weightedDays(d.doctors, 'cm28') + missing)) > med.cap;
+
+  return `
+    <div class="doc-plan">
+      <div class="j-head"><h3>🗓️ Objectif burn 0 à l'ouverture</h3></div>
+      <label class="field inline"><span>Ouverture</span><input type="date" data-doc="open" value="${open}"></label>
+      ${missing <= 0 ? `<p class="doc-ok">✅ Breakeven atteint avec les médecins actuels</p>` : `
+        <div class="doc-burn">
+          <span>Il manque</span>
+          <b class="warn">${j(missing)}</b>
+          <small>jours-médecins / sem en CM28 (pondérés) · ≈ ${fr(missing / 5, 1)} ETP</small>
+        </div>
+        <p class="center ${late > 0.05 ? 'warn' : 'good'}"><b>${late > 0.05 ? `⚠️ En retard de ${j(late)} j/sem sur la cadence` : '✅ Dans les temps'}</b></p>
+        <p class="hint center">${left > 0 ? `J-${left} · cadence : ≈ ${j(missing / months)} jours-médecins / sem à signer par mois` : 'Date d\'ouverture passée'}</p>
+        <ul class="doc-steps">
+          <li class="hint"><span>Aujourd'hui</span><b>${j(now)}</b><small>obj. ${j(expected)}</small></li>
+          ${steps.map((iso) => `<li><span>${iso === open ? '🚀 ' : ''}${shortDate(iso)}</span><b>${j(goalAt(iso))}</b><small>+${j(Math.max(0, goalAt(iso) - now))}</small></li>`).join('')}
+        </ul>
+        <p class="hint">Jours-médecins / sem pondérés (Singulier + CM28) à avoir signés à chaque date. Calcul : CA d'un jour-médecin / sem en CM28 = ${fr(f.etpDays / 5)} sem × ${euros(med.ca)} = ${euros(perDay)} / an. Cadence linéaire depuis le ${shortDate(start)}.</p>
+        ${capWarn ? '<p class="hint warn">⚠️ Pas assez de bureaux médicaux pour absorber ces jours : il faudra aussi plus de bureaux.</p>' : ''}`}
+    </div>`;
 }
 
 // « 10 candidats · ✅ Sûr 7 · 🤔 En réflexion 3 · 🔭 Prospectif 0 »
@@ -313,6 +381,7 @@ function doctorsCard(d) {
         <div class="doc-days" data-doc-days>${docDays(docs, etpDays)}</div>
         <p class="hint center">Pondéré : sûr 90 % · réflexion 50 % · prospectif 10 %<br>1 ETP = 5 j/sem × ${fr(etpDays / 5)} semaines = ${fr(etpDays)} j/an</p>
         <div data-doc-burn>${docBurn(d)}</div>
+        <div data-doc-plan>${docPlan(d)}</div>
         <p class="hint" data-doc-count>${docCount(docs)}</p>` : ''}
       ${docs.map((x) => `
         <div class="doc-row">
@@ -339,6 +408,13 @@ if (typeof document !== 'undefined') {
     const field = e.target.dataset?.doc;
     if (!field) return;
     const d = load();
+    if (field === 'open') {
+      if (e.type !== 'change' || !/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) return;
+      d.recruit.open = e.target.value;
+      save(d);
+      document.querySelector('[data-doc-plan]').innerHTML = docPlan(d);
+      return;
+    }
     const x = d.doctors.find((y) => y.id === e.target.dataset.id);
     if (!x) return;
     if (field === 'name') { if (e.target.value.trim()) x.name = e.target.value.trim(); }
@@ -352,6 +428,8 @@ if (typeof document !== 'undefined') {
     if (days) days.innerHTML = docDays(d.doctors, d.etpDays);
     const burn = document.querySelector('[data-doc-burn]');
     if (burn) burn.innerHTML = docBurn(d);
+    const plan = document.querySelector('[data-doc-plan]');
+    if (plan) plan.innerHTML = docPlan(d);
   };
   document.addEventListener('input', onDoc);
   document.addEventListener('change', onDoc);

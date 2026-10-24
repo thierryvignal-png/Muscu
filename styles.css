@@ -520,6 +520,17 @@ small.warn { color: var(--warn); }
 .doc-burn b.warn { color: var(--warn); }
 .doc-burn b.good { color: var(--good); }
 .doc-burn small { font-size: 12px; color: var(--muted); }
+.doc-plan { margin: 18px 0 10px; padding-top: 14px; border-top: 2px solid var(--line); }
+.doc-plan h3 { font-size: 17px; color: var(--text); font-weight: 700; }
+.doc-plan .field.inline { flex-direction: row; align-items: center; justify-content: space-between; margin: 8px 0; }
+.doc-plan .field.inline input { max-width: 170px; margin: 0; }
+.doc-plan p.good { color: var(--good); }
+.doc-ok { text-align: center; font-weight: 700; color: var(--good); }
+.doc-steps { list-style: none; padding: 0; margin: 10px 0; }
+.doc-steps li { display: grid; grid-template-columns: 1fr auto 60px; gap: 8px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.doc-steps li b { font-size: 16px; }
+.doc-steps li small { text-align: right; color: var(--muted); font-size: 12px; }
+.doc-steps li.hint b { color: var(--accent); }
 .doc-row { display: grid; grid-template-columns: 56px 1fr 1.1fr 28px; gap: 6px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .doc-row .doc-name { grid-column: 1 / 4; }
 .doc-row input { padding: 9px 8px; font-size: 15px; margin: 0; }
