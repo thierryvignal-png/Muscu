@@ -507,3 +507,18 @@ small.warn { color: var(--warn); }
 .clinic-add select { margin: 0; font-size: 13px; padding: 9px 6px; }
 .clinic-add button { padding: 10px 14px; }
 .card h2 small.hint { display: block; font-size: 12px; margin-top: 2px; }
+
+/* Clinique : scénario et coûts min / max */
+.scn-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.scn-pick .scn { margin-top: 4px; }
+.scn .seg { padding: 8px; }
+.cost-row { display: grid; grid-template-columns: 1fr 1fr 28px; grid-template-areas: "name bu del" "min max ."; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
+.cost-row:first-child { border-top: 0; padding-top: 0; }
+.cost-name { grid-area: name; font-weight: 600; }
+.cost-bu { grid-area: bu; }
+.cost-bu select { margin: 0; font-size: 13px; padding: 9px 6px; }
+.cost-del { grid-area: del; padding: 4px; }
+.cost-min { grid-area: min; }
+.cost-max { grid-area: max; }
+.cost-min span, .cost-max span { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+.cost-row input { padding: 9px 8px; font-size: 15px; }
