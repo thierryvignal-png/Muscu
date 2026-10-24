@@ -461,3 +461,8 @@ small.warn { color: var(--warn); }
 }
 .chart .tip-line { stroke: var(--muted); stroke-dasharray: 3 3; stroke-width: 1; }
 .chart .tip-dot { fill: var(--bg); stroke: var(--accent); stroke-width: 2.5; }
+
+/* Champ chiffré avec bouton ± (pas de touche « − » sur le clavier numérique iPhone) */
+.signed-input { display: flex; gap: 6px; flex: 1; min-width: 0; }
+.signed-input input { flex: 1; min-width: 0; }
+.sign-btn { flex: none; width: 44px; padding: 8px 0; font-size: 18px; }

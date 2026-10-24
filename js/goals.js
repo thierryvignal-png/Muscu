@@ -57,7 +57,7 @@ function goalCard(g) {
       ${isPercent(g) ? '' : `<p class="hint">${valueText(g, c.cur)} sur ${valueText(g, g.targetValue)} (départ ${valueText(g, g.startValue ?? 0)})</p>`}
       <form data-form="goalUpdate" class="burn-form">
         <input type="hidden" name="id" value="${g.id}">
-        <input name="value" inputmode="decimal" placeholder="${isPercent(g) ? 'Avancement en %' : `Valeur actuelle${g.unit ? ' (' + esc(g.unit) + ')' : ''}`}" autocomplete="off">
+        <span class="signed-input"><input name="value" inputmode="decimal" placeholder="${isPercent(g) ? 'Avancement en %' : `Valeur actuelle${g.unit ? ' (' + esc(g.unit) + ')' : ''}`}" autocomplete="off">${isPercent(g) ? '' : '<button type="button" class="sign-btn" data-action="goal-sign" aria-label="Changer le signe">±</button>'}</span>
         <button class="primary">MAJ</button>
       </form>
       ${last ? `<p class="hint">Dernière mise à jour : ${fmtDate(last.date)}</p>` : ''}
@@ -78,8 +78,8 @@ function goalForm(g) {
         </label>
         <label class="field"><span>Début</span><input name="start" type="date" required value="${esc(g?.start || today())}"></label>
         <label class="field"><span>Unité (optionnel)</span><input name="unit" placeholder="€, km, livres…" value="${esc(g?.unit || '')}" autocomplete="off"></label>
-        <label class="field"><span>Valeur de départ</span><input name="startValue" inputmode="decimal" placeholder="0" value="${g?.startValue ?? ''}"></label>
-        <label class="field"><span>Valeur cible</span><input name="targetValue" inputmode="decimal" placeholder="vide = suivi en %" value="${g?.targetValue ?? ''}"></label>
+        <label class="field"><span>Valeur de départ</span><span class="signed-input"><input name="startValue" inputmode="decimal" placeholder="0" value="${g?.startValue ?? ''}"><button type="button" class="sign-btn" data-action="goal-sign" aria-label="Changer le signe">±</button></span></label>
+        <label class="field"><span>Valeur cible</span><span class="signed-input"><input name="targetValue" inputmode="decimal" placeholder="vide = suivi en %" value="${g?.targetValue ?? ''}"><button type="button" class="sign-btn" data-action="goal-sign" aria-label="Changer le signe">±</button></span></label>
         <p class="hint full">Sans valeur cible, tu suis l'objectif en % d'avancement. Avec une cible chiffrée (ex : 0 → 50 000 €), l'app calcule le % toute seule.</p>
         <button class="primary full">${g ? 'Enregistrer' : 'Créer'}</button>
         <button type="button" class="full" data-action="goal-cancel">Annuler</button>
@@ -164,6 +164,14 @@ export const forms = {
 };
 
 export const actions = {
+  // Le clavier numérique iPhone n'a pas de « − » : ce bouton inverse le signe du champ
+  'goal-sign'(el) {
+    const input = el.parentElement.querySelector('input');
+    const v = input.value.trim();
+    input.value = v.startsWith('-') ? v.slice(1) : '-' + (v || '');
+    input.focus();
+    return false;
+  },
   'goal-add'() { adding = true; editing = null; },
   'goal-edit'(el) { editing = el.dataset.id; adding = false; window.scrollTo(0, 0); },
   'goal-cancel'() { editing = null; adding = false; },
