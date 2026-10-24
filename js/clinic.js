@@ -235,7 +235,7 @@ export function view() {
       <p class="hint">🔒 Tes chiffres restent sur ce téléphone (et dans ta sauvegarde), jamais dans le code public.</p>
     </section>
 
-    ${doctorsCard(d.doctors, d.etpDays)}
+    ${doctorsCard(d)}
   `;
 }
 
@@ -265,17 +265,54 @@ const docDays = (docs, etpDays) => DOC_TYPES.map((t) => {
   return `<div><span>${t.label} · ${t.desc}</span><b>${fr(v, v % 1 ? 1 : 0)}</b><small>jours-médecins / sem</small>
     <em>≈ ${fr(perYear / etpDays, 1)} ETP</em><small>${fr(perYear)} j / an</small></div>`;
 }).join('');
+// Burn annuel si on fait tourner les bureaux avec ces médecins (ETP pondérés), hypothèses moyennes :
+// CA / jour = moyenne min-max, coûts « mid », devices et bilans à leur taux d'occupation actuel.
+const DOC_OFFICE = { singulier: 'esth', cm28: 'med' }; // Singulier → bureaux esthétiques, CM28 → bureaux médicaux
+const mid = (a, b) => (a == null ? b : b == null ? a : (a + b) / 2);
+function docBurn(d) {
+  const etpDays = d.etpDays || 200;
+  const offices = DOC_TYPES.map((t) => {
+    const r = REVENUES.find((x) => x.key === DOC_OFFICE[t.key]);
+    const line = d.rev[r.key];
+    const officeDays = (weightedDays(d.doctors, t.key) / 5) * etpDays; // jours-bureau / an
+    const ca = mid(line.caMin, line.caMax);
+    const cap = line.count != null && d.days ? line.count * d.days : null; // capacité à 100 % de TO
+    return { t, ca, year: ca == null ? null : officeDays * ca, to: cap ? (officeDays / cap) * 100 : null };
+  });
+  if (offices.some((o) => o.year == null)) return '<p class="hint">Renseigne le CA / bureau / jour des bureaux (plus haut) pour voir le burn.</p>';
+  const others = REVENUES.filter((r) => !r.offices).reduce((s, r) => {
+    const line = d.rev[r.key];
+    const ca = mid(line.caMin, line.caMax);
+    return s + (line.to != null && ca != null && d.days != null ? (line.to / 100) * ca * d.days : 0);
+  }, 0);
+  const caYear = offices.reduce((s, o) => s + o.year, 0) + others;
+  const costYear = d.costs.reduce((s, c) => s + costMonth(c, 'mid') * 12, 0);
+  const res = caYear - costYear;
+  const tos = offices.filter((o) => o.to != null).map((o) => `${o.t.label} ${fr(o.to)} %`).join(' · ');
+  const over = offices.some((o) => o.to > 100);
+  return `
+    <div class="doc-burn">
+      <span>${res < 0 ? '🔥 Burn annuel avec ces médecins' : '✅ Résultat annuel avec ces médecins'}</span>
+      <b class="${res < 0 ? 'warn' : 'good'}">${euros(res < 0 ? -res : res)}</b>
+      <small>soit ${euros(Math.abs(res) / 12)} / mois · CA ${euros(caYear)} − coûts ${euros(costYear)}</small>
+    </div>
+    <p class="hint">Hypothèses moyennes : CA / jour moyen (min-max), coûts mid, devices et bilans à leur taux d'occupation actuel.${tos ? ` Taux d'occupation des bureaux correspondant : ${tos}.` : ''}</p>
+    ${over ? '<p class="hint warn">⚠️ Plus de jours-médecins que de bureaux disponibles : il faut plus de bureaux.</p>' : ''}`;
+}
+
 // « 10 candidats · ✅ Sûr 7 · 🤔 En réflexion 3 · 🔭 Prospectif 0 »
 const docCount = (docs) => `${docs.length} candidat${docs.length > 1 ? 's' : ''} · ` +
   DOC_STATUS.map((t) => `${t.label} ${docs.filter((x) => docStatus(x) === t.key).length}`).join(' · ');
 
-function doctorsCard(docs, etpDays) {
+function doctorsCard(d) {
+  const docs = d.doctors, etpDays = d.etpDays;
   return `
     <h2 class="section-title">🩺 Médecins candidats</h2>
     <section class="card">
       ${docs.length ? `
         <div class="doc-days" data-doc-days>${docDays(docs, etpDays)}</div>
         <p class="hint center">Pondéré : sûr 90 % · réflexion 50 % · prospectif 10 %<br>1 ETP = 5 j/sem × ${fr(etpDays / 5)} semaines = ${fr(etpDays)} j/an</p>
+        <div data-doc-burn>${docBurn(d)}</div>
         <p class="hint" data-doc-count>${docCount(docs)}</p>` : ''}
       ${docs.map((x) => `
         <div class="doc-row">
@@ -313,6 +350,8 @@ if (typeof document !== 'undefined') {
     if (c) c.textContent = docCount(d.doctors);
     const days = document.querySelector('[data-doc-days]');
     if (days) days.innerHTML = docDays(d.doctors, d.etpDays);
+    const burn = document.querySelector('[data-doc-burn]');
+    if (burn) burn.innerHTML = docBurn(d);
   };
   document.addEventListener('input', onDoc);
   document.addEventListener('change', onDoc);
