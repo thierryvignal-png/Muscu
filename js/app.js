@@ -998,7 +998,6 @@ function journeeView() {
   const slope = weightSlope();
   const protRatio = Math.min(1, (b.protein || 0) / s.proteinGoal);
   const alc = alcoholDay(t);
-  const favs = favMeals(6);
 
   let goalLine;
   if (g.missing) goalLine = `<span class="hint">${g.missing}</span>`;
@@ -1040,7 +1039,6 @@ function journeeView() {
         <button class="primary" aria-label="Ajouter le repas">＋</button>
       </form>
       <datalist id="jMealNames">${favMeals(30).map((m) => `<option value="${esc(m.name)}">`).join('')}</datalist>
-      ${favs.length ? `<div class="chips">${favs.map((m) => `<button class="chip" data-action="fav-meal" data-id="${m.id}" data-date="${t}">${esc(m.name)} <small>${fr(m.kcal)}</small></button>`).join('')}</div>` : ''}
 
       <div class="j-lines">
         <div>⚖️ ${lastW ? `<b>${fr(lastW.value, 1)} kg</b> <span class="hint">moy. 7 j${slope == null ? '' : ` · ${slope > 0 ? '+' : '−'}${fr(Math.abs(slope), 2)} kg/sem`}</span>` : '<span class="hint">pas encore de pesée</span>'}
