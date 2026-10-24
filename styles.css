@@ -452,6 +452,7 @@ small.warn { color: var(--warn); }
 .deal-add { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
 .deal-add button { padding: 10px 14px; }
 .deal-add.with-amount { grid-template-columns: 1fr 110px auto; }
+.fin-row.pl { grid-template-columns: 1fr 120px 28px; }
 
 /* Graphiques : toucher pour voir date + valeur */
 .chart-wrap { position: relative; cursor: pointer; -webkit-user-select: none; user-select: none; }
