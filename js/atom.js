@@ -1,9 +1,9 @@
-// Espace « Atom » : deals transaction, deals location, deals location à venir, next steps (grands projets).
+// Espace « Atom » : lignes de revenu, deals transaction, deals location, deals location à venir, next steps (grands projets).
 // Chaque deal a une valeur en € ; sans valeur propre, il prend la commission par défaut.
 import { esc, uid, read, write, num, fr, today, cashCard } from './util.js';
 
 export const KEY = 'atom.data.v1';
-// {feeTx, feeLoc, deals: [{id, kind: 'tx'|'loc'|'locSoon'|'proj', name, amount|null}]}
+// {feeTx, feeLoc, deals: [{id, kind: 'rev'|'tx'|'loc'|'locSoon'|'proj', name, amount|null}]}
 // (ancienne commission unique « defaultFee » : reprise pour les deux au premier chargement)
 const load = () => {
   const d = read(KEY, { deals: [] });
@@ -12,10 +12,11 @@ const load = () => {
   return d;
 };
 // Commission par défaut selon la rubrique : transaction, ou location (en cours et à venir)
-const feeFor = (d, kind) => (kind === 'tx' ? d.feeTx : d.feeLoc);
+const feeFor = (d, kind) => (kind === 'tx' ? d.feeTx : kind === 'rev' ? null : d.feeLoc);
 const TX_MONTHS = 6; // total transaction encaissable sur 6 mois
 const save = (d) => write(KEY, d);
 
+const REV = { kind: 'rev', title: '💸 Revenus', placeholder: 'Nouvelle ligne' };
 const LISTS = [
   { kind: 'tx', title: '🏠 Deals transaction', placeholder: 'Nouveau deal' },
   { kind: 'loc', title: '🔑 Deals location', placeholder: 'Nouveau deal' },
@@ -39,7 +40,7 @@ function row(d, def) {
           <input type="hidden" name="id" value="${d.id}">
           <input type="hidden" name="kind" value="${d.kind}">
           <input name="name" required value="${esc(d.name)}" autocomplete="off">
-          ${hasValue(d.kind) ? `<input name="amount" inputmode="decimal" value="${d.amount ?? ''}" placeholder="Valeur € (vide = défaut${def != null ? ` : ${euros(def)}` : ''})" autocomplete="off">` : ''}
+          ${hasValue(d.kind) ? `<input name="amount" inputmode="decimal" value="${d.amount ?? ''}" placeholder="${d.kind === 'rev' ? 'Montant €' : `Valeur € (vide = défaut${def != null ? ` : ${euros(def)}` : ''})`}" autocomplete="off">` : ''}
           <div class="deal-form-actions">
             <button class="primary">OK</button>
             <button type="button" data-action="atom-cancel">Annuler</button>
@@ -59,12 +60,42 @@ function row(d, def) {
     </li>`;
 }
 
+function listCard(data, { kind, title, placeholder, hint }) {
+  const { deals } = data;
+  const list = deals.filter((d) => d.kind === kind);
+  const def = feeFor(data, kind);
+  const total = list.reduce((s, d) => s + (valueOf(d, def) || 0), 0);
+  return `
+    <section class="card">
+      <h2>${title} <small class="hint">${list.length || ''}</small></h2>
+      ${hint ? `<p class="hint">${hint}</p>` : ''}
+      ${list.length ? `<ul class="deal-list">${list.map((d) => row(d, def)).join('')}</ul>` : ''}
+      ${hasValue(kind) && list.length ? `<div class="deal-total"><span>Total · ${list.length} ${kind === 'rev' ? 'ligne' : 'deal'}${list.length > 1 ? 's' : ''}</span><b>${euros(total)}</b></div>${kind === 'tx' ? `<div class="deal-total sub"><span>÷ ${TX_MONTHS} · encaissable par mois</span><b>${euros(Math.round(total / TX_MONTHS))}</b></div>` : ''}` : ''}
+      <form data-form="atomDeal" class="deal-add ${kind === 'rev' ? 'with-amount' : ''}">
+        <input type="hidden" name="kind" value="${kind}">
+        <input name="name" required placeholder="${placeholder}" autocomplete="off">
+        ${kind === 'rev' ? '<input name="amount" inputmode="decimal" placeholder="€" autocomplete="off">' : ''}
+        <button class="primary" aria-label="Ajouter">＋</button>
+      </form>
+      ${kind === 'rev' ? '' : pasting === kind ? `
+        <form data-form="atomPaste" class="deal-paste">
+          <input type="hidden" name="kind" value="${kind}">
+          <textarea name="list" rows="6" placeholder="Un élément par ligne"></textarea>
+          <div class="deal-form-actions two">
+            <button class="primary">Ajouter la liste</button>
+            <button type="button" data-action="atom-paste" data-kind="">Annuler</button>
+          </div>
+        </form>`
+      : `<button class="chip paste-btn" data-action="atom-paste" data-kind="${kind}">📋 Coller une liste</button>`}
+    </section>`;
+}
+
 export function view() {
   const data = load();
-  const { deals } = data;
   return `
     <header class="page-head"><h1>Atom</h1></header>
     ${cashCard(data.cash, 'atomCash')}
+    ${listCard(data, REV)}
     <section class="card">
       <h2>💶 Commission par défaut</h2>
       <form data-form="atomDefault" class="form">
@@ -74,33 +105,7 @@ export function view() {
       </form>
       <p class="hint">Appliquée à tous les deals sans valeur propre (affichée en gris). Touche un deal pour lui donner une autre valeur.</p>
     </section>
-    ${LISTS.map(({ kind, title, placeholder, hint }) => {
-      const list = deals.filter((d) => d.kind === kind);
-      const def = feeFor(data, kind);
-      const total = list.reduce((s, d) => s + (valueOf(d, def) || 0), 0);
-      return `
-        <section class="card">
-          <h2>${title} <small class="hint">${list.length || ''}</small></h2>
-          ${hint ? `<p class="hint">${hint}</p>` : ''}
-          ${list.length ? `<ul class="deal-list">${list.map((d) => row(d, def)).join('')}</ul>` : ''}
-          ${hasValue(kind) && list.length ? `<div class="deal-total"><span>Total · ${list.length} deal${list.length > 1 ? 's' : ''}</span><b>${euros(total)}</b></div>${kind === 'tx' ? `<div class="deal-total sub"><span>÷ ${TX_MONTHS} · encaissable par mois</span><b>${euros(Math.round(total / TX_MONTHS))}</b></div>` : ''}` : ''}
-          <form data-form="atomDeal" class="deal-add">
-            <input type="hidden" name="kind" value="${kind}">
-            <input name="name" required placeholder="${placeholder}" autocomplete="off">
-            <button class="primary" aria-label="Ajouter">＋</button>
-          </form>
-          ${pasting === kind ? `
-            <form data-form="atomPaste" class="deal-paste">
-              <input type="hidden" name="kind" value="${kind}">
-              <textarea name="list" rows="6" placeholder="Un élément par ligne"></textarea>
-              <div class="deal-form-actions two">
-                <button class="primary">Ajouter la liste</button>
-                <button type="button" data-action="atom-paste" data-kind="">Annuler</button>
-              </div>
-            </form>`
-          : `<button class="chip paste-btn" data-action="atom-paste" data-kind="${kind}">📋 Coller une liste</button>`}
-        </section>`;
-    }).join('')}
+    ${LISTS.map((l) => listCard(data, l)).join('')}
   `;
 }
 
@@ -143,7 +148,7 @@ export const forms = {
       const patch = { name };
       if (hasValue(f.kind)) patch.amount = num(f.amount);
       Object.assign(d.deals.find((x) => x.id === f.id) || {}, patch);
-    } else d.deals.push({ id: uid(), kind: f.kind, name, amount: null });
+    } else d.deals.push({ id: uid(), kind: f.kind, name, amount: num(f.amount) });
     editing = null;
     save(d);
     return f.id ? 'Modifié' : 'Ajouté';
