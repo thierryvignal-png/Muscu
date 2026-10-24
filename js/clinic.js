@@ -54,6 +54,40 @@ function revenueYear(r, line, days, which) {
 // Coût mensuel selon le scénario : min, max, ou mid (moyenne des deux)
 const costMonth = (c, which) => (which === 'max' ? c.max : which === 'mid' ? ((c.min || 0) + (c.max || 0)) / 2 : c.min) || 0;
 
+// Objectifs d'EBITDA annuel : les TO sont recalculés pour les atteindre
+const TARGETS = [
+  { v: 0, label: 'Breakeven' },
+  { v: 500000, label: '500 k€' },
+  { v: 1000000, label: '1 M€' },
+];
+
+// Taux d'occupation nécessaires pour un EBITDA annuel donné (scénario courant).
+// On garde les écarts entre lignes : tous les TO sont multipliés par un même facteur.
+// Si aucun TO n'est encore saisi, on applique le même TO à toutes les lignes.
+function solveTO(d, target) {
+  const costYear = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
+  const needed = target + costYear; // CA annuel à atteindre
+  const lines = REVENUES.map((r) => {
+    const line = d.rev[r.key];
+    const ca = pick(line, 'ca', d.scn.rev);
+    const count = r.offices ? line.count : 1;
+    const k = d.days != null && ca != null && count != null ? count * ca * d.days : null; // CA à 100 % de TO
+    return { r, line, k };
+  }).filter((x) => x.k);
+  if (!lines.length) return null;
+  const allHaveTO = lines.every((x) => x.line.to > 0);
+  const result = {};
+  if (allHaveTO) {
+    const current = lines.reduce((s, x) => s + x.k * (x.line.to / 100), 0);
+    const f = needed / current;
+    lines.forEach((x) => { result[x.r.key] = x.line.to * f; });
+  } else {
+    const uniform = (needed / lines.reduce((s, x) => s + x.k, 0)) * 100;
+    lines.forEach((x) => { result[x.r.key] = uniform; });
+  }
+  return result;
+}
+
 function model(d) {
   const { rev, cost } = d.scn;
   const lines = REVENUES.map((r) => {
@@ -101,6 +135,14 @@ export function view() {
         <div><span class="hint">Coûts</span>${seg('cost', d.scn.cost)}</div>
       </div>
       <p class="hint center">Scénario <b>${scnName}</b></p>
+      <div class="target-pick">
+        <span class="hint">🎯 EBITDA visé</span>
+        <div class="alcohol scn three">${TARGETS.map((t) => `<button class="seg ${Math.abs(m.res - t.v) < 1000 ? 'on good' : ''}" data-action="clinic-target" data-v="${t.v}">${t.label}</button>`).join('')}</div>
+        ${(() => {
+          const over = REVENUES.filter((r) => d.rev[r.key].to > 100);
+          return over.length ? `<p class="hint warn">⚠️ TO au-dessus de 100 % (${over.map((r) => r.label.replace(/^\S+ /, '')).join(', ')}) : objectif pas atteignable avec ces paramètres.</p>` : '';
+        })()}
+      </div>
       <div class="clinic-sum-grid">
         <div><span>CA</span><b>${euros(m.caYear / 12)}</b><small>${euros(m.caYear)} / an</small></div>
         <div><span>Coûts</span><b>${euros(m.costYear / 12)}</b><small>${euros(m.costYear)} / an</small></div>
@@ -224,6 +266,16 @@ export const forms = {
 };
 
 export const actions = {
+  'clinic-target'(el) {
+    const d = load();
+    const target = Number(el.dataset.v);
+    const tos = solveTO(d, target);
+    if (!tos) return 'Renseigne d\'abord les jours d\'ouverture, bureaux et CA / jour';
+    for (const [k, v] of Object.entries(tos)) d.rev[k].to = Math.round(v * 10) / 10;
+    save(d);
+    const label = TARGETS.find((t) => t.v === target).label;
+    return `${label} : taux d'occupation ajustés`;
+  },
   'clinic-scn'(el) {
     const d = load();
     d.scn[el.dataset.kind] = el.dataset.v;

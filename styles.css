@@ -534,3 +534,7 @@ small.warn { color: var(--warn); }
 .fin-net b { font-size: 20px; }
 .fin-net b.good { color: var(--good); }
 .fin-net b.warn { color: var(--warn); }
+
+.target-pick { margin: 6px 0 12px; }
+.target-pick .scn { margin-top: 4px; }
+.target-pick p.warn { color: var(--warn); margin: 6px 0 0; }
