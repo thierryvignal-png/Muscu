@@ -122,15 +122,6 @@ export function view() {
       </form>
     </section>
 
-    <section class="card">
-      <h2>🔗 Raccourci vers un fichier</h2>
-      <form data-form="clinicLink" class="burn-form">
-        <input name="link" type="text" inputmode="url" autocapitalize="off" placeholder="https://… (Google Sheets, Excel…)" value="${esc(d.link)}" autocomplete="off">
-        <button class="primary">OK</button>
-      </form>
-      ${d.link ? `<a class="button-like block-link" href="${esc(d.link)}" target="_blank" rel="noopener">Ouvrir mon modèle ↗</a>` : ''}
-      <p class="hint">🔒 Tes chiffres restent sur ce téléphone (et dans ta sauvegarde), jamais dans le code public.</p>
-    </section>
   `;
 }
 
@@ -165,14 +156,6 @@ export const forms = {
     d.costs.push({ id: uid(), name, monthly: null, bu: f.bu || 'singulier' });
     save(d);
     return 'Coût ajouté : indique son montant mensuel';
-  },
-  clinicLink(f) {
-    const d = load();
-    let l = (f.link || '').trim();
-    if (l && !/^https?:\/\//i.test(l)) l = 'https://' + l; // n'accepte que des liens web
-    d.link = l;
-    save(d);
-    return l ? 'Lien enregistré' : 'Lien effacé';
   },
 };
 
