@@ -605,10 +605,18 @@ function weekSetsCard() {
   const mon = mondayOf(today());
   const prev = addDays(mon, -7);
   const rows = [{ label: 'Total', re: null }, ...MUSCLES].map((m) => ({ ...m, now: weekSets(mon, m.re), before: weekSets(prev, m.re) }));
+  // Graphique : 10 dernières semaines pour la ligne choisie (toucher une ligne pour changer)
+  const pick = rows[state.wsetsPick] ? state.wsetsPick : 0;
+  const bars = Array.from({ length: 10 }, (_, i) => {
+    const m = addDays(mon, -7 * (9 - i));
+    return { date: m, label: `${m.slice(8)}/${m.slice(5, 7)}`, value: weekSets(m, rows[pick].re) };
+  });
   return `
     <section class="card wsets">
       <div class="wsets-row head"><span>📊 Sets par semaine</span><span>cette sem.</span><span>sem. dern.</span></div>
-      ${rows.map((r) => `<div class="wsets-row ${r.re ? '' : 'total'}"><span>${r.label}</span><b>${r.now}</b><small>${r.before}</small></div>`).join('')}
+      ${rows.map((r, i) => `<div class="wsets-row ${r.re ? '' : 'total'} ${i === pick ? 'on' : ''}" data-action="wsets-pick" data-i="${i}"><span>${r.label}</span><b>${r.now}</b><small>${r.before}</small></div>`).join('')}
+      <p class="hint wsets-chart-title">${rows[pick].label} · 10 dernières semaines <small>(touche une ligne pour changer)</small></p>
+      ${barChart(bars, { unit: ' sets' })}
     </section>`;
 }
 
@@ -989,6 +997,10 @@ const actions = {
     const { id, date, ...rest } = m;
     store.add('meals', { ...rest, date: el.dataset.date || state.mealDate });
     toast(`${m.name} ajouté`);
+  },
+  'wsets-pick'(el) {
+    state.wsetsPick = +el.dataset.i;
+    render();
   },
   'resume-workout'() {
     state.editorOpen = true;

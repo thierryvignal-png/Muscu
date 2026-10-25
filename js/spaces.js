@@ -39,7 +39,7 @@ export function spaceSwitch(current) {
 }
 
 // À changer à chaque mise à jour (comme VERSION dans sw.js) : affiché en bas du menu
-export const APP_VERSION = 'v71';
+export const APP_VERSION = 'v72';
 
 export function spaceMenu(current) {
   return `
