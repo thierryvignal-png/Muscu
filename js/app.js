@@ -599,8 +599,8 @@ views.gym = () => {
     ${bigThreeCard()}
     ${state.draft ? `
       <section class="card draft-banner">
-        <div><b>⏸ Séance en cours</b><small>${esc(state.draft.name || 'Séance')} · ${fmtDate(state.draft.date)}</small></div>
-        <button class="primary" data-action="resume-workout">Reprendre</button>
+        <div><b>⚠️ Séance du ${fmtDate(state.draft.date)} non enregistrée</b><small>${esc(state.draft.name || 'Séance')} · touche « Compléter » puis « Enregistrer »</small></div>
+        <button class="primary" data-action="resume-workout">Compléter</button>
         <button class="icon-btn" data-action="cancel-workout" aria-label="Abandonner">✕</button>
       </section>`
       : '<button class="primary block" data-action="new-workout">＋ Nouvelle séance</button>'}
@@ -656,7 +656,7 @@ function gymEditor() {
   const d = state.draft;
   const names = exerciseNames();
   return `
-    <header class="page-head"><h1>${d.id ? 'Modifier la séance' : 'Séance en cours'}</h1></header>
+    <header class="page-head"><h1>${d.id ? 'Modifier la séance' : d.date === today() ? 'Séance du jour' : `Séance du ${fmtDay(d.date)}`}</h1><p>${d.id ? '' : 'Pas encore enregistrée : termine par « Enregistrer la séance »'}</p></header>
     ${bigThreeCard()}
     <form data-form="workout" class="form" id="workoutForm">
       ${input('date', 'Date', { type: 'date', value: d.date })}
@@ -688,7 +688,7 @@ function gymEditor() {
       </div>
       <button type="button" class="full" data-action="add-ex">＋ Exercice</button>
       <label class="field full"><span>Notes</span><textarea data-field="notes" rows="2">${esc(d.notes)}</textarea></label>
-      <button class="primary full">Terminer et enregistrer</button>
+      <button class="primary full">Enregistrer la séance</button>
       <button type="button" class="full danger" data-action="cancel-workout">Annuler</button>
     </form>
   `;
