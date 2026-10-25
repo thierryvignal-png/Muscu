@@ -606,3 +606,13 @@ small.warn { color: var(--warn); }
 .draft-banner b { display: block; }
 .draft-banner small { color: var(--muted); font-size: 13px; }
 .draft-banner .primary { padding: 10px 14px; }
+
+/* Salle : sets par semaine */
+.wsets-row { display: grid; grid-template-columns: 1fr 70px 70px; gap: 8px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.wsets-row b, .wsets-row small { text-align: right; }
+.wsets-row b { font-size: 17px; }
+.wsets-row small { color: var(--muted); font-size: 13px; }
+.wsets-row.head { border-top: 0; padding-top: 0; font-size: 12px; color: var(--muted); }
+.wsets-row.head span:first-child { font-size: 15px; font-weight: 700; color: var(--text); }
+.wsets-row.head span:not(:first-child) { text-align: right; }
+.wsets-row.total b { color: var(--accent); }

@@ -585,6 +585,32 @@ document.addEventListener('change', (e) => {
   store.setSettings({ big3: { ...(store.settings().big3 || {}), [k]: e.target.value || null } });
 });
 
+// Sets par semaine (lundi → dimanche), au total et par muscle
+const MUSCLES = [
+  { label: '🦵 Jambes', re: /squat|\brdl\b|roumain|romanian/i },
+  { label: '💪 Upper pecs', re: /inclin/i },
+  { label: '🔱 Side delts', re: /lat[ée]ral|lateral raise/i },
+  { label: '🪽 Dos', re: /traction|chin.?up|pull.?up/i },
+];
+function weekSets(mon, filter) {
+  const end = addDays(mon, 6);
+  return store.get().workouts
+    .filter((w) => w.date >= mon && w.date <= end)
+    .flatMap((w) => w.exercises)
+    .filter((e) => !filter || filter.test(e.name))
+    .reduce((n, e) => n + e.sets.filter((x) => x.reps).length, 0);
+}
+function weekSetsCard() {
+  const mon = mondayOf(today());
+  const prev = addDays(mon, -7);
+  const rows = [{ label: 'Total', re: null }, ...MUSCLES].map((m) => ({ ...m, now: weekSets(mon, m.re), before: weekSets(prev, m.re) }));
+  return `
+    <section class="card wsets">
+      <div class="wsets-row head"><span>📊 Sets par semaine</span><span>cette sem.</span><span>sem. dern.</span></div>
+      ${rows.map((r) => `<div class="wsets-row ${r.re ? '' : 'total'}"><span>${r.label}</span><b>${r.now}</b><small>${r.before}</small></div>`).join('')}
+    </section>`;
+}
+
 views.gym = () => {
   if (state.draft && state.editorOpen) return gymEditor();
   const workouts = [...store.get().workouts].sort(byDate).reverse();
@@ -598,6 +624,7 @@ views.gym = () => {
   return `
     <header class="page-head"><h1>Salle</h1></header>
     ${bigThreeCard()}
+    ${weekSetsCard()}
     ${state.draft ? `
       <section class="card draft-banner">
         <div><b>⚠️ Séance du ${fmtDate(state.draft.date)} non enregistrée</b><small>${esc(sessionTitle(state.draft))} · touche « Compléter » puis « Enregistrer »</small></div>
