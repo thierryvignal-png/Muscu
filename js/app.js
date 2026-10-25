@@ -132,6 +132,9 @@ const workoutVolume = (w) => sum(w.exercises.flatMap((e) => e.sets), (s) => (s.r
 const setsText = (sets) => sets.map((s) => `${fr(s.reps)}×${fr(s.weight, s.weight % 1 ? 1 : 0)}`).join(' · ');
 
 // ---------- Vues ----------
+// Budget kcal du jour quand la dépense n'est pas saisie
+const DEFAULT_BURN = 2300;
+
 const views = {};
 let current = 'home';
 const state = {
@@ -384,6 +387,9 @@ views.home = () => {
   const gp = goalProjection();
   const required = gp.required;
   const cal = gp.cal || calibration();
+  // Reste à manger : dépense saisie (sinon 2 300 par défaut) − mangé
+  const budget = b.burn ?? DEFAULT_BURN;
+  const left = budget - (b.kcal || 0);
   const alc = alcoholDay(d);
   const streak = completeStreak();
   const sober = soberStreak();
@@ -403,17 +409,16 @@ views.home = () => {
 
     <section class="card hero">
       <div class="hero-main">
-        <span class="hint">${b.deficit == null ? 'Bilan du jour' : balanceLabel(b.deficit) + ' du jour'}</span>
-        <strong class="${balanceCls(b.deficit)}">${b.deficit == null ? '–' : signed(b.deficit) + ' kcal'}</strong>
+        <span class="hint">🍽️ ${isToday ? 'Reste à manger' : 'Restait à manger'}</span>
+        <strong class="${left >= 0 ? 'good' : 'warn'}">${left >= 0 ? `${fr(left)} kcal` : `dépassé de ${fr(-left)} kcal`}</strong>
       </div>
       <div class="hero-row">
-        <div><span>Mangé</span><b>${fr(b.kcal)}</b></div>
+        <div><span>Budget${b.burn == null ? ' (défaut)' : ''}</span><b>${fr(budget)}</b></div>
         <div class="op">−</div>
-        <div><span>Dépensé</span><b>${b.burn == null ? '?' : fr(b.burn)}</b></div>
+        <div><span>Mangé</span><b>${fr(b.kcal || 0)}</b></div>
       </div>
-      ${cal.ready && b.deficit != null && Math.abs(cal.bias) >= 100 ? `<p class="hint">≈ ${signed(b.deficit - cal.bias)} kcal après correction balance</p>` : ''}
       <form data-form="burn" class="burn-form">
-        <input name="kcal" inputmode="numeric" placeholder="Dépense totale du jour (kcal)" value="${b.burn ?? ''}" autocomplete="off">
+        <input name="kcal" inputmode="numeric" placeholder="Dépense du jour (défaut ${fr(DEFAULT_BURN)})" value="${b.burn ?? ''}" autocomplete="off">
         <button class="primary">OK</button>
       </form>
       <div class="alcohol">
@@ -1111,9 +1116,6 @@ function favMeals(n) {
   });
   return Object.values(freq).sort((a, b) => b.n - a.n).slice(0, n).map((f) => f.m);
 }
-
-// Budget kcal du jour quand la dépense n'est pas saisie
-const DEFAULT_BURN = 2300;
 
 function journeeView() {
   const s = store.settings();
