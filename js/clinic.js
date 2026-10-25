@@ -157,6 +157,31 @@ function sumInner(d, m) {
       </table>`;
 }
 
+// Bandeau fixé en haut de l'écran quand la synthèse sort de la vue
+function stickyInner(m) {
+  return `
+    <div><span>Résultat / an</span><b class="${resCls(m.res)}">${euros(m.res)}</b><small>${euros(m.res / 12)} / mois</small></div>
+    <div><span>CA / an</span><b>${euros(m.caYear)}</b></div>
+    <div><span>Coûts / an</span><b>${euros(m.costYear)}</b></div>`;
+}
+function updateSticky() {
+  const bar = document.querySelector('[data-clinic-sticky]');
+  const sum = document.querySelector('[data-clinic-sum]');
+  if (!bar || !sum) return;
+  bar.classList.toggle('show', sum.getBoundingClientRect().bottom < 0);
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('scroll', updateSticky, { passive: true });
+  // iPhone : clavier ouvert, l'écran visible se décale → le bandeau suit la partie visible
+  const vv = window.visualViewport;
+  const follow = () => {
+    const bar = document.querySelector('[data-clinic-sticky]');
+    if (bar) bar.style.top = `${Math.max(0, vv.offsetTop)}px`;
+    updateSticky();
+  };
+  if (vv) { vv.addEventListener('scroll', follow); vv.addEventListener('resize', follow); }
+}
+
 function revImpl(d, r, line) {
   // Ce que ça implique : ETP pour les bureaux, actes / jour pour devices et bilans
   let impl = '';
@@ -180,6 +205,7 @@ function revImpl(d, r, line) {
 export function view() {
   const d = load();
   const m = model(d);
+  if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(updateSticky); // après un re-rendu
 
   return `
     <header class="page-head"><h1>Clinique Singulier</h1><p>Modèle financier</p></header>
@@ -194,6 +220,7 @@ export function view() {
     })()}
 
     <section class="card clinic-sum" data-clinic-sum>${sumInner(d, m)}</section>
+    <div class="clinic-sticky" data-clinic-sticky>${stickyInner(m)}</div>
 
     <h2 class="section-title">📈 Revenus</h2>
     <form data-form="clinicRev">
@@ -455,6 +482,7 @@ if (typeof document !== 'undefined') {
     const m = model(d);
     const set = (sel, html) => { const el = document.querySelector(sel); if (el) el.innerHTML = html; };
     set('[data-clinic-sum]', sumInner(d, m));
+    set('[data-clinic-sticky]', stickyInner(m));
     for (const { r, line, min, max } of m.lines) {
       set(`[data-rev-range="${r.key}"]`, `${range(min, max)} / an`);
       const impl = revImpl(d, r, line);

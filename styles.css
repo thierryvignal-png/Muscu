@@ -620,3 +620,21 @@ small.warn { color: var(--warn); }
 .wsets-row.on { background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 8px; margin: 0 -6px; padding-left: 6px; padding-right: 6px; }
 .wsets-chart-title { margin: 12px 0 0; }
 .clinic-impl[hidden] { display: none; }
+
+/* Clinique : bandeau résultat fixé en haut pendant qu'on modifie les paramètres */
+.clinic-sticky {
+  position: fixed; left: 0; right: 0; top: 0; z-index: 30;
+  display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 6px; text-align: center;
+  padding: calc(8px + env(safe-area-inset-top)) max(16px, calc((100vw - 640px) / 2 + 16px)) 10px;
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line); box-shadow: 0 4px 14px rgba(0, 0, 0, .18);
+  transform: translateY(-110%); transition: transform .2s ease; pointer-events: none;
+}
+.clinic-sticky.show { transform: none; }
+.clinic-sticky span { display: block; font-size: 11px; color: var(--muted); }
+.clinic-sticky b { display: block; font-size: 15px; white-space: nowrap; }
+.clinic-sticky div:first-child b { font-size: 20px; }
+.clinic-sticky b.good { color: var(--good); }
+.clinic-sticky b.warn { color: var(--warn); }
+.clinic-sticky small { font-size: 11px; color: var(--muted); }
