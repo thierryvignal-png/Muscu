@@ -73,31 +73,35 @@ const TARGETS = [
   { v: 1000000, label: '1 M€' },
 ];
 
-// Taux d'occupation nécessaires pour un EBITDA annuel donné (scénario courant).
-// On garde les écarts entre lignes : tous les TO sont multipliés par un même facteur.
-// Si aucun TO n'est encore saisi, on applique le même TO à toutes les lignes.
+// Taux d'occupation et CA / jour pour un EBITDA annuel donné.
+// 1. On fait varier les TO (en gardant leurs écarts), sans jamais dépasser 85 %.
+// 2. Si tous les TO à 85 % ne suffisent pas, on augmente le CA / jour de chaque ligne du même pourcentage.
+export const TO_MAX = 85;
 function solveTO(d, target) {
   const costYear = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
   const needed = target + costYear; // CA annuel à atteindre
   const lines = REVENUES.map((r) => {
     const line = d.rev[r.key];
-    const ca = line.ca;
     const count = r.offices ? line.count : 1;
-    const k = d.days != null && ca != null && count != null ? count * ca * d.days : null; // CA à 100 % de TO
+    const k = d.days != null && line.ca != null && count != null ? count * line.ca * d.days : null; // CA à 100 % de TO
     return { r, line, k };
   }).filter((x) => x.k);
   if (!lines.length) return null;
-  const allHaveTO = lines.every((x) => x.line.to > 0);
-  const result = {};
-  if (allHaveTO) {
-    const current = lines.reduce((s, x) => s + x.k * (x.line.to / 100), 0);
-    const f = needed / current;
-    lines.forEach((x) => { result[x.r.key] = x.line.to * f; });
-  } else {
-    const uniform = (needed / lines.reduce((s, x) => s + x.k, 0)) * 100;
-    lines.forEach((x) => { result[x.r.key] = uniform; });
+  const base = lines.every((x) => x.line.to > 0) ? (x) => x.line.to : () => 1; // proportions de départ
+  const caAt = (f) => lines.reduce((s, x) => s + x.k * Math.min(TO_MAX, base(x) * f) / 100, 0);
+  const to = {}, ca = {};
+  const full = caAt(Infinity); // tous les TO à 85 %
+  if (needed <= full) {
+    // Facteur commun trouvé par dichotomie (les TO plafonnés à 85 % ne bougent plus)
+    let lo = 0, hi = 1;
+    while (caAt(hi) < needed) hi *= 2;
+    for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (caAt(m) < needed) lo = m; else hi = m; }
+    lines.forEach((x) => { to[x.r.key] = Math.max(0, Math.min(TO_MAX, base(x) * hi)); });
+    return { to, ca, caUp: 0 };
   }
-  return result;
+  const g = needed / full; // CA / jour à augmenter de (g − 1)
+  lines.forEach((x) => { to[x.r.key] = TO_MAX; ca[x.r.key] = Math.ceil(x.line.ca * g); });
+  return { to, ca, caUp: g - 1 };
 }
 
 function model(d) {
@@ -142,10 +146,10 @@ function sumInner(d, m) {
       </div>
       <div class="target-pick">
         <span class="hint">🎯 EBITDA visé</span>
-        <div class="alcohol scn targets">${TARGETS.map((t) => `<button class="seg ${Math.abs(m.res - t.v) < 1000 ? 'on good' : ''}" data-action="clinic-target" data-v="${t.v}">${t.label}</button>`).join('')}</div>
+        <div class="alcohol scn targets">${TARGETS.map((t) => `<button class="seg ${Math.abs(m.res - t.v) < 5000 ? 'on good' : ''}" data-action="clinic-target" data-v="${t.v}">${t.label}</button>`).join('')}</div>
         ${(() => {
-          const over = REVENUES.filter((r) => d.rev[r.key].to > 100);
-          return over.length ? `<p class="hint warn">⚠️ TO au-dessus de 100 % (${over.map((r) => r.label.replace(/^\S+ /, '')).join(', ')}) : objectif pas atteignable avec ces paramètres.</p>` : '';
+          const over = REVENUES.filter((r) => d.rev[r.key].to > TO_MAX);
+          return over.length ? `<p class="hint warn">⚠️ TO au-dessus de ${TO_MAX} % (${over.map((r) => r.label.replace(/^\S+ /, '')).join(', ')}) : pas réaliste.</p>` : '';
         })()}
       </div>
       <div class="clinic-sum-grid">
@@ -554,12 +558,15 @@ export const actions = {
   'clinic-target'(el) {
     const d = load();
     const target = Number(el.dataset.v);
-    const tos = solveTO(d, target);
-    if (!tos) return 'Renseigne d\'abord les jours d\'ouverture, bureaux et CA / jour';
-    for (const [k, v] of Object.entries(tos)) d.rev[k].to = Math.round(v * 10) / 10;
+    const sol = solveTO(d, target);
+    if (!sol) return 'Renseigne d\'abord les jours d\'ouverture, bureaux et CA / jour';
+    for (const [k, v] of Object.entries(sol.to)) d.rev[k].to = Math.round(v * 10) / 10;
+    for (const [k, v] of Object.entries(sol.ca)) d.rev[k].ca = v;
     save(d);
     const label = TARGETS.find((t) => t.v === target).label;
-    return `${label} : taux d'occupation ajustés`;
+    return sol.caUp > 0
+      ? `${label} : TO à ${TO_MAX} % partout et CA / jour +${fr(sol.caUp * 100)} % sur chaque ligne`
+      : `${label} : taux d'occupation ajustés (max ${TO_MAX} %)`;
   },
   'clinic-scn'(el) {
     const d = load();
