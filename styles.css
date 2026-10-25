@@ -600,3 +600,9 @@ small.warn { color: var(--warn); }
 .big3-ago { color: var(--muted); font-size: 13px; white-space: nowrap; }
 .big3-ago.warn { color: var(--warn); }
 .big3-row input[type=date] { margin: 0; padding: 7px 8px; font-size: 14px; }
+.last-time[hidden] { display: none; }
+.draft-banner { display: flex; align-items: center; gap: 10px; }
+.draft-banner > div { flex: 1; min-width: 0; }
+.draft-banner b { display: block; }
+.draft-banner small { color: var(--muted); font-size: 13px; }
+.draft-banner .primary { padding: 10px 14px; }

@@ -550,9 +550,9 @@ function saveDraft() {
 
 // Big three : dernière séance où chaque mouvement a été fait (reconnu dans le nom de l'exercice)
 const BIG_THREE = [
-  { label: 'Squat', re: /squat/i },
+  { label: 'Squat', re: /^(?!.*(split|bulgar|goblet)).*squat/i },
   { label: 'RDL', re: /\brdl\b|roumain|romanian/i },
-  { label: 'Bench', re: /bench|d[ée]velopp[ée].?couch[ée]/i },
+  { label: 'Bench', re: /^(?!.*(inclin|dumbbell|halt[eè]re|\bdb\b)).*(bench|d[ée]velopp[ée].?couch[ée])/i }, // barre à plat (pas l'incliné haltères)
 ];
 function bigThreeCard() {
   const ws = store.get().workouts;
@@ -585,7 +585,7 @@ document.addEventListener('change', (e) => {
 });
 
 views.gym = () => {
-  if (state.draft) return gymEditor();
+  if (state.draft && state.editorOpen) return gymEditor();
   const workouts = [...store.get().workouts].sort(byDate).reverse();
   const names = exerciseNames();
   const ex = state.exercise && names.includes(state.exercise) ? state.exercise : names[0];
@@ -597,7 +597,13 @@ views.gym = () => {
   return `
     <header class="page-head"><h1>Salle</h1></header>
     ${bigThreeCard()}
-    <button class="primary block" data-action="new-workout">＋ Nouvelle séance</button>
+    ${state.draft ? `
+      <section class="card draft-banner">
+        <div><b>⏸ Séance en cours</b><small>${esc(state.draft.name || 'Séance')} · ${fmtDate(state.draft.date)}</small></div>
+        <button class="primary" data-action="resume-workout">Reprendre</button>
+        <button class="icon-btn" data-action="cancel-workout" aria-label="Abandonner">✕</button>
+      </section>`
+      : '<button class="primary block" data-action="new-workout">＋ Nouvelle séance</button>'}
     ${names.length ? card(
       'Progression',
       `<select id="exSelect">${names.map((n) => `<option ${n === ex ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
@@ -632,6 +638,20 @@ views.gym = () => {
   `;
 };
 
+// « Dernière fois » et placeholders d'un exercice, mis à jour sur place (le clavier reste ouvert sur iPhone)
+function showLastTime(i) {
+  const d = state.draft;
+  const e = d?.exercises[i];
+  const box = document.querySelector(`.exercise[data-ex="${i}"]`);
+  if (!e || !box) return;
+  const prev = e.name ? exerciseHistory(e.name).filter((h) => h.date < d.date || !d.id).pop() : null;
+  const p = box.querySelector('.last-time');
+  p.hidden = !prev;
+  p.textContent = prev ? `Dernière fois : ${setsText(prev.sets)}` : '';
+  box.querySelectorAll('[data-field=reps]').forEach((x) => { x.placeholder = prev?.sets[+x.dataset.set]?.reps ?? ''; });
+  box.querySelectorAll('[data-field=weight]').forEach((x) => { x.placeholder = prev?.sets[+x.dataset.set]?.weight ?? ''; });
+}
+
 function gymEditor() {
   const d = state.draft;
   const names = exerciseNames();
@@ -651,7 +671,7 @@ function gymEditor() {
               <input data-field="ex-name" data-ex="${i}" list="exNames" placeholder="Exercice (ex : Développé couché)" value="${esc(e.name)}" autocomplete="off">
               <button type="button" class="icon-btn" data-action="del-ex" data-ex="${i}" aria-label="Supprimer l'exercice">✕</button>
             </div>
-            ${prev ? `<p class="hint">Dernière fois : ${setsText(prev.sets)}</p>` : ''}
+            <p class="hint last-time" ${prev ? '' : 'hidden'}>${prev ? `Dernière fois : ${setsText(prev.sets)}` : ''}</p>
             <div class="sets">
               <div class="set-row head"><span>#</span><span>Reps</span><span>Kg</span><span></span></div>
               ${e.sets.map((s, j) => `
@@ -857,10 +877,13 @@ const forms = {
       .filter((e) => e.name && e.sets.length);
     if (!exercises.length) return toast('Ajoute au moins un exercice avec une série');
     const w = { date: d.date, name: d.name, exercises, notes: d.notes.trim() };
+    // Brouillon vidé AVANT l'enregistrement : le rendu qui suit affiche la page Salle (historique, 1RM)
+    state.draft = null;
+    state.editorOpen = false;
+    saveDraft();
     if (d.id) store.update('workouts', d.id, w);
     else store.add('workouts', w);
-    state.draft = null;
-    saveDraft();
+    window.scrollTo(0, 0);
     toast('Séance enregistrée 💪');
   },
 };
@@ -929,13 +952,20 @@ const actions = {
     store.add('meals', { ...rest, date: el.dataset.date || state.mealDate });
     toast(`${m.name} ajouté`);
   },
+  'resume-workout'() {
+    state.editorOpen = true;
+    render();
+    window.scrollTo(0, 0);
+  },
   'new-workout'() {
+    state.editorOpen = true;
     state.draft = emptyDraft();
     saveDraft();
     render();
   },
   'repeat-workout'(el) {
     const w = store.get().workouts.find((x) => x.id === el.dataset.id);
+    state.editorOpen = true;
     state.draft = {
       ...emptyDraft(),
       name: w.name,
@@ -947,6 +977,7 @@ const actions = {
   },
   'edit-workout'(el) {
     const w = store.get().workouts.find((x) => x.id === el.dataset.id);
+    state.editorOpen = true;
     state.draft = {
       id: w.id, date: w.date, name: w.name, notes: w.notes || '',
       exercises: w.exercises.map((e) => ({ name: e.name, sets: e.sets.map((s) => ({ reps: String(s.reps ?? ''), weight: String(s.weight ?? '') })) })),
@@ -958,6 +989,7 @@ const actions = {
   'cancel-workout'() {
     if (!confirm('Abandonner cette séance ?')) return;
     state.draft = null;
+    state.editorOpen = false;
     saveDraft();
     render();
   },
@@ -967,6 +999,8 @@ const actions = {
     render();
   },
   'del-ex'(el) {
+    const e = state.draft.exercises[+el.dataset.ex];
+    if ((e.name || e.sets.some((x) => x.reps || x.weight)) && !confirm(`Supprimer l'exercice${e.name ? ` « ${e.name} »` : ''} ?`)) return;
     state.draft.exercises.splice(+el.dataset.ex, 1);
     if (!state.draft.exercises.length) state.draft.exercises.push({ name: '', sets: [{ reps: '', weight: '' }] });
     saveDraft();
@@ -1194,7 +1228,7 @@ document.addEventListener('change', (e) => {
   if (el.id === 'homeDate') { state.homeDate = el.value && el.value <= today() ? el.value : today(); render(); }
   if (el.id === 'mealDate') { state.mealDate = el.value || today(); render(); }
   if (el.id === 'exSelect') { state.exercise = el.value; render(); }
-  if (el.dataset.field === 'ex-name') render(); // affiche "dernière fois"
+  if (el.dataset.field === 'ex-name') showLastTime(+el.dataset.ex); // affiche "dernière fois" sans tout redessiner
   if (el.id === 'importFile' && el.files[0]) {
     el.files[0].text().then((txt) => {
       if (!confirm('Remplacer les données actuelles par ce fichier ?')) return;
