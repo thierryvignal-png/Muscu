@@ -20,21 +20,29 @@ const REVENUES = [
   { key: 'bilans', label: '🧪 Bilans & vitamino', offices: false, bu: 'bilans' },
 ];
 
+const mid = (a, b) => (a == null ? b : b == null ? a : (a + b) / 2);
+
 const load = () => {
   const d = read(KEY, {});
   d.days ??= null;
   d.rev ??= {};
   for (const r of REVENUES) {
     const l = (d.rev[r.key] ??= { count: null, bu: r.bu });
-    // Anciennes valeurs uniques → min = max
     // Taux d'occupation unique : reprend l'ancien TO max (ou min) s'il existait
     if (l.to == null) l.to = l.toMax ?? l.toMin ?? null;
-    l.priceMin ??= null; l.priceMax ??= null; // prix moyen par acte (devices, bilans)
-    l.caMin ??= l.ca ?? null; l.caMax ??= l.ca ?? null;
+    // Une seule hypothèse de CA / jour et de prix par acte (anciens min / max : on garde celui du scénario choisi)
+    if (!d.singleCa) {
+      const which = d.scn?.rev === 'max' ? 'Max' : 'Min';
+      l.ca = l['ca' + which] ?? l.caMin ?? l.caMax ?? l.ca ?? null;
+      l.price = mid(l.priceMin ?? null, l.priceMax ?? null) ?? l.price ?? null;
+    }
+    l.ca ??= null; l.price ??= null;
+    delete l.caMin; delete l.caMax; delete l.priceMin; delete l.priceMax;
   }
+  if (!d.singleCa) { d.singleCa = true; write(KEY, d); }
   d.costs ??= [];
   d.costs.forEach((c) => { c.min ??= c.monthly ?? null; c.max ??= c.monthly ?? null; });
-  d.scn ??= { rev: 'min', cost: 'max' }; // scénario prudent par défaut
+  d.scn ??= { cost: 'max' }; // coûts : scénario prudent par défaut
   d.etpDays ??= 200; // jours travaillés par an par un praticien à temps plein
   d.recruit ??= { open: '2027-02-01' }; // roadmap de recrutement : ouverture, point de départ
   if (!d.recruit.start && d.doctors?.length) { d.recruit.start = today(); d.recruit.startDays = totalDays(d.doctors); write(KEY, d); }
@@ -45,12 +53,10 @@ const load = () => {
 const save = (d) => write(KEY, d);
 
 const euros = (v) => (v == null || !Number.isFinite(v) ? '–' : `${fr(Math.round(v))} €`);
-const pick = (o, base, which) => o[base + (which === 'max' ? 'Max' : 'Min')];
-
-// CA annuel d'une ligne de revenus pour un scénario (null si un paramètre manque)
-function revenueYear(r, line, days, which) {
+// CA annuel d'une ligne de revenus (null si un paramètre manque)
+function revenueYear(r, line, days) {
   const to = line.to;
-  const ca = pick(line, 'ca', which);
+  const ca = line.ca;
   const count = r.offices ? line.count : 1;
   if (days == null || to == null || ca == null || count == null) return null;
   return count * (to / 100) * ca * days;
@@ -75,7 +81,7 @@ function solveTO(d, target) {
   const needed = target + costYear; // CA annuel à atteindre
   const lines = REVENUES.map((r) => {
     const line = d.rev[r.key];
-    const ca = pick(line, 'ca', d.scn.rev);
+    const ca = line.ca;
     const count = r.offices ? line.count : 1;
     const k = d.days != null && ca != null && count != null ? count * ca * d.days : null; // CA à 100 % de TO
     return { r, line, k };
@@ -95,10 +101,10 @@ function solveTO(d, target) {
 }
 
 function model(d) {
-  const { rev, cost } = d.scn;
+  const { cost } = d.scn;
   const lines = REVENUES.map((r) => {
     const line = d.rev[r.key];
-    return { r, line, year: revenueYear(r, line, d.days, rev), min: revenueYear(r, line, d.days, 'min'), max: revenueYear(r, line, d.days, 'max') };
+    return { r, line, year: revenueYear(r, line, d.days) };
   });
   const caYear = lines.reduce((s, x) => s + (x.year || 0), 0);
   const costYear = d.costs.reduce((s, c) => s + costMonth(c, cost) * 12, 0);
@@ -119,9 +125,9 @@ const field = (name, label, value, placeholder = '') =>
   `<label class="field"><span>${label}</span><input name="${name}" inputmode="decimal" value="${value ?? ''}" placeholder="${placeholder}" autocomplete="off"></label>`;
 
 const seg = (kind, value) => `
-  <div class="alcohol scn ${kind === 'cost' ? 'three' : ''}">
+  <div class="alcohol scn three">
     <button class="seg ${value === 'min' ? 'on good' : ''}" data-action="clinic-scn" data-kind="${kind}" data-v="min">Min</button>
-    ${kind === 'cost' ? `<button class="seg ${value === 'mid' ? 'on good' : ''}" data-action="clinic-scn" data-kind="${kind}" data-v="mid">Mid</button>` : ''}
+    <button class="seg ${value === 'mid' ? 'on good' : ''}" data-action="clinic-scn" data-kind="${kind}" data-v="mid">Mid</button>
     <button class="seg ${value === 'max' ? 'on good' : ''}" data-action="clinic-scn" data-kind="${kind}" data-v="max">Max</button>
   </div>`;
 
@@ -130,13 +136,10 @@ const range = (a, b) => (a == null && b == null ? '–' : a === b || b == null ?
 
 // Synthèse : scénario, objectifs d'EBITDA, CA / coûts / résultat, tableau par BU
 function sumInner(d, m) {
-  const scnName = d.scn.rev === 'min' && d.scn.cost === 'max' ? 'prudent' : d.scn.rev === 'max' && d.scn.cost === 'min' ? 'optimiste' : 'intermédiaire';
   return `
-      <div class="scn-pick">
-        <div><span class="hint">Revenus</span>${seg('rev', d.scn.rev)}</div>
+      <div class="scn-pick one">
         <div><span class="hint">Coûts</span>${seg('cost', d.scn.cost)}</div>
       </div>
-      <p class="hint center">Scénario <b>${scnName}</b></p>
       <div class="target-pick">
         <span class="hint">🎯 EBITDA visé</span>
         <div class="alcohol scn targets">${TARGETS.map((t) => `<button class="seg ${Math.abs(m.res - t.v) < 1000 ? 'on good' : ''}" data-action="clinic-target" data-v="${t.v}">${t.label}</button>`).join('')}</div>
@@ -190,14 +193,8 @@ function revImpl(d, r, line) {
     impl = `👩‍⚕️ ≈ <b>${fr(etp, 1)} ${r.key === 'med' ? 'médecins' : 'praticiens'} ETP</b> à recruter <small>(${fr(line.count)} bureaux × ${fr(line.to)} % × ${fr(d.days)} j ÷ ${fr(d.etpDays)} j/ETP)</small>`;
   }
   if (!r.offices && line.to != null) {
-    const ca = pick(line, 'ca', d.scn.rev);
-    const acts = (price) => (ca != null && price ? (ca * (line.to / 100)) / price : null);
-    const a1 = acts(line.priceMin), a2 = acts(line.priceMax);
-    if (a1 != null || a2 != null) {
-      const parts = [[line.priceMin, a1], [line.priceMax, a2]].filter(([p, a]) => a != null && p)
-        .map(([p, a]) => `<b>${fr(a, 1)} actes / jour</b> à ${fr(p)} €`);
-      impl = `🔢 ${parts.join(' · ')} <small>(CA / jour ${d.scn.rev} × TO ÷ prix ; ≈ ${fr(((a1 ?? a2) * (d.days || 0)), 0)} actes / an)</small>`;
-    }
+    const a = line.ca != null && line.price ? (line.ca * (line.to / 100)) / line.price : null;
+    if (a != null) impl = `🔢 <b>${fr(a, 1)} actes / jour</b> à ${fr(line.price)} € <small>(CA / jour × TO ÷ prix ; ≈ ${fr(a * (d.days || 0), 0)} actes / an)</small>`;
   }
   return impl;
 }
@@ -230,21 +227,17 @@ export function view() {
           ${field('etpDays', 'Jours travaillés / an par ETP', d.etpDays, 'ex : 200')}
         </div>
       </section>
-      ${m.lines.map(({ r, line, min, max }) => {
+      ${m.lines.map(({ r, line, year }) => {
         const impl = revImpl(d, r, line);
         return `
         <section class="card">
-          <h2>${r.label} <small class="hint" data-rev-range="${r.key}">${range(min, max)} / an</small></h2>
+          <h2>${r.label} <small class="hint" data-rev-range="${r.key}">${euros(year)} / an</small></h2>
           <div class="form">
             ${r.offices ? field(`${r.key}_count`, 'Nombre de bureaux', line.count) : ''}
             <label class="field ${r.offices ? '' : 'full'}"><span>Business unit</span>${buSelect(`${r.key}_bu`, line.bu || r.bu)}</label>
             ${field(`${r.key}_to`, "Taux d'occupation (%)", line.to, 'ex : 70')}
-            <span></span>
-            ${field(`${r.key}_caMin`, r.offices ? 'CA/bureau/jour min (€)' : 'CA / jour min (€)', line.caMin)}
-            ${field(`${r.key}_caMax`, r.offices ? 'CA/bureau/jour max (€)' : 'CA / jour max (€)', line.caMax)}
-            ${r.offices ? '' : `
-              ${field(`${r.key}_priceMin`, 'Prix / acte min (€)', line.priceMin, 'ex : 150')}
-              ${field(`${r.key}_priceMax`, 'Prix / acte max (€)', line.priceMax, 'ex : 200')}`}
+            ${field(`${r.key}_ca`, r.offices ? 'CA / bureau / jour (€)' : 'CA / jour (€)', line.ca)}
+            ${r.offices ? '' : field(`${r.key}_price`, 'Prix / acte (€)', line.price, 'ex : 150')}
           </div>
           <p class="clinic-impl" data-rev-impl="${r.key}" ${impl ? '' : 'hidden'}>${impl}</p>
         </section>`;
@@ -307,7 +300,6 @@ const docDays = (docs, etpDays) => DOC_TYPES.map((t) => {
 // Burn annuel si on fait tourner les bureaux avec ces médecins (ETP pondérés), hypothèses moyennes :
 // CA / jour = moyenne min-max, coûts « mid », devices et bilans à leur taux d'occupation actuel.
 const DOC_OFFICE = { singulier: 'esth', cm28: 'med' }; // Singulier → bureaux esthétiques, CM28 → bureaux médicaux
-const mid = (a, b) => (a == null ? b : b == null ? a : (a + b) / 2);
 // Chiffres du modèle si les bureaux tournent avec ces médecins (ETP pondérés)
 function docFin(d) {
   const etpDays = d.etpDays || 200;
@@ -315,14 +307,14 @@ function docFin(d) {
     const r = REVENUES.find((x) => x.key === DOC_OFFICE[t.key]);
     const line = d.rev[r.key];
     const officeDays = (weightedDays(d.doctors, t.key) / 5) * etpDays; // jours-bureau / an
-    const ca = mid(line.caMin, line.caMax);
+    const ca = line.ca;
     const cap = line.count != null && d.days ? line.count * d.days : null; // capacité à 100 % de TO
     return { t, ca, cap, year: ca == null ? null : officeDays * ca, to: cap ? (officeDays / cap) * 100 : null };
   });
   if (offices.some((o) => o.year == null)) return null;
   const others = REVENUES.filter((r) => !r.offices).reduce((s, r) => {
     const line = d.rev[r.key];
-    const ca = mid(line.caMin, line.caMax);
+    const ca = line.ca;
     return s + (line.to != null && ca != null && d.days != null ? (line.to / 100) * ca * d.days : 0);
   }, 0);
   const caYear = offices.reduce((s, o) => s + o.year, 0) + others;
@@ -342,7 +334,7 @@ function docBurn(d) {
       <b class="${res < 0 ? 'warn' : 'good'}">${euros(res < 0 ? -res : res)}</b>
       <small>soit ${euros(Math.abs(res) / 12)} / mois · CA ${euros(caYear)} − coûts ${euros(costYear)}</small>
     </div>
-    <p class="hint">Hypothèses moyennes : CA / jour moyen (min-max), coûts mid, devices et bilans à leur taux d'occupation actuel.${tos ? ` Taux d'occupation des bureaux correspondant : ${tos}.` : ''}</p>
+    <p class="hint">Hypothèses : CA / jour saisi, coûts mid, devices et bilans à leur taux d'occupation actuel.${tos ? ` Taux d'occupation des bureaux correspondant : ${tos}.` : ''}</p>
     ${over ? '<p class="hint warn">⚠️ Plus de jours-médecins que de bureaux disponibles : il faut plus de bureaux.</p>' : ''}`;
 }
 
@@ -483,8 +475,8 @@ if (typeof document !== 'undefined') {
     const set = (sel, html) => { const el = document.querySelector(sel); if (el) el.innerHTML = html; };
     set('[data-clinic-sum]', sumInner(d, m));
     set('[data-clinic-sticky]', stickyInner(m));
-    for (const { r, line, min, max } of m.lines) {
-      set(`[data-rev-range="${r.key}"]`, `${range(min, max)} / an`);
+    for (const { r, line, year } of m.lines) {
+      set(`[data-rev-range="${r.key}"]`, `${euros(year)} / an`);
       const impl = revImpl(d, r, line);
       const el = document.querySelector(`[data-rev-impl="${r.key}"]`);
       if (el) { el.innerHTML = impl; el.hidden = !impl; }
@@ -494,7 +486,9 @@ if (typeof document !== 'undefined') {
     set('[data-doc-plan]', docPlan(d));
   };
   document.addEventListener('input', live);
-  document.addEventListener('change', live);
+  // « change » seulement pour les listes (BU) : sur un champ texte il arrive au moment où l'on touche
+  // un bouton, et redessiner la synthèse à cet instant ferait rater le toucher (ex : EBITDA visé)
+  document.addEventListener('change', (e) => { if (e.target.tagName === 'SELECT') live(e); });
 }
 
 export const forms = {
@@ -518,10 +512,8 @@ export const forms = {
       const line = d.rev[r.key];
       if (r.offices) line.count = num(f[`${r.key}_count`]);
       line.to = num(f[`${r.key}_to`]);
-      for (const k of ['caMin', 'caMax', 'priceMin', 'priceMax']) if (`${r.key}_${k}` in f) line[k] = num(f[`${r.key}_${k}`]);
-      // Un seul des deux rempli → on l'utilise pour les deux
-      line.caMax ??= line.caMin; line.caMin ??= line.caMax;
-      line.priceMax ??= line.priceMin; line.priceMin ??= line.priceMax;
+      line.ca = num(f[`${r.key}_ca`]);
+      if (`${r.key}_price` in f) line.price = num(f[`${r.key}_price`]);
       line.bu = f[`${r.key}_bu`] || r.bu;
     }
     save(d);

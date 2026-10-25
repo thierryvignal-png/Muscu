@@ -553,6 +553,7 @@ small.warn { color: var(--warn); }
 /* Clinique : scénario et coûts min / max */
 .scn-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .scn-pick .scn { margin-top: 4px; }
+.scn-pick.one { grid-template-columns: 1fr; }
 .scn .seg { padding: 8px; }
 .cost-row { display: grid; grid-template-columns: 1fr 1fr 28px; grid-template-areas: "name bu del" "min max ."; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
 .cost-row:first-child { border-top: 0; padding-top: 0; }
