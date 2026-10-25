@@ -548,12 +548,13 @@ function saveDraft() {
   } catch {}
 }
 
-// Big four : dernière séance où chaque mouvement a été fait (reconnu dans le nom de l'exercice)
+// Big five : dernière séance où chaque mouvement a été fait (reconnu dans le nom de l'exercice)
 const BIG_THREE = [
   { label: 'Squat', re: /^(?!.*(split|bulgar|goblet)).*squat/i },
   { label: 'RDL', re: /\brdl\b|roumain|romanian/i },
   { label: 'Bench', re: /^(?!.*(inclin|dumbbell|halt[eè]re|\bdb\b)).*(bench|d[ée]velopp[ée].?couch[ée])/i }, // barre à plat (pas l'incliné haltères)
   { label: 'Élév. latérales', re: /lat[ée]ral|lateral raise/i },
+  { label: 'Tractions', re: /traction|chin.?up/i },
 ];
 function bigThreeCard() {
   const ws = store.get().workouts;
@@ -568,7 +569,7 @@ function bigThreeCard() {
   const agoTxt = (n) => (n === 0 ? "aujourd'hui" : n === 1 ? 'hier' : `il y a ${n} j`);
   return `
     <section class="card big3">
-      <div class="big3-head"><span>🏋️ Dernier big four</span><b>${latest ? `${fmtDate(latest)} · ${agoTxt(daysBetween(latest, today()))}` : 'jamais'}</b></div>
+      <div class="big3-head"><span>🏋️ Dernier big five</span><b>${latest ? `${fmtDate(latest)} · ${agoTxt(daysBetween(latest, today()))}` : 'jamais'}</b></div>
       ${rows.map((r) => `
         <label class="big3-row">
           <span>${r.label}</span>
