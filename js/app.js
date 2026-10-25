@@ -647,7 +647,7 @@ function showLastTime(i) {
   const prev = e.name ? exerciseHistory(e.name).filter((h) => h.date < d.date || !d.id).pop() : null;
   const p = box.querySelector('.last-time');
   p.hidden = !prev;
-  p.textContent = prev ? `Dernière fois : ${setsText(prev.sets)}` : '';
+  p.textContent = prev ? `Dernière fois : ${setsText(prev.sets)} · en gris = repris si tu laisses vide` : '';
   box.querySelectorAll('[data-field=reps]').forEach((x) => { x.placeholder = prev?.sets[+x.dataset.set]?.reps ?? ''; });
   box.querySelectorAll('[data-field=weight]').forEach((x) => { x.placeholder = prev?.sets[+x.dataset.set]?.weight ?? ''; });
 }
@@ -671,7 +671,7 @@ function gymEditor() {
               <input data-field="ex-name" data-ex="${i}" list="exNames" placeholder="Exercice (ex : Développé couché)" value="${esc(e.name)}" autocomplete="off">
               <button type="button" class="icon-btn" data-action="del-ex" data-ex="${i}" aria-label="Supprimer l'exercice">✕</button>
             </div>
-            <p class="hint last-time" ${prev ? '' : 'hidden'}>${prev ? `Dernière fois : ${setsText(prev.sets)}` : ''}</p>
+            <p class="hint last-time" ${prev ? '' : 'hidden'}>${prev ? `Dernière fois : ${setsText(prev.sets)} · en gris = repris si tu laisses vide` : ''}</p>
             <div class="sets">
               <div class="set-row head"><span>#</span><span>Reps</span><span>Kg</span><span></span></div>
               ${e.sets.map((s, j) => `
@@ -869,13 +869,21 @@ const forms = {
     const form = $('#workoutForm');
     d.date = form.elements.date.value || today();
     d.name = form.elements.name.value.trim();
+    // Case vide = valeur affichée en gris (celle de la dernière fois) : ce qu'on voit est ce qui est enregistré
     const exercises = d.exercises
-      .map((e) => ({
-        name: e.name.trim(),
-        sets: e.sets.map((s) => ({ reps: num(s.reps), weight: num(s.weight) ?? 0 })).filter((s) => s.reps),
-      }))
+      .map((e) => {
+        const name = e.name.trim();
+        const prev = name ? exerciseHistory(name).filter((h) => h.date < d.date || !d.id).pop() : null;
+        return {
+          name,
+          sets: e.sets.map((s, j) => ({
+            reps: num(s.reps) ?? prev?.sets[j]?.reps ?? null,
+            weight: num(s.weight) ?? prev?.sets[j]?.weight ?? 0,
+          })).filter((s) => s.reps),
+        };
+      })
       .filter((e) => e.name && e.sets.length);
-    if (!exercises.length) return toast('Ajoute au moins un exercice avec une série');
+    if (!exercises.length) return toast('Ajoute au moins un exercice avec ses reps');
     const w = { date: d.date, name: d.name, exercises, notes: d.notes.trim() };
     // Brouillon vidé AVANT l'enregistrement : le rendu qui suit affiche la page Salle (historique, 1RM)
     state.draft = null;
