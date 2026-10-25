@@ -948,6 +948,7 @@ const actions = {
     store.setAlcohol(date, manual && manual.value === v ? null : v);
   },
   'open-muscu'(el) {
+    backToToday();
     $('#sheet').hidden = true;
     space = 'muscu';
     current = el.dataset.mtab || 'home';
@@ -1240,10 +1241,24 @@ function wrapSpace(handlers) {
 Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions), wrapSpace(todo.actions), wrapSpace(esthetique.actions), wrapSpace(atom.actions), wrapSpace(finance.actions), wrapSpace(clinic.actions));
 Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms), wrapSpace(todo.forms), wrapSpace(esthetique.forms), wrapSpace(atom.forms), wrapSpace(finance.forms), wrapSpace(clinic.forms));
 
+// ---------- Retour sur aujourd'hui ----------
+// L'app reste ouverte en arrière-plan sur l'iPhone : au changement de jour, et à chaque changement
+// d'onglet, Repas et Accueil reviennent sur la date du jour.
+let openedDay = today();
+function backToToday() {
+  state.mealDate = today();
+  state.homeDate = today();
+  openedDay = today();
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && today() !== openedDay) { backToToday(); render(); }
+});
+setInterval(() => { if (today() !== openedDay) { backToToday(); render(); } }, 60000);
+
 // ---------- Événements (délégation) ----------
 document.addEventListener('click', (e) => {
   const tab = e.target.closest('[data-tab]');
-  if (tab) return go(tab.dataset.tab);
+  if (tab) { backToToday(); return go(tab.dataset.tab); }
   const goBtn = e.target.closest('[data-go]');
   if (goBtn) return go(goBtn.dataset.go);
   const act = e.target.closest('[data-action]');
