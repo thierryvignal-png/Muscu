@@ -70,6 +70,7 @@ const TARGETS = [
   { v: -300000, label: '−300 k€' },
   { v: 0, label: 'Breakeven' },
   { v: 500000, label: '500 k€' },
+  { v: 750000, label: '750 k€' },
   { v: 1000000, label: '1 M€' },
 ];
 
