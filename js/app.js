@@ -599,7 +599,7 @@ views.gym = () => {
     ${bigThreeCard()}
     ${state.draft ? `
       <section class="card draft-banner">
-        <div><b>⚠️ Séance du ${fmtDate(state.draft.date)} non enregistrée</b><small>${esc(state.draft.name || 'Séance')} · touche « Compléter » puis « Enregistrer »</small></div>
+        <div><b>⚠️ Séance du ${fmtDate(state.draft.date)} non enregistrée</b><small>${esc(sessionTitle(state.draft))} · touche « Compléter » puis « Enregistrer »</small></div>
         <button class="primary" data-action="resume-workout">Compléter</button>
         <button class="icon-btn" data-action="cancel-workout" aria-label="Abandonner">✕</button>
       </section>`
@@ -622,7 +622,7 @@ views.gym = () => {
         ? `<ul class="list workouts">${workouts.map((w) => `
           <li>
             <div>
-              <b>${esc(w.name || 'Séance')} · ${fmtDate(w.date)}</b>
+              <b>${fmtDate(w.date)} · ${esc(sessionTitle(w))}</b>
               <small>${w.exercises.length} exo · ${fr(workoutVolume(w))} kg de volume</small>
               <ul class="mini">${w.exercises.map((e) => `<li>${esc(e.name)} <span>${setsText(e.sets)}</span></li>`).join('')}</ul>
               ${w.notes ? `<small>${esc(w.notes)}</small>` : ''}
@@ -637,6 +637,9 @@ views.gym = () => {
     )}
   `;
 };
+
+// Titre d'une séance : ses exercices (plus de champ « Nom » à remplir)
+const sessionTitle = (w) => w.exercises.map((e) => e.name.trim()).filter(Boolean).join(', ') || w.name || 'Séance';
 
 // « Dernière fois » et placeholders d'un exercice, mis à jour sur place (le clavier reste ouvert sur iPhone)
 function showLastTime(i) {
@@ -659,8 +662,7 @@ function gymEditor() {
     <header class="page-head"><h1>${d.id ? 'Modifier la séance' : d.date === today() ? 'Séance du jour' : `Séance du ${fmtDay(d.date)}`}</h1><p>${d.id ? '' : 'Pas encore enregistrée : termine par « Enregistrer la séance »'}</p></header>
     ${bigThreeCard()}
     <form data-form="workout" class="form" id="workoutForm">
-      ${input('date', 'Date', { type: 'date', value: d.date })}
-      ${input('name', 'Nom', { placeholder: 'ex : Push, Jambes…', value: d.name })}
+      ${input('date', 'Date', { type: 'date', value: d.date, cls: 'full' })}
       <datalist id="exNames">${names.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
       <div class="full exercises">
         ${d.exercises.map((e, i) => {
@@ -868,7 +870,6 @@ const forms = {
     const d = state.draft;
     const form = $('#workoutForm');
     d.date = form.elements.date.value || today();
-    d.name = form.elements.name.value.trim();
     // Case vide = valeur affichée en gris (celle de la dernière fois) : ce qu'on voit est ce qui est enregistré
     const exercises = d.exercises
       .map((e) => {
