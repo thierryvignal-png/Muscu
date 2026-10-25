@@ -75,16 +75,20 @@ const TARGETS = [
 
 // Taux d'occupation et CA / jour pour un EBITDA annuel donné.
 // 1. On fait varier les TO (en gardant leurs écarts), sans jamais dépasser 85 %.
-// 2. Si tous les TO à 85 % ne suffisent pas, on augmente le CA / jour de chaque ligne du même pourcentage.
+// 2. Si tous les TO à 85 % ne suffisent pas, on augmente le CA / jour de chaque ligne du même pourcentage,
+//    sans dépasser son plafond (saisi dans l'app, vide = pas de limite) ; les lignes sans plafond absorbent le reste.
 export const TO_MAX = 85;
+const capOf = (d, key) => d.rev[key]?.caCap ?? null; // plafond de CA / jour d'une ligne
 function solveTO(d, target) {
   const costYear = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
   const needed = target + costYear; // CA annuel à atteindre
   const lines = REVENUES.map((r) => {
     const line = d.rev[r.key];
     const count = r.offices ? line.count : 1;
-    const k = d.days != null && line.ca != null && count != null ? count * line.ca * d.days : null; // CA à 100 % de TO
-    return { r, line, k };
+    // CA / jour ramené sous son plafond s'il le dépasse
+    const ca = line.ca != null && capOf(d, r.key) != null ? Math.min(line.ca, capOf(d, r.key)) : line.ca;
+    const k = d.days != null && ca != null && count != null ? count * ca * d.days : null; // CA à 100 % de TO
+    return { r, line, ca, k };
   }).filter((x) => x.k);
   if (!lines.length) return null;
   const base = lines.every((x) => x.line.to > 0) ? (x) => x.line.to : () => 1; // proportions de départ
@@ -96,12 +100,18 @@ function solveTO(d, target) {
     let lo = 0, hi = 1;
     while (caAt(hi) < needed) hi *= 2;
     for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (caAt(m) < needed) lo = m; else hi = m; }
-    lines.forEach((x) => { to[x.r.key] = Math.max(0, Math.min(TO_MAX, base(x) * hi)); });
+    lines.forEach((x) => { to[x.r.key] = Math.max(0, Math.min(TO_MAX, base(x) * hi)); if (x.ca !== x.line.ca) ca[x.r.key] = x.ca; });
     return { to, ca, caUp: 0 };
   }
-  const g = needed / full; // CA / jour à augmenter de (g − 1)
-  lines.forEach((x) => { to[x.r.key] = TO_MAX; ca[x.r.key] = Math.ceil(x.line.ca * g); });
-  return { to, ca, caUp: g - 1 };
+  // CA / jour : même hausse partout, plafonnée par ligne (dichotomie sur la hausse)
+  const caOf = (x, g) => (capOf(d, x.r.key) != null ? Math.min(x.ca * g, capOf(d, x.r.key)) : x.ca * g);
+  const caAtG = (g) => lines.reduce((s, x) => s + (x.k / x.ca) * caOf(x, g) * TO_MAX / 100, 0);
+  let lo = 1, hi = 2;
+  while (caAtG(hi) < needed && hi < 1e6) hi *= 2;
+  if (caAtG(hi) < needed) return { to, ca, impossible: true };
+  for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (caAtG(m) < needed) lo = m; else hi = m; }
+  lines.forEach((x) => { to[x.r.key] = TO_MAX; ca[x.r.key] = Math.ceil(caOf(x, hi)); });
+  return { to, ca, caUp: hi - 1 };
 }
 
 function model(d) {
@@ -148,8 +158,11 @@ function sumInner(d, m) {
         <span class="hint">🎯 EBITDA visé</span>
         <div class="alcohol scn targets">${TARGETS.map((t) => `<button class="seg ${Math.abs(m.res - t.v) < 5000 ? 'on good' : ''}" data-action="clinic-target" data-v="${t.v}">${t.label}</button>`).join('')}</div>
         ${(() => {
+          const name = (r) => r.label.replace(/^\S+ /, '');
           const over = REVENUES.filter((r) => d.rev[r.key].to > TO_MAX);
-          return over.length ? `<p class="hint warn">⚠️ TO au-dessus de ${TO_MAX} % (${over.map((r) => r.label.replace(/^\S+ /, '')).join(', ')}) : pas réaliste.</p>` : '';
+          const caOver = REVENUES.filter((r) => capOf(d, r.key) != null && d.rev[r.key].ca > capOf(d, r.key));
+          return (over.length ? `<p class="hint warn">⚠️ TO au-dessus de ${TO_MAX} % (${over.map(name).join(', ')}) : pas réaliste.</p>` : '')
+            + (caOver.length ? `<p class="hint warn">⚠️ CA / jour au-dessus du plafond : ${caOver.map((r) => `${name(r)} (max ${fr(capOf(d, r.key))} €)`).join(', ')}.</p>` : '');
         })()}
       </div>
       <div class="clinic-sum-grid">
@@ -241,6 +254,7 @@ export function view() {
             <label class="field ${r.offices ? '' : 'full'}"><span>Business unit</span>${buSelect(`${r.key}_bu`, line.bu || r.bu)}</label>
             ${field(`${r.key}_to`, "Taux d'occupation (%)", line.to, 'ex : 70')}
             ${field(`${r.key}_ca`, r.offices ? 'CA / bureau / jour (€)' : 'CA / jour (€)', line.ca)}
+            ${field(`${r.key}_caCap`, 'Plafond CA / jour (€)', line.caCap, 'vide = sans limite')}
             ${r.offices ? '' : field(`${r.key}_price`, 'Prix / acte (€)', line.price, 'ex : 150')}
           </div>
           <p class="clinic-impl" data-rev-impl="${r.key}" ${impl ? '' : 'hidden'}>${impl}</p>
@@ -517,6 +531,7 @@ export const forms = {
       if (r.offices) line.count = num(f[`${r.key}_count`]);
       line.to = num(f[`${r.key}_to`]);
       line.ca = num(f[`${r.key}_ca`]);
+      line.caCap = num(f[`${r.key}_caCap`]);
       if (`${r.key}_price` in f) line.price = num(f[`${r.key}_price`]);
       line.bu = f[`${r.key}_bu`] || r.bu;
     }
@@ -560,12 +575,13 @@ export const actions = {
     const target = Number(el.dataset.v);
     const sol = solveTO(d, target);
     if (!sol) return 'Renseigne d\'abord les jours d\'ouverture, bureaux et CA / jour';
+    if (sol.impossible) return 'Objectif impossible : toutes les lignes sont à leur plafond de CA / jour';
     for (const [k, v] of Object.entries(sol.to)) d.rev[k].to = Math.round(v * 10) / 10;
     for (const [k, v] of Object.entries(sol.ca)) d.rev[k].ca = v;
     save(d);
     const label = TARGETS.find((t) => t.v === target).label;
     return sol.caUp > 0
-      ? `${label} : TO à ${TO_MAX} % partout et CA / jour +${fr(sol.caUp * 100)} % sur chaque ligne`
+      ? `${label} : TO à ${TO_MAX} % partout · CA / jour ${REVENUES.filter((r) => sol.ca[r.key] != null).map((r) => `${r.label.replace(/^\S+ /, '')} ${fr(sol.ca[r.key])} €`).join(', ')}`
       : `${label} : taux d'occupation ajustés (max ${TO_MAX} %)`;
   },
   'clinic-scn'(el) {
