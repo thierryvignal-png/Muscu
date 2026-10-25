@@ -1140,7 +1140,6 @@ function journeeView() {
 
   const tasks = todo.todayList();
   const news = goodnews.upcomingList(3);
-  const gs = goals.summary();
   const es = esthetique.scores();
   const head = (title, spaceKey, label = 'Tout voir ›') =>
     `<div class="j-head"><h2>${title}</h2><button class="chip" data-action="space" data-space="${spaceKey}">${label}</button></div>`;
@@ -1206,13 +1205,7 @@ function journeeView() {
         : '<p class="hint">Ajoute ce qui t\'attend de cool.</p>'}
     </section>
 
-    <section class="card">
-      ${head('🎯 Objectifs de vie', 'goals')}
-      ${gs.total ? `
-        <p><b class="${gs.onTrack === gs.total ? 'good' : gs.onTrack >= gs.total / 2 ? 'mid' : 'warn'}">${gs.onTrack}/${gs.total}</b> dans les temps</p>
-        ${gs.watch.length ? `<ul class="mini">${gs.watch.slice(0, 4).map((x) => `<li>${esc(x.g.emoji || '🎯')} ${esc(x.g.title)} <span class="${x.c.cls}">· ${x.c.status} (${fr(x.c.progress * 100)} % vs ${fr(x.c.expected * 100)} %)</span></li>`).join('')}</ul>` : '<p class="hint">Tout est dans les temps ✅</p>'}`
-        : '<p class="hint">Aucun objectif pour l\'instant.</p>'}
-    </section>
+    ${clinic.recruitCard(head)}
 
     ${es.hasBase || es.next ? `<section class="card">
       ${head('✨ Roadmap esthétique', 'esthetique')}

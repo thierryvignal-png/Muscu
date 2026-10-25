@@ -352,9 +352,10 @@ const j = (v) => fr(r1(v), r1(v) % 1 ? 1 : 0);
 const dayDiff = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000);
 const shortDate = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
 
-function docPlan(d) {
+// Calculs de la roadmap de recrutement (partagés avec « Ma journée »)
+function planCalc(d) {
   const f = docFin(d);
-  if (!f) return '';
+  if (!f) return null;
   const { open, start, startDays } = d.recruit;
   const med = f.offices.find((o) => o.t.key === 'cm28');
   const perDay = (f.etpDays / 5) * med.ca; // CA / an apporté par 1 jour-médecin / sem en CM28
@@ -379,7 +380,13 @@ function docPlan(d) {
   steps.push(open);
   const goalAt = (iso) => startDays + (target - startDays) * Math.min(1, dayDiff(start, iso) / span);
   const capWarn = med.cap && ((f.etpDays / 5) * (weightedDays(d.doctors, 'cm28') + missing)) > med.cap;
+  return { f, open, start, med, perDay, missing, now, expected, late, left, months, steps, goalAt, capWarn };
+}
 
+function docPlan(d) {
+  const p = planCalc(d);
+  if (!p) return '';
+  const { f, open, start, med, perDay, missing, now, expected, late, left, months, steps, goalAt, capWarn } = p;
   return `
     <div class="doc-plan">
       <div class="j-head"><h3>🗓️ Objectif burn 0 à l'ouverture</h3></div>
@@ -494,6 +501,25 @@ if (typeof document !== 'undefined') {
   // « change » seulement pour les listes (BU) : sur un champ texte il arrive au moment où l'on touche
   // un bouton, et redessiner la synthèse à cet instant ferait rater le toucher (ex : EBITDA visé)
   document.addEventListener('change', (e) => { if (e.target.tagName === 'SELECT') live(e); });
+}
+
+// Carte « Ma journée » : où en est le recrutement pour un burn à 0 à l'ouverture
+export function recruitCard(head) {
+  const d = load();
+  const p = planCalc(d);
+  const body = !p
+    ? '<p class="hint">Renseigne le CA / jour des bureaux dans Clinique pour suivre le plan.</p>'
+    : p.missing <= 0
+      ? '<p class="good"><b>✅ Breakeven atteint avec les médecins actuels</b></p>'
+      : (() => {
+        const next = p.steps.find((iso) => iso > today()) || p.open;
+        return `
+        <p><b class="warn">${j(p.missing)}</b> jours-médecins / sem CM28 manquants · J-${Math.max(0, p.left)}</p>
+        <p><b class="${p.late > 0.05 ? 'warn' : 'good'}">${p.late > 0.05 ? `⚠️ En retard de ${j(p.late)} j/sem` : '✅ Dans les temps'}</b>
+          <span class="hint">· ${j(p.now)} signés (obj. du jour ${j(p.expected)})</span></p>
+        <p class="hint">Prochain jalon ${shortDate(next)} : ${j(p.goalAt(next))} j/sem (+${j(Math.max(0, p.goalAt(next) - p.now))})</p>`;
+      })();
+  return `<section class="card">${head('🩺 Recrutement médecins', 'clinique')}${body}</section>`;
 }
 
 export const forms = {
