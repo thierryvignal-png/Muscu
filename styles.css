@@ -619,3 +619,4 @@ small.warn { color: var(--warn); }
 .wsets-row[data-action] { cursor: pointer; }
 .wsets-row.on { background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 8px; margin: 0 -6px; padding-left: 6px; padding-right: 6px; }
 .wsets-chart-title { margin: 12px 0 0; }
+.clinic-impl[hidden] { display: none; }

@@ -125,26 +125,13 @@ const seg = (kind, value) => `
     <button class="seg ${value === 'max' ? 'on good' : ''}" data-action="clinic-scn" data-kind="${kind}" data-v="max">Max</button>
   </div>`;
 
-export function view() {
-  const d = load();
-  const m = model(d);
-  const resCls = (v) => (v > 0 ? 'good' : v < 0 ? 'warn' : '');
-  const range = (a, b) => (a == null && b == null ? '–' : a === b || b == null ? euros(a) : `${euros(a)} – ${euros(b)}`);
+const resCls = (v) => (v > 0 ? 'good' : v < 0 ? 'warn' : '');
+const range = (a, b) => (a == null && b == null ? '–' : a === b || b == null ? euros(a) : `${euros(a)} – ${euros(b)}`);
+
+// Synthèse : scénario, objectifs d'EBITDA, CA / coûts / résultat, tableau par BU
+function sumInner(d, m) {
   const scnName = d.scn.rev === 'min' && d.scn.cost === 'max' ? 'prudent' : d.scn.rev === 'max' && d.scn.cost === 'min' ? 'optimiste' : 'intermédiaire';
-
   return `
-    <header class="page-head"><h1>Clinique Singulier</h1><p>Modèle financier</p></header>
-    ${cashCard(d.cash, 'clinicCash')}
-    ${cashCard(d.capex, 'clinicCapex', { title: '🏗️ Capex restant', placeholder: 'Montant restant (€)', colored: false, sign: false })}
-    ${(() => {
-      // Solde disponible pour le ramp-up = trésorerie − capex restant
-      const cash = d.cash?.amount, capex = d.capex?.amount;
-      const left = cash == null ? null : cash - (capex || 0);
-      const cls = left == null ? '' : left >= 0 ? 'good' : 'warn';
-      return `<section class="card fin-net"><span>🚀 Solde pour le ramp-up</span><b class="${cls}">${euros(left)}</b></section>`;
-    })()}
-
-    <section class="card clinic-sum">
       <div class="scn-pick">
         <div><span class="hint">Revenus</span>${seg('rev', d.scn.rev)}</div>
         <div><span class="hint">Coûts</span>${seg('cost', d.scn.cost)}</div>
@@ -167,8 +154,46 @@ export function view() {
       <table class="week-table clinic-bu">
         <tr><th></th><th>CA / an</th><th>Coûts / an</th><th>Résultat</th></tr>
         ${m.byBu.map((x) => `<tr><td>${esc(x.b.label)}</td><td>${euros(x.ca)}</td><td>${euros(x.cost)}</td><td class="${resCls(x.res)}">${euros(x.res)}</td></tr>`).join('')}
-      </table>
-    </section>
+      </table>`;
+}
+
+function revImpl(d, r, line) {
+  // Ce que ça implique : ETP pour les bureaux, actes / jour pour devices et bilans
+  let impl = '';
+  if (r.offices && line.count != null && line.to != null && d.days != null && d.etpDays) {
+    const etp = (line.count * (line.to / 100) * d.days) / d.etpDays;
+    impl = `👩‍⚕️ ≈ <b>${fr(etp, 1)} ${r.key === 'med' ? 'médecins' : 'praticiens'} ETP</b> à recruter <small>(${fr(line.count)} bureaux × ${fr(line.to)} % × ${fr(d.days)} j ÷ ${fr(d.etpDays)} j/ETP)</small>`;
+  }
+  if (!r.offices && line.to != null) {
+    const ca = pick(line, 'ca', d.scn.rev);
+    const acts = (price) => (ca != null && price ? (ca * (line.to / 100)) / price : null);
+    const a1 = acts(line.priceMin), a2 = acts(line.priceMax);
+    if (a1 != null || a2 != null) {
+      const parts = [[line.priceMin, a1], [line.priceMax, a2]].filter(([p, a]) => a != null && p)
+        .map(([p, a]) => `<b>${fr(a, 1)} actes / jour</b> à ${fr(p)} €`);
+      impl = `🔢 ${parts.join(' · ')} <small>(CA / jour ${d.scn.rev} × TO ÷ prix ; ≈ ${fr(((a1 ?? a2) * (d.days || 0)), 0)} actes / an)</small>`;
+    }
+  }
+  return impl;
+}
+
+export function view() {
+  const d = load();
+  const m = model(d);
+
+  return `
+    <header class="page-head"><h1>Clinique Singulier</h1><p>Modèle financier</p></header>
+    ${cashCard(d.cash, 'clinicCash')}
+    ${cashCard(d.capex, 'clinicCapex', { title: '🏗️ Capex restant', placeholder: 'Montant restant (€)', colored: false, sign: false })}
+    ${(() => {
+      // Solde disponible pour le ramp-up = trésorerie − capex restant
+      const cash = d.cash?.amount, capex = d.capex?.amount;
+      const left = cash == null ? null : cash - (capex || 0);
+      const cls = left == null ? '' : left >= 0 ? 'good' : 'warn';
+      return `<section class="card fin-net"><span>🚀 Solde pour le ramp-up</span><b class="${cls}">${euros(left)}</b></section>`;
+    })()}
+
+    <section class="card clinic-sum" data-clinic-sum>${sumInner(d, m)}</section>
 
     <h2 class="section-title">📈 Revenus</h2>
     <form data-form="clinicRev">
@@ -179,25 +204,10 @@ export function view() {
         </div>
       </section>
       ${m.lines.map(({ r, line, min, max }) => {
-        // Ce que ça implique : ETP pour les bureaux, actes / jour pour devices et bilans
-        let impl = '';
-        if (r.offices && line.count != null && line.to != null && d.days != null && d.etpDays) {
-          const etp = (line.count * (line.to / 100) * d.days) / d.etpDays;
-          impl = `👩‍⚕️ ≈ <b>${fr(etp, 1)} ${r.key === 'med' ? 'médecins' : 'praticiens'} ETP</b> à recruter <small>(${fr(line.count)} bureaux × ${fr(line.to)} % × ${fr(d.days)} j ÷ ${fr(d.etpDays)} j/ETP)</small>`;
-        }
-        if (!r.offices && line.to != null) {
-          const ca = pick(line, 'ca', d.scn.rev);
-          const acts = (price) => (ca != null && price ? (ca * (line.to / 100)) / price : null);
-          const a1 = acts(line.priceMin), a2 = acts(line.priceMax);
-          if (a1 != null || a2 != null) {
-            const parts = [[line.priceMin, a1], [line.priceMax, a2]].filter(([p, a]) => a != null && p)
-              .map(([p, a]) => `<b>${fr(a, 1)} actes / jour</b> à ${fr(p)} €`);
-            impl = `🔢 ${parts.join(' · ')} <small>(CA / jour ${d.scn.rev} × TO ÷ prix ; ≈ ${fr(((a1 ?? a2) * (d.days || 0)), 0)} actes / an)</small>`;
-          }
-        }
+        const impl = revImpl(d, r, line);
         return `
         <section class="card">
-          <h2>${r.label} <small class="hint">${range(min, max)} / an</small></h2>
+          <h2>${r.label} <small class="hint" data-rev-range="${r.key}">${range(min, max)} / an</small></h2>
           <div class="form">
             ${r.offices ? field(`${r.key}_count`, 'Nombre de bureaux', line.count) : ''}
             <label class="field ${r.offices ? '' : 'full'}"><span>Business unit</span>${buSelect(`${r.key}_bu`, line.bu || r.bu)}</label>
@@ -209,10 +219,10 @@ export function view() {
               ${field(`${r.key}_priceMin`, 'Prix / acte min (€)', line.priceMin, 'ex : 150')}
               ${field(`${r.key}_priceMax`, 'Prix / acte max (€)', line.priceMax, 'ex : 200')}`}
           </div>
-          ${impl ? `<p class="clinic-impl">${impl}</p>` : ''}
+          <p class="clinic-impl" data-rev-impl="${r.key}" ${impl ? '' : 'hidden'}>${impl}</p>
         </section>`;
       }).join('')}
-      <button class="primary block">Enregistrer les revenus</button>
+      <p class="hint center">Enregistré et recalculé à chaque saisie.</p>
     </form>
 
     <h2 class="section-title">📉 Coûts</h2>
@@ -227,8 +237,7 @@ export function view() {
               <label class="cost-min"><span>min € / mois</span><input name="min_${c.id}" inputmode="decimal" value="${c.min ?? ''}" placeholder="0" autocomplete="off"></label>
               <label class="cost-max"><span>max € / mois</span><input name="max_${c.id}" inputmode="decimal" value="${c.max ?? ''}" placeholder="0" autocomplete="off"></label>
             </div>`).join('')}
-          <div class="fin-total two"><span>Total / mois</span><b>${range(m.totMin, m.totMax)}</b><span></span></div>
-          <button class="primary block">Enregistrer les coûts</button>
+          <div class="fin-total two"><span>Total / mois</span><b data-cost-total>${range(m.totMin, m.totMax)}</b><span></span></div>
         </form>` : '<p class="hint">Ajoute tes postes de coûts (loyer, staff, consommables…).</p>'}
       <form data-form="clinicCostAdd" class="clinic-add">
         <input name="name" required placeholder="Nouveau coût (ex : Loyer…)" autocomplete="off">
@@ -433,6 +442,31 @@ if (typeof document !== 'undefined') {
   };
   document.addEventListener('input', onDoc);
   document.addEventListener('change', onDoc);
+}
+
+// Revenus et coûts : enregistrés à chaque saisie, synthèse recalculée sans redessiner (le clavier reste ouvert)
+if (typeof document !== 'undefined') {
+  const live = (e) => {
+    const form = e.target.closest?.('form[data-form="clinicRev"], form[data-form="clinicCosts"]');
+    if (!form) return;
+    const values = Object.fromEntries(new FormData(form).entries());
+    forms[form.dataset.form](values);
+    const d = load();
+    const m = model(d);
+    const set = (sel, html) => { const el = document.querySelector(sel); if (el) el.innerHTML = html; };
+    set('[data-clinic-sum]', sumInner(d, m));
+    for (const { r, line, min, max } of m.lines) {
+      set(`[data-rev-range="${r.key}"]`, `${range(min, max)} / an`);
+      const impl = revImpl(d, r, line);
+      const el = document.querySelector(`[data-rev-impl="${r.key}"]`);
+      if (el) { el.innerHTML = impl; el.hidden = !impl; }
+    }
+    set('[data-cost-total]', range(m.totMin, m.totMax));
+    set('[data-doc-burn]', docBurn(d));
+    set('[data-doc-plan]', docPlan(d));
+  };
+  document.addEventListener('input', live);
+  document.addEventListener('change', live);
 }
 
 export const forms = {
