@@ -132,6 +132,14 @@ const workoutVolume = (w) => sum(w.exercises.flatMap((e) => e.sets), (s) => (s.r
 const setsText = (sets) => sets.map((s) => `${fr(s.reps)}×${fr(s.weight, s.weight % 1 ? 1 : 0)}`).join(' · ');
 
 // ---------- Vues ----------
+// Boutons rapides (Ma journée et accueil Muscu) : ouvrent directement la saisie
+const quickActions = () => `
+  <div class="quick-actions">
+    <button data-action="quick" data-mtab="food">🍽️ Repas</button>
+    <button data-action="quick" data-mtab="gym">🏋️ Séance</button>
+    <button data-action="quick" data-mtab="body">⚖️ Pesée</button>
+  </div>`;
+
 // Budget kcal du jour quand la dépense n'est pas saisie
 const DEFAULT_BURN = 2300;
 
@@ -397,6 +405,7 @@ views.home = () => {
 
   return `
     <header class="page-head"><h1>${isToday ? "Aujourd'hui" : 'Bilan'}</h1></header>
+    ${quickActions()}
     <div class="day-nav">
       <button data-action="home-day" data-delta="-1">‹</button>
       <input type="date" id="homeDate" value="${d}" max="${today()}">
@@ -437,11 +446,6 @@ views.home = () => {
 
     ${weekCard()}
 
-    <div class="quick three">
-      <button data-go="food">＋ Repas</button>
-      <button data-go="gym">＋ Séance</button>
-      <button data-go="body">＋ Pesée</button>
-    </div>
 
     ${(() => {
       const { last, prev } = visbody();
@@ -768,6 +772,20 @@ views.body = () => {
   return `
     <header class="page-head"><h1>Corps</h1></header>
 
+    ${card(
+      'Pesée',
+      `<form data-form="body" class="burn-form">
+        <input type="hidden" name="date" value="${today()}">
+        <input name="weight" inputmode="decimal" placeholder="Poids du jour (kg)" autocomplete="off">
+        <button class="primary">OK</button>
+      </form>
+      ${lineChart(raw, { trend, goal: s.weightGoal, unit: ' kg' })}
+      <p class="hint legend"><i class="lg raw"></i> pesées <i class="lg trend"></i> moyenne 7 j</p>
+      <p class="hint">Tendance : <b>${trend.length ? fr(trend[trend.length - 1].value, 1) + ' kg' : '–'}</b>${slope == null ? '' : ` · ${slope > 0 ? '+' : '−'}${fr(Math.abs(slope), 2)} kg/sem`}</p>
+      <p class="hint">${calibrationText(calibration())}</p>
+      ${weights.length ? `<ul class="list">${weights.slice(0, 10).map((e) => `<li><div><b>${fmtDate(e.date)}</b><small>${fr(e.weight, 1)} kg</small></div>${delBtn('body', e.id)}</li>`).join('')}</ul>` : ''}`
+    )}
+
     <section class="card vb-hero">
       <h2>🧬 Body fat · Visbody</h2>
       ${last ? `
@@ -803,20 +821,6 @@ views.body = () => {
       `<ul class="list">${[...vb.list].reverse().map((x) => `
         <li><div><b>${fmtDate(x.date)} · ${fr(x.bodyfat, 1)} %</b><small>${[x.fatMass != null && `gras ${fr(x.fatMass, 1)} kg`, x.smm != null && `muscle ${fr(x.smm, 1)} kg`, x.weight != null && `${fr(x.weight, 1)} kg`].filter(Boolean).join(' · ')}</small></div>${delBtn('visbody', x.id)}</li>`).join('')}</ul>`
     ) : ''}
-
-    ${card(
-      'Pesée',
-      `<form data-form="body" class="burn-form">
-        <input type="hidden" name="date" value="${today()}">
-        <input name="weight" inputmode="decimal" placeholder="Poids du jour (kg)" autocomplete="off">
-        <button class="primary">OK</button>
-      </form>
-      ${lineChart(raw, { trend, goal: s.weightGoal, unit: ' kg' })}
-      <p class="hint legend"><i class="lg raw"></i> pesées <i class="lg trend"></i> moyenne 7 j</p>
-      <p class="hint">Tendance : <b>${trend.length ? fr(trend[trend.length - 1].value, 1) + ' kg' : '–'}</b>${slope == null ? '' : ` · ${slope > 0 ? '+' : '−'}${fr(Math.abs(slope), 2)} kg/sem`}</p>
-      <p class="hint">${calibrationText(calibration())}</p>
-      ${weights.length ? `<ul class="list">${weights.slice(0, 10).map((e) => `<li><div><b>${fmtDate(e.date)}</b><small>${fr(e.weight, 1)} kg</small></div>${delBtn('body', e.id)}</li>`).join('')}</ul>` : ''}`
-    )}
   `;
 };
 
@@ -951,6 +955,23 @@ const actions = {
     const manual = store.get().alcohol.find((x) => x.date === date);
     // Re-toucher le choix actif l'annule (retour à la détection auto)
     store.setAlcohol(date, manual && manual.value === v ? null : v);
+  },
+  // Bouton rapide : va sur l'onglet et met le curseur dans le bon champ (séance : ouvre la saisie)
+  quick(el) {
+    const tab = el.dataset.mtab;
+    backToToday();
+    $('#sheet').hidden = true;
+    space = 'muscu';
+    current = tab;
+    if (tab === 'gym') {
+      state.editorOpen = true;
+      if (!state.draft) { state.draft = emptyDraft(); saveDraft(); }
+    }
+    location.hash = current;
+    render();
+    window.scrollTo(0, 0);
+    const field = tab === 'food' ? 'form[data-form="meal"] input[name="name"]' : tab === 'body' ? 'form[data-form="body"] input[name="weight"]' : null;
+    if (field) document.querySelector(field)?.focus();
   },
   'open-muscu'(el) {
     backToToday();
@@ -1146,6 +1167,7 @@ function journeeView() {
 
   return `
     <header class="page-head"><h1>Ma journée</h1><p>${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</p></header>
+    ${quickActions()}
 
     <section class="card j-muscu">
       <div class="j-head"><h2>🍽️ Reste à manger</h2><button class="chip" data-action="open-muscu" data-mtab="home">Muscu ›</button></div>
@@ -1173,7 +1195,7 @@ function journeeView() {
 
       <div class="j-lines">
         <div>⚖️ ${lastW ? `<b>${fr(lastW.value, 1)} kg</b> <span class="hint">moy. 7 j${slope == null ? '' : ` · ${slope > 0 ? '+' : '−'}${fr(Math.abs(slope), 2)} kg/sem`}</span>` : '<span class="hint">pas encore de pesée</span>'}
-          <button class="chip" data-action="open-muscu" data-mtab="body">＋ Pesée</button></div>
+          <button class="chip" data-action="quick" data-mtab="body">＋ Pesée</button></div>
         <div>🎯 ${goalLine}</div>
         ${bodyfatLine() ? `<div>${bodyfatLine()} <button class="chip" data-action="open-muscu" data-mtab="body">＋ Visbody</button></div>` : ''}
         ${(() => {
