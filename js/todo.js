@@ -117,7 +117,7 @@ export function view() {
   const done = tasks.filter((t) => t.done).sort((a, b) => ((a.doneAt || '') > (b.doneAt || '') ? -1 : 1));
 
   const group = (title, list, cls = '') =>
-    list.length ? `<section class="card ${cls}"><h2>${title} <small class="hint">${list.length}</small></h2><ul class="task-list">${list.map(row).join('')}</ul></section>` : '';
+    list.length ? `<section class="card ${cls}"><h2>${title} <small class="hint">${list.length}</small></h2><ul class="task-list">${list.map((t) => row(t)).join('')}</ul></section>` : '';
 
   const count = (k) => all.filter((t) => !t.done && (k === 'all' || t.cat === k)).length;
 
@@ -138,7 +138,7 @@ export function view() {
     ${done.length ? `
       <section class="card">
         <h2>Faites ✓ <button class="chip" data-action="todo-done">${showDone ? 'Masquer' : `Voir (${done.length})`}</button></h2>
-        ${showDone ? `<ul class="task-list">${done.slice(0, 30).map(row).join('')}</ul>` : ''}
+        ${showDone ? `<ul class="task-list">${done.slice(0, 30).map((t) => row(t)).join('')}</ul>` : ''}
       </section>` : ''}
   `;
 }
