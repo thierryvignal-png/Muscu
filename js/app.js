@@ -181,7 +181,7 @@ const KCAL_PER_KG = 7700;
 
 function goalProjection() {
   const s = store.settings();
-  const goal = s.weightGoal ?? 75;
+  const goal = s.weightGoal ?? 74;
   const target = s.targetDate || '2026-12-31';
   const { raw, trend } = weightSeries();
   if (!trend.length) return { goal, target, missing: 'Ajoute une pesée dans Corps pour voir tes projections.' };
@@ -832,7 +832,7 @@ views.more = () => {
       'Objectifs',
       `<form data-form="settings" class="form">
         ${input('proteinGoal', 'Protéines (g/j)', { numeric: true, value: s.proteinGoal })}
-        ${input('weightGoal', 'Poids cible (kg)', { decimal: true, value: s.weightGoal ?? 75 })}
+        ${input('weightGoal', 'Poids cible (kg)', { decimal: true, value: s.weightGoal ?? 74 })}
         ${input('targetDate', 'Date cible', { type: 'date', value: s.targetDate || '2026-12-31' })}
         ${input('heightCm', 'Taille (cm, pour l\'IMC)', { numeric: true, value: s.heightCm ?? '' })}
         <button class="primary full">Enregistrer</button>
@@ -1347,6 +1347,10 @@ if (!store.settings().visbodySeeded) {
     if (!store.get().visbody.some((v) => v.date === x.date)) store.add('visbody', x);
   }
   store.setSettings({ visbodySeeded: true });
+}
+// Nouvel objectif : 74 kg au 31/12/2026 (appliqué une seule fois, modifiable ensuite dans Réglages)
+if (!store.settings().goal74Seeded) {
+  store.setSettings({ weightGoal: 74, targetDate: '2026-12-31', goal74Seeded: true });
 }
 // Dernier verre : jeudi 15 octobre 2026 → la série sans alcool part du 16
 if (!store.settings().lastDrinkSeeded) {

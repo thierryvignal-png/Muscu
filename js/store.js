@@ -7,7 +7,7 @@ const DEFAULT = {
     calorieGoal: 2200,
     deficitGoal: 500,
     proteinGoal: 160,
-    weightGoal: 75,
+    weightGoal: 74,
     targetDate: '2026-12-31',
     heightCm: null,
   },
