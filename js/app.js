@@ -1359,6 +1359,7 @@ if (!store.settings().lastDrinkSeeded) {
 }
 
 store.onChange(render);
+document.addEventListener('space-changed', render); // un espace a modifié ses données hors action (ex : liste déroulante)
 
 const initial = location.hash.slice(1);
 if (views[initial]) current = initial;

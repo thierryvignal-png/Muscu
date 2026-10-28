@@ -12,7 +12,6 @@ export const CATS = [
   { key: 'atom', label: 'Atom', icon: '⚛️' },
 ];
 const PRIOS = { high: '🔴 Urgent', normal: '🟠 Important', low: '🔵 Suivi' };
-const PRIO_NEXT = { high: 'normal', normal: 'low', low: 'high' }; // toucher la pastille fait tourner la priorité
 const PRIO_RANK = { high: 0, normal: 1, low: 2 };
 const RECS = { '': 'Pas de répétition', daily: 'Chaque jour', weekly: 'Chaque semaine', monthly: 'Chaque mois' };
 const REC_SHORT = { daily: 'chaque jour', weekly: 'chaque semaine', monthly: 'chaque mois' };
@@ -60,7 +59,7 @@ export function row(t, compact = false) {
       <button class="tick ${t.done ? 'on' : ''}" data-action="todo-toggle" data-id="${t.id}" aria-label="${t.done ? 'Marquer à faire' : 'Marquer fait'}">✓</button>
       <div><b>${esc(t.title)}</b>${meta ? `<small>${meta}</small>` : ''}</div>
       ${t.done && !compact ? `<button class="prio-pill undo-pill" data-action="todo-toggle" data-id="${t.id}">↩︎ Remettre</button>` : ''}
-      ${t.done ? '' : compact ? `<span class="prio-pill p-${t.prio}">${PRIOS[t.prio] || ''}</span>` : `<button class="prio-pill p-${t.prio}" data-action="todo-prio" data-id="${t.id}" aria-label="Changer la priorité">${PRIOS[t.prio] || ''}</button>`}
+      ${t.done ? '' : compact ? `<span class="prio-pill p-${t.prio}">${PRIOS[t.prio] || ''}</span>` : `<select class="prio-pill p-${t.prio}" data-todo-prio="${t.id}" aria-label="Priorité">${Object.entries(PRIOS).map(([k, v]) => `<option value="${k}" ${k === t.prio ? 'selected' : ''}>${v}</option>`).join('')}</select>`}
       ${compact || t.done ? '' : `<button class="icon-btn" data-action="todo-edit" data-id="${t.id}" aria-label="Modifier">✎</button>`}
       ${compact ? '' : `<button class="icon-btn" data-action="todo-delete" data-id="${t.id}" aria-label="Supprimer">✕</button>`}
     </li>`;
@@ -162,6 +161,20 @@ export const forms = {
   },
 };
 
+// Priorité choisie dans la liste déroulante de la tâche
+if (typeof document !== 'undefined') {
+  document.addEventListener('change', (e) => {
+    const id = e.target.dataset?.todoPrio;
+    if (!id) return;
+    const d = load();
+    const t = d.tasks.find((x) => x.id === id);
+    if (!t) return;
+    t.prio = e.target.value;
+    save(d);
+    document.dispatchEvent(new CustomEvent('space-changed'));
+  });
+}
+
 export const actions = {
   'todo-toggle'(el) {
     const d = load();
@@ -186,13 +199,6 @@ export const actions = {
     const d = load();
     d.tasks = d.tasks.filter((t) => t.id !== el.dataset.id);
     if (editing === el.dataset.id) editing = null;
-    save(d);
-  },
-  'todo-prio'(el) {
-    const d = load();
-    const t = d.tasks.find((x) => x.id === el.dataset.id);
-    if (!t) return false;
-    t.prio = PRIO_NEXT[t.prio] || 'high';
     save(d);
   },
   // Choix de la priorité dans le formulaire (sans redessiner, pour garder le texte tapé)
