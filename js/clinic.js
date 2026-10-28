@@ -306,25 +306,29 @@ const docDays = (docs, etpDays) => DOC_TYPES.map((t) => {
 // CA / jour = moyenne min-max, coûts « mid », devices et bilans à leur taux d'occupation actuel.
 const DOC_OFFICE = { singulier: 'esth', cm28: 'med' }; // Singulier → bureaux esthétiques, CM28 → bureaux médicaux
 // Chiffres du modèle si les bureaux tournent avec ces médecins (ETP pondérés)
-function docFin(d) {
+// extraCm28 : jours-médecins / sem CM28 en plus (pour calculer ce qu'apporte un jour de plus)
+function docFin(d, extraCm28 = 0) {
   const etpDays = d.etpDays || 200;
   const offices = DOC_TYPES.map((t) => {
     const r = REVENUES.find((x) => x.key === DOC_OFFICE[t.key]);
     const line = d.rev[r.key];
-    const officeDays = (weightedDays(d.doctors, t.key) / 5) * etpDays; // jours-bureau / an
+    const days = weightedDays(d.doctors, t.key) + (t.key === 'cm28' ? extraCm28 : 0);
+    const officeDays = (days / 5) * etpDays; // jours-bureau / an
     const ca = line.ca;
     const cap = line.count != null && d.days ? line.count * d.days : null; // capacité à 100 % de TO
-    return { t, ca, cap, year: ca == null ? null : officeDays * ca, to: cap ? (officeDays / cap) * 100 : null };
+    return { t, ca, cap, officeDays, year: ca == null ? null : officeDays * ca, to: cap ? (officeDays / cap) * 100 : null };
   });
   if (offices.some((o) => o.year == null)) return null;
+  // Devices et bilans tournent au même taux d'occupation que l'ensemble des bureaux remplis par ces médecins
+  const capAll = offices.reduce((s, o) => s + (o.cap || 0), 0);
+  const officeTo = capAll ? Math.min(1, offices.reduce((s, o) => s + o.officeDays, 0) / capAll) : 0;
   const others = REVENUES.filter((r) => !r.offices).reduce((s, r) => {
-    const line = d.rev[r.key];
-    const ca = line.ca;
-    return s + (line.to != null && ca != null && d.days != null ? (line.to / 100) * ca * d.days : 0);
+    const ca = d.rev[r.key].ca;
+    return s + (ca != null && d.days != null ? officeTo * ca * d.days : 0);
   }, 0);
   const caYear = offices.reduce((s, o) => s + o.year, 0) + others;
-  const costYear = d.costs.reduce((s, c) => s + costMonth(c, 'mid') * 12, 0);
-  return { etpDays, offices, caYear, costYear, res: caYear - costYear };
+  const costYear = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0); // scénario de coûts choisi
+  return { etpDays, offices, officeTo, others, caYear, costYear, res: caYear - costYear };
 }
 
 function docBurn(d) {
@@ -339,7 +343,7 @@ function docBurn(d) {
       <b class="${res < 0 ? 'warn' : 'good'}">${euros(res < 0 ? -res : res)}</b>
       <small>soit ${euros(Math.abs(res) / 12)} / mois · CA ${euros(caYear)} − coûts ${euros(costYear)}</small>
     </div>
-    <p class="hint">Hypothèses : CA / jour saisi, coûts mid, devices et bilans à leur taux d'occupation actuel.${tos ? ` Taux d'occupation des bureaux correspondant : ${tos}.` : ''}</p>
+    <p class="hint">Hypothèses : CA / jour saisi, coûts ${d.scn.cost === 'mid' ? 'mid' : d.scn.cost}, devices et bilans au même taux d'occupation que les bureaux (${fr(f.officeTo * 100)} %).${tos ? ` Taux d'occupation des bureaux : ${tos}.` : ''}</p>
     ${over ? '<p class="hint warn">⚠️ Plus de jours-médecins que de bureaux disponibles : il faut plus de bureaux.</p>' : ''}`;
 }
 
@@ -358,7 +362,8 @@ function planCalc(d) {
   if (!f) return null;
   const { open, start, startDays } = d.recruit;
   const med = f.offices.find((o) => o.t.key === 'cm28');
-  const perDay = (f.etpDays / 5) * med.ca; // CA / an apporté par 1 jour-médecin / sem en CM28
+  // CA / an apporté par 1 jour-médecin / sem de plus en CM28 (bureau + devices et bilans qui suivent)
+  const perDay = docFin(d, 1).caYear - f.caYear;
   const missing = f.res < 0 ? -f.res / perDay : 0; // jours-médecins / sem à ajouter
   const now = totalDays(d.doctors);
   const target = now + missing;
@@ -403,7 +408,7 @@ function docPlan(d) {
           <li class="hint"><span>Aujourd'hui</span><b>${j(now)}</b><small>obj. ${j(expected)}</small></li>
           ${steps.map((iso) => `<li><span>${iso === open ? '🚀 ' : ''}${shortDate(iso)}</span><b>${j(goalAt(iso))}</b><small>+${j(Math.max(0, goalAt(iso) - now))}</small></li>`).join('')}
         </ul>
-        <p class="hint">Jours-médecins / sem pondérés (Singulier + CM28) à avoir signés à chaque date. Calcul : CA d'un jour-médecin / sem en CM28 = ${fr(f.etpDays / 5)} sem × ${euros(med.ca)} = ${euros(perDay)} / an. Cadence linéaire depuis le ${shortDate(start)}.</p>
+        <p class="hint">Jours-médecins / sem pondérés (Singulier + CM28) à avoir signés à chaque date. Un jour-médecin / sem de plus en CM28 rapporte ${euros(perDay)} / an (${fr(f.etpDays / 5)} sem × ${euros(med.ca)} au bureau, plus devices et bilans qui suivent l'occupation). Cadence linéaire depuis le ${shortDate(start)}.</p>
         ${capWarn ? '<p class="hint warn">⚠️ Pas assez de bureaux médicaux pour absorber ces jours : il faudra aussi plus de bureaux.</p>' : ''}`}
     </div>`;
 }
