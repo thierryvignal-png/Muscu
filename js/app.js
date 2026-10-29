@@ -739,7 +739,6 @@ function gymEditor() {
           </div>`;
         }).join('')}
       </div>
-      <label class="field full"><span>Notes</span><textarea data-field="notes" rows="2">${esc(d.notes)}</textarea></label>
       <button class="primary full">Enregistrer la séance</button>
       <button type="button" class="full danger" data-action="cancel-workout">Annuler</button>
     </form>
