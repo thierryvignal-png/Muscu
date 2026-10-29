@@ -18,6 +18,36 @@ export const pts = (p) => (p == null ? '? pts' : `${p >= 0 ? '+' : '−'}${fr(Ma
 const sumPts = (list) => list.reduce((s, x) => s + (x.points || 0), 0);
 const clamp100 = (v) => Math.min(100, v);
 
+// Le score après la roadmap ne peut pas dépasser 100 : si c'est le cas, les points des autres
+// traitements prévus baissent tous dans la même proportion (au demi-point) pour arriver à 100 pile.
+// keepId : le traitement qu'on vient d'ajouter ou de modifier garde ses points.
+function fitTo100(d, keepId) {
+  const base = d.base ?? 0;
+  const total = base + sumPts(d.items);
+  if (total <= 100) return false;
+  const others = d.items.filter((x) => !x.done && x.points > 0 && x.id !== keepId);
+  const othersSum = sumPts(others);
+  if (!othersSum) return false;
+  const room = Math.max(0, othersSum - (total - 100)); // points restants pour ces traitements
+  const f = room / othersSum;
+  others.forEach((x) => { x.points = Math.round(x.points * f * 2) / 2; });
+  // Arrondis : l'écart restant va sur le plus gros traitement
+  const gap = Math.round((room - sumPts(others)) * 2) / 2;
+  if (gap) { const big = others.reduce((a, b) => (b.points > a.points ? b : a)); big.points = Math.max(0, big.points + gap); }
+  return true;
+}
+
+// Une fois : la roadmap actuelle (avec la subcision ajoutée) ramenée à 100 pile
+export function fitTo100Once() {
+  const d = load();
+  if (d.fit100V1) return false;
+  const keep = d.items.find((x) => /subcision/i.test(x.name));
+  const changed = fitTo100(d, keep?.id);
+  d.fit100V1 = true;
+  save(d);
+  return changed;
+}
+
 // Copie unique des traitements esthétiques déjà notés dans Good news
 // (même nom, même date ; points à estimer plus tard).
 const TREATMENT_WORDS = ['rejuvelook', 'lenisna', 'greffe', 'retouche body', 'em face', 'emface', 'radiesse', 'juvelook'];
@@ -246,15 +276,18 @@ export const forms = {
     const points = num(f.points);
     if (!name || !f.date) return 'Traitement et date requis';
     const d = load();
+    let id = editing;
     if (editing) {
       Object.assign(d.items.find((x) => x.id === editing) || {}, { name, date: f.date, points });
     } else {
-      d.items.push({ id: uid(), name, date: f.date, points, done: false });
+      id = uid();
+      d.items.push({ id, name, date: f.date, points, done: false });
     }
     editing = null;
     adding = false;
+    const fitted = fitTo100(d, id);
     save(d);
-    return 'Traitement enregistré';
+    return fitted ? 'Traitement enregistré · autres points ajustés pour finir à 100' : 'Traitement enregistré';
   },
 };
 
