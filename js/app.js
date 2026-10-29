@@ -108,6 +108,17 @@ function weightSlope(days = 28) {
   return deno ? (nume / deno) * 7 : null; // kg / semaine
 }
 
+// Les 5 exercices du programme (bench = développé incliné haltères)
+const EXERCISES = ['Squat', 'Bench', 'RDL', 'Tractions', 'Élévations latérales'];
+const EX_ALIASES = [
+  [/squat/i, 'Squat'],
+  [/bench|d[ée]velopp/i, 'Bench'],
+  [/\brdl\b|roumain|romanian/i, 'RDL'],
+  [/traction|chin.?up|pull.?up/i, 'Tractions'],
+  [/lat[ée]ral|lateral raise/i, 'Élévations latérales'],
+];
+const canonicalEx = (name) => (EX_ALIASES.find(([re]) => re.test(name)) || [null, name])[1];
+
 function exerciseNames() {
   const names = new Set();
   store.get().workouts.forEach((w) => w.exercises.forEach((e) => e.name && names.add(e.name)));
@@ -545,7 +556,7 @@ views.food = () => {
 
 // ----- Salle -----
 function emptyDraft() {
-  return { id: null, date: today(), name: '', exercises: [{ name: '', sets: [{ reps: '', weight: '' }] }], notes: '' };
+  return { id: null, date: today(), name: '', exercises: [], notes: '' };
 }
 function loadDraft() {
   try { return JSON.parse(localStorage.getItem('muscu.draft')) || null; } catch { return null; }
@@ -561,7 +572,7 @@ function saveDraft() {
 const BIG_THREE = [
   { label: 'Squat', re: /^(?!.*(split|bulgar|goblet)).*squat/i },
   { label: 'RDL', re: /\brdl\b|roumain|romanian/i },
-  { label: 'Bench', re: /^(?!.*(inclin|dumbbell|halt[eè]re|\bdb\b)).*(bench|d[ée]velopp[ée].?couch[ée])/i }, // barre à plat (pas l'incliné haltères)
+  { label: 'Bench', re: /bench|d[ée]velopp/i }, // développé incliné haltères
   { label: 'Élév. latérales', re: /lat[ée]ral|lateral raise/i },
   { label: 'Tractions', re: /traction|chin.?up/i },
 ];
@@ -598,7 +609,7 @@ document.addEventListener('change', (e) => {
 // Sets par semaine (lundi → dimanche), au total et par muscle
 const MUSCLES = [
   { label: '🦵 Jambes', re: /squat|\brdl\b|roumain|romanian/i },
-  { label: '💪 Upper pecs', re: /inclin/i },
+  { label: '💪 Upper pecs', re: /bench|inclin|d[ée]velopp/i },
   { label: '🔱 Side delts', re: /lat[ée]ral|lateral raise/i },
   { label: '🪽 Dos', re: /traction|chin.?up|pull.?up/i },
 ];
@@ -687,36 +698,30 @@ views.gym = () => {
 // Titre d'une séance : ses exercices (plus de champ « Nom » à remplir)
 const sessionTitle = (w) => w.exercises.map((e) => e.name.trim()).filter(Boolean).join(', ') || w.name || 'Séance';
 
-// « Dernière fois » et placeholders d'un exercice, mis à jour sur place (le clavier reste ouvert sur iPhone)
-function showLastTime(i) {
-  const d = state.draft;
-  const e = d?.exercises[i];
-  const box = document.querySelector(`.exercise[data-ex="${i}"]`);
-  if (!e || !box) return;
-  const prev = e.name ? exerciseHistory(e.name).filter((h) => h.date < d.date || !d.id).pop() : null;
-  const p = box.querySelector('.last-time');
-  p.hidden = !prev;
-  p.textContent = prev ? `Dernière fois : ${setsText(prev.sets)} · en gris = repris si tu laisses vide` : '';
-  box.querySelectorAll('[data-field=reps]').forEach((x) => { x.placeholder = prev?.sets[+x.dataset.set]?.reps ?? ''; });
-  box.querySelectorAll('[data-field=weight]').forEach((x) => { x.placeholder = prev?.sets[+x.dataset.set]?.weight ?? ''; });
-}
-
 function gymEditor() {
   const d = state.draft;
-  const names = exerciseNames();
+  const used = new Set(d.exercises.map((e) => e.name));
+  const exSelect = (e, i) => `
+    <select data-field="ex-name" data-ex="${i}" aria-label="Exercice">
+      ${e.name ? '' : '<option value="" selected>Choisir l\'exercice…</option>'}
+      ${[...new Set([...EXERCISES, ...(e.name ? [e.name] : [])])].map((n) => `<option ${n === e.name ? 'selected' : ''}>${esc(n)}</option>`).join('')}
+    </select>`;
   return `
     <header class="page-head"><h1>${d.id ? 'Modifier la séance' : d.date === today() ? 'Séance du jour' : `Séance du ${fmtDay(d.date)}`}</h1><p>${d.id ? '' : 'Pas encore enregistrée : termine par « Enregistrer la séance »'}</p></header>
     ${bigThreeCard()}
     <form data-form="workout" class="form" id="workoutForm">
       ${input('date', 'Date', { type: 'date', value: d.date, cls: 'full' })}
-      <datalist id="exNames">${names.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
+      <div class="full ex-pick">
+        <span class="hint">Ajouter un exercice</span>
+        <div class="chips">${EXERCISES.map((n) => `<button type="button" class="chip ${used.has(n) ? 'done' : ''}" data-action="add-ex" data-name="${esc(n)}">${used.has(n) ? '✓' : '＋'} ${esc(n)}</button>`).join('')}</div>
+      </div>
       <div class="full exercises">
         ${d.exercises.map((e, i) => {
           const prev = e.name ? exerciseHistory(e.name).filter((h) => h.date < d.date || !d.id).pop() : null;
           return `
           <div class="exercise card" data-ex="${i}">
             <div class="ex-head">
-              <input data-field="ex-name" data-ex="${i}" list="exNames" placeholder="Exercice (ex : Développé couché)" value="${esc(e.name)}" autocomplete="off">
+              ${exSelect(e, i)}
               <button type="button" class="icon-btn" data-action="del-ex" data-ex="${i}" aria-label="Supprimer l'exercice">✕</button>
             </div>
             <p class="hint last-time" ${prev ? '' : 'hidden'}>${prev ? `Dernière fois : ${setsText(prev.sets)} · en gris = repris si tu laisses vide` : ''}</p>
@@ -734,7 +739,6 @@ function gymEditor() {
           </div>`;
         }).join('')}
       </div>
-      <button type="button" class="full" data-action="add-ex">＋ Exercice</button>
       <label class="field full"><span>Notes</span><textarea data-field="notes" rows="2">${esc(d.notes)}</textarea></label>
       <button class="primary full">Enregistrer la séance</button>
       <button type="button" class="full danger" data-action="cancel-workout">Annuler</button>
@@ -1070,8 +1074,13 @@ const actions = {
     saveDraft();
     render();
   },
-  'add-ex'() {
-    state.draft.exercises.push({ name: '', sets: [{ reps: '', weight: '' }] });
+  'add-ex'(el) {
+    const name = el.dataset.name || '';
+    const ex = state.draft.exercises;
+    // Une carte encore vide (sans nom ni série remplie) est réutilisée
+    const empty = ex.find((e) => !e.name && !e.sets.some((x) => x.reps || x.weight));
+    if (empty) empty.name = name;
+    else ex.push({ name, sets: [{ reps: '', weight: '' }] });
     saveDraft();
     render();
   },
@@ -1079,7 +1088,6 @@ const actions = {
     const e = state.draft.exercises[+el.dataset.ex];
     if ((e.name || e.sets.some((x) => x.reps || x.weight)) && !confirm(`Supprimer l'exercice${e.name ? ` « ${e.name} »` : ''} ?`)) return;
     state.draft.exercises.splice(+el.dataset.ex, 1);
-    if (!state.draft.exercises.length) state.draft.exercises.push({ name: '', sets: [{ reps: '', weight: '' }] });
     saveDraft();
     render();
   },
@@ -1310,7 +1318,7 @@ document.addEventListener('change', (e) => {
   if (el.id === 'homeDate') { state.homeDate = el.value && el.value <= today() ? el.value : today(); render(); }
   if (el.id === 'mealDate') { state.mealDate = el.value || today(); render(); }
   if (el.id === 'exSelect') { state.exercise = el.value; render(); }
-  if (el.dataset.field === 'ex-name') showLastTime(+el.dataset.ex); // affiche "dernière fois" sans tout redessiner
+  if (el.dataset.field === 'ex-name') render(); // liste déroulante : pas de clavier ouvert, on peut redessiner
   if (el.id === 'importFile' && el.files[0]) {
     el.files[0].text().then((txt) => {
       if (!confirm('Remplacer les données actuelles par ce fichier ?')) return;
@@ -1351,6 +1359,14 @@ if (!store.settings().visbodySeeded) {
 // Nouvel objectif : 74 kg au 31/12/2026 (appliqué une seule fois, modifiable ensuite dans Réglages)
 if (!store.settings().goal74Seeded) {
   store.setSettings({ weightGoal: 74, targetDate: '2026-12-31', goal74Seeded: true });
+}
+// Anciennes séances : noms d'exercices ramenés aux 5 noms du programme (une seule fois)
+if (!store.settings().exNamesV1) {
+  for (const w of store.get().workouts) {
+    const exercises = w.exercises.map((e) => ({ ...e, name: canonicalEx(e.name) }));
+    if (exercises.some((e, i) => e.name !== w.exercises[i].name)) store.update('workouts', w.id, { exercises });
+  }
+  store.setSettings({ exNamesV1: true });
 }
 // Dernier verre : jeudi 15 octobre 2026 → la série sans alcool part du 16
 if (!store.settings().lastDrinkSeeded) {
