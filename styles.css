@@ -666,3 +666,6 @@ small.warn { color: var(--warn); }
 .obj-row.head { font-size: 12px; color: var(--muted); padding-bottom: 0; }
 .obj-row.total { border-top: 1px solid var(--line); font-weight: 700; margin-bottom: 8px; }
 .doc-row.dup { outline: 2px solid var(--warn); outline-offset: 2px; border-radius: 10px; }
+.obj-row.cap { border-top: 1px dashed var(--line); color: var(--muted); }
+.obj-row.cap > span:nth-child(2) { font-weight: 700; color: var(--text); }
+.obj-row.cap .cap-note { grid-column: 1 / -1; text-align: left; margin-top: -2px; }

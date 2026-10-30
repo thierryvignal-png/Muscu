@@ -231,6 +231,7 @@ export function view() {
         <div class="form">
           ${field('days', "Jours d'ouverture / an", d.days, 'ex : 300')}
           ${field('etpDays', 'Jours travaillés / an par ETP', d.etpDays, 'ex : 200')}
+          ${field('spareOffices', "Bureaux d'appoint (équivalent)", d.spareOffices, 'ex : 0,5')}
         </div>
       </section>
       ${m.lines.map(({ r, line, year }) => {
@@ -453,6 +454,24 @@ function objBurn(d) {
       <small>soit ${euros(Math.abs(target.res) / 12)} / mois · avec ce qui est obtenu à ce jour (${j(got)} j/sem) : ${label(now.res)} / an</small>
     </div>`;
 }
+// Capacité max : tous les bureaux (+ appoint) pleins tous les jours d'ouverture, en jours-médecins / sem
+// (même unité que les candidats : jours-bureau / an ÷ semaines travaillées par un ETP)
+function capacity(d) {
+  const offices = REVENUES.filter((r) => r.offices).reduce((s, r) => s + (d.rev[r.key].count || 0), 0) + (d.spareOffices || 0);
+  if (!offices || !d.days) return null;
+  return { offices, perWeek: (offices * d.days) / ((d.etpDays || 200) / 5) };
+}
+function capRow(d) {
+  const cap = capacity(d);
+  if (!cap) return '<span>Max</span><span>–</span><span class="hint">bureaux et jours d\'ouverture à saisir</span><span></span>';
+  const got = totalDays(d.doctors);
+  const obj = (d.recruitObj.kamel || 0) + (d.recruitObj.perso || 0);
+  return `<span>Max</span><span>${j(cap.perWeek)}</span>
+    <span><b>${j(got)}</b> <small>${fr((got / cap.perWeek) * 100)} %</small></span>
+    <span><b class="warn">${signed1(got - cap.perWeek)}</b></span>
+    <small class="cap-note">Capacité max du centre : ${fr(cap.offices, cap.offices % 1 ? 1 : 0)} bureaux × ${fr(d.days)} j${obj ? ` · objectif = ${fr((obj / cap.perWeek) * 100)} % de la capacité (écart ${signed1(obj - cap.perWeek)})` : ''}</small>`;
+}
+
 function objBlock(d) {
   const row = (src, label) => {
     const c = objCells(d, src);
@@ -473,6 +492,7 @@ function objBlock(d) {
       ${row('kamel', 'Kamel')}
       ${row('perso', 'Perso')}
       <div class="obj-row total"><span>Total</span><span data-obj-objtotal>${j((d.recruitObj.kamel || 0) + (d.recruitObj.perso || 0))}</span><span data-obj-got="total">${t.got}</span><span data-obj-gap="total">${t.gap}</span></div>
+      <div class="obj-row cap" data-obj-cap>${capRow(d)}</div>
       <div data-obj-burn>${objBurn(d)}</div>
     </div>`;
 }
@@ -542,6 +562,8 @@ if (typeof document !== 'undefined') {
       }
       const ot = document.querySelector('[data-obj-objtotal]');
       if (ot) ot.textContent = j((d.recruitObj.kamel || 0) + (d.recruitObj.perso || 0));
+      const cr = document.querySelector('[data-obj-cap]');
+      if (cr) cr.innerHTML = capRow(d);
       const b = document.querySelector('[data-obj-burn]');
       if (b) b.innerHTML = objBurn(d);
     };
@@ -593,6 +615,7 @@ if (typeof document !== 'undefined') {
     }
     set('[data-cost-total]', range(m.totMin, m.totMax));
     set('[data-doc-burn]', docBurn(d));
+    set('[data-obj-cap]', capRow(d));
     set('[data-doc-plan]', docPlan(d));
   };
   document.addEventListener('input', live);
@@ -637,6 +660,7 @@ export const forms = {
     const d = load();
     d.days = num(f.days);
     d.etpDays = num(f.etpDays) || 200;
+    d.spareOffices = num(f.spareOffices);
     for (const r of REVENUES) {
       const line = d.rev[r.key];
       if (r.offices) line.count = num(f[`${r.key}_count`]);
