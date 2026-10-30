@@ -232,6 +232,10 @@ export function view() {
           ${field('days', "Jours d'ouverture / an", d.days, 'ex : 300')}
           ${field('etpDays', 'Jours travaillés / an par ETP', d.etpDays, 'ex : 200')}
           ${field('spareOffices', "Bureaux d'appoint (équivalent)", d.spareOffices, 'ex : 0,5')}
+          <p class="hint full">Semaine type : médecins présents par jour</p>
+          ${field('planWk', 'Lundi → vendredi', d.plan?.wk, 'ex : 9')}
+          ${field('planSat', 'Samedi', d.plan?.sat, 'ex : 8')}
+          ${field('planSun', 'Dimanche', d.plan?.sun, 'ex : 7')}
         </div>
       </section>
       ${m.lines.map(({ r, line, year }) => {
@@ -471,14 +475,18 @@ function objBurn(d) {
 // qu'à 85 % (chevauchements, vacances imprévisibles), et chaque médecin n'est là que 40 semaines sur 52 :
 // il faut donc signer 52/40 jours / sem pour occuper une place chaque semaine.
 const BUSY_DAYS = 5.5;
+const n1 = (v) => fr(v, v % 1 ? 1 : 0);
 function capacity(d) {
   const offices = REVENUES.filter((r) => r.offices).reduce((s, r) => s + (d.rev[r.key].count || 0), 0) + (d.spareOffices || 0);
   if (!offices || !d.days) return null;
   const weeks = (d.etpDays || 200) / 5; // semaines travaillées par un médecin
+  const p = d.plan || {};
+  const slots = p.wk != null || p.sat != null || p.sun != null ? (p.wk || 0) * 5 + (p.sat || 0) + (p.sun || 0) : null;
   return {
-    offices, weeks,
+    offices, weeks, slots,
     max: (offices * d.days) / weeks,
-    real: offices * BUSY_DAYS * (TO_MAX / 100) * (52 / weeks),
+    // avec la semaine type : chaque présence hebdo demande 52/40 jours signés (absences des médecins)
+    real: slots != null ? slots * (52 / weeks) : offices * BUSY_DAYS * (TO_MAX / 100) * (52 / weeks),
   };
 }
 function capRow(d) {
@@ -490,7 +498,9 @@ function capRow(d) {
   return `<span>Réaliste</span><span>${j(cap.real)}</span>
     <span><b>${j(got)}</b> <small>${fr((got / cap.real) * 100)} %</small></span>
     <span><b class="${got >= cap.real ? 'good' : 'warn'}">${signed1(got - cap.real)}</b></span>
-    <small class="cap-note">Potentiel réaliste ≈ ${fr(cap.real / 5, 1)} ETP : ${off} bureaux × ${fr(BUSY_DAYS, 1)} j / sem (lun-ven + ½ samedi) remplis à ${TO_MAX} %, médecins présents ${fr(cap.weeks)} sem / 52.${obj ? ` Objectif = ${fr((obj / cap.real) * 100)} % du potentiel (écart ${signed1(obj - cap.real)}).` : ''} Max théorique, tout plein ${fr(d.days)} j / an : ${j(cap.max)}.</small>`;
+    <small class="cap-note">Potentiel réaliste ≈ ${fr(cap.real / 5, 1)} ETP : ${cap.slots != null
+      ? `semaine type ${n1(d.plan.wk || 0)} × 5 + ${n1(d.plan.sat || 0)} + ${n1(d.plan.sun || 0)} = ${n1(cap.slots)} présences / sem`
+      : `${off} bureaux × ${fr(BUSY_DAYS, 1)} j / sem (lun-ven + ½ samedi) remplis à ${TO_MAX} % (saisis ta semaine type dans Revenus pour l'affiner)`}, médecins présents ${fr(cap.weeks)} sem / 52.${cap.slots != null && Math.max(d.plan.wk || 0, d.plan.sat || 0, d.plan.sun || 0) > cap.offices ? ` ⚠️ Plus de médecins certains jours que de bureaux (${off}) : il faut des créneaux décalés ou des petits bureaux.` : ''}${obj ? ` Objectif = ${fr((obj / cap.real) * 100)} % du potentiel (écart ${signed1(obj - cap.real)}).` : ''} Max théorique, tout plein ${fr(d.days)} j / an : ${j(cap.max)}.</small>`;
 }
 
 function objBlock(d) {
@@ -682,6 +692,7 @@ export const forms = {
     d.days = num(f.days);
     d.etpDays = num(f.etpDays) || 200;
     d.spareOffices = num(f.spareOffices);
+    d.plan = { wk: num(f.planWk), sat: num(f.planSat), sun: num(f.planSun) };
     for (const r of REVENUES) {
       const line = d.rev[r.key];
       if (r.offices) line.count = num(f[`${r.key}_count`]);
