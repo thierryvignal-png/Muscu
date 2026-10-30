@@ -428,10 +428,15 @@ const sourceSelect = (attrs, value) => `<select ${attrs}>${options(DOC_SOURCES, 
 const sourceDays = (docs, src) => docs.filter((x) => docSource(x) === src).reduce((s, x) => s + (x.days || 0) * DOC_WEIGHT[docStatus(x)], 0);
 
 // Objectifs : jours-médecins / sem à trouver d'ici l'ouverture, par source, vs total pondéré obtenu
-function objSoFar(d, src) {
-  const got = sourceDays(d.doctors, src);
-  const obj = d.recruitObj[src];
-  return `<b>${j(got)}</b> pondérés${obj ? ` · <span class="${got >= obj ? 'good' : 'warn'}">${fr(Math.min(999, (got / obj) * 100))} %</span>` : ''}`;
+const signed1 = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${j(Math.abs(v))}`;
+function objCells(d, src) {
+  const got = src === 'total' ? totalDays(d.doctors) : sourceDays(d.doctors, src);
+  const obj = src === 'total' ? (d.recruitObj.kamel || 0) + (d.recruitObj.perso || 0) : d.recruitObj[src];
+  const gap = obj ? got - obj : null;
+  return {
+    got: `<b>${j(got)}</b>${obj ? ` <small>${fr(Math.min(999, (got / obj) * 100))} %</small>` : ''}`,
+    gap: gap == null ? '–' : `<b class="${gap >= 0 ? 'good' : 'warn'}">${signed1(gap)}</b>`,
+  };
 }
 function objBurn(d) {
   const obj = (d.recruitObj.kamel || 0) + (d.recruitObj.perso || 0);
@@ -449,17 +454,25 @@ function objBurn(d) {
     </div>`;
 }
 function objBlock(d) {
-  const row = (src, label) => `
+  const row = (src, label) => {
+    const c = objCells(d, src);
+    return `
     <div class="obj-row">
       <span>${label}</span>
-      <input data-doc="obj" data-src="${src}" inputmode="decimal" value="${d.recruitObj[src] ?? ''}" placeholder="objectif" aria-label="Objectif ${label}" autocomplete="off">
-      <span data-obj-sofar="${src}">${objSoFar(d, src)}</span>
+      <input data-doc="obj" data-src="${src}" inputmode="decimal" value="${d.recruitObj[src] ?? ''}" placeholder="–" aria-label="Objectif ${label}" autocomplete="off">
+      <span data-obj-got="${src}">${c.got}</span>
+      <span data-obj-gap="${src}">${c.gap}</span>
     </div>`;
+  };
+  const t = objCells(d, 'total');
   return `
     <div class="doc-obj">
-      <h3>🎯 Objectifs d'ici l'ouverture <small class="hint">(jours-médecins / sem)</small></h3>
+      <h3>🎯 Objectifs d'ici l'ouverture</h3>
+      <p class="hint">En jours-médecins / sem. Obtenu = jours de tes candidats de cette source × 90 % (sûr), 50 % (réflexion) ou 10 % (prospectif).</p>
+      <div class="obj-row head"><span></span><span>Objectif</span><span>Obtenu</span><span>Écart</span></div>
       ${row('kamel', 'Kamel')}
       ${row('perso', 'Perso')}
+      <div class="obj-row total"><span>Total</span><span data-obj-objtotal>${j((d.recruitObj.kamel || 0) + (d.recruitObj.perso || 0))}</span><span data-obj-got="total">${t.got}</span><span data-obj-gap="total">${t.gap}</span></div>
       <div data-obj-burn>${objBurn(d)}</div>
     </div>`;
 }
@@ -520,10 +533,15 @@ if (typeof document !== 'undefined') {
       return;
     }
     const refreshObj = () => {
-      for (const src of ['kamel', 'perso']) {
-        const el = document.querySelector(`[data-obj-sofar="${src}"]`);
-        if (el) el.innerHTML = objSoFar(d, src);
+      for (const src of ['kamel', 'perso', 'total']) {
+        const c = objCells(d, src);
+        const g = document.querySelector(`[data-obj-got="${src}"]`);
+        if (g) g.innerHTML = c.got;
+        const e2 = document.querySelector(`[data-obj-gap="${src}"]`);
+        if (e2) e2.innerHTML = c.gap;
       }
+      const ot = document.querySelector('[data-obj-objtotal]');
+      if (ot) ot.textContent = j((d.recruitObj.kamel || 0) + (d.recruitObj.perso || 0));
       const b = document.querySelector('[data-obj-burn]');
       if (b) b.innerHTML = objBurn(d);
     };

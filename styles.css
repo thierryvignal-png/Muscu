@@ -657,10 +657,12 @@ small.warn { color: var(--warn); }
 .doc-obj { margin: 14px 0 6px; padding-top: 12px; border-top: 2px solid var(--line); }
 .doc-obj h3 { font-size: 17px; color: var(--text); font-weight: 700; margin-bottom: 6px; }
 .doc-obj h3 small { display: inline; font-weight: 400; }
-.obj-row { display: grid; grid-template-columns: 64px 90px 1fr; gap: 8px; align-items: center; padding: 6px 0; font-size: 14px; }
+.obj-row { display: grid; grid-template-columns: 58px 76px 1fr 64px; gap: 8px; align-items: center; padding: 6px 0; font-size: 15px; }
+.obj-row > span:nth-child(n+2) { text-align: center; }
 .obj-row input { margin: 0; padding: 8px; text-align: center; }
-.obj-row span:last-child { text-align: right; color: var(--muted); }
-.obj-row span:last-child b { color: var(--text); }
-.obj-row .good { color: var(--good); font-weight: 700; }
-.obj-row .warn { color: var(--warn); font-weight: 700; }
+.obj-row small { color: var(--muted); font-size: 12px; }
+.obj-row .good { color: var(--good); }
+.obj-row .warn { color: var(--warn); }
+.obj-row.head { font-size: 12px; color: var(--muted); padding-bottom: 0; }
+.obj-row.total { border-top: 1px solid var(--line); font-weight: 700; margin-bottom: 8px; }
 .doc-row.dup { outline: 2px solid var(--warn); outline-offset: 2px; border-radius: 10px; }
