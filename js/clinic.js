@@ -464,8 +464,16 @@ function objBlock(d) {
     </div>`;
 }
 
+// Candidats saisis plusieurs fois (même nom) : signalés pour qu'on supprime le doublon
+const dupNames = (docs) => {
+  const seen = {};
+  docs.forEach((x) => { const k = x.name.trim().toLowerCase(); seen[k] = (seen[k] || 0) + 1; });
+  return new Set(Object.keys(seen).filter((k) => seen[k] > 1));
+};
+
 function doctorsCard(d) {
   const docs = d.doctors, etpDays = d.etpDays;
+  const dups = dupNames(docs);
   return `
     <h2 class="section-title">🩺 Médecins candidats</h2>
     <section class="card">
@@ -475,9 +483,10 @@ function doctorsCard(d) {
         ${objBlock(d)}
         <div data-doc-burn>${docBurn(d)}</div>
         <div data-doc-plan>${docPlan(d)}</div>
-        <p class="hint" data-doc-count>${docCount(docs)}</p>` : ''}
+        <p class="hint" data-doc-count>${docCount(docs)}</p>
+        ${dups.size ? `<p class="hint warn">⚠️ Saisis 2 fois : ${docs.filter((x, i) => dups.has(x.name.trim().toLowerCase()) && docs.findIndex((y) => y.name.trim().toLowerCase() === x.name.trim().toLowerCase()) === i).map((x) => esc(x.name)).join(', ')}. Ce sont deux fiches distinctes : supprime le doublon avec ✕ (il est encadré en rouge).</p>` : ''}` : ''}
       ${docs.map((x) => `
-        <div class="doc-row">
+        <div class="doc-row ${dups.has(x.name.trim().toLowerCase()) ? 'dup' : ''}">
           <input class="doc-name" data-doc="name" data-id="${x.id}" value="${esc(x.name)}" autocomplete="off">
           ${sourceSelect(`data-doc="source" data-id="${x.id}"`, docSource(x))}
           <button type="button" class="icon-btn" data-action="clinic-doc-del" data-id="${x.id}" aria-label="Supprimer">✕</button>

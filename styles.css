@@ -663,3 +663,4 @@ small.warn { color: var(--warn); }
 .obj-row span:last-child b { color: var(--text); }
 .obj-row .good { color: var(--good); font-weight: 700; }
 .obj-row .warn { color: var(--warn); font-weight: 700; }
+.doc-row.dup { outline: 2px solid var(--warn); outline-offset: 2px; border-radius: 10px; }
