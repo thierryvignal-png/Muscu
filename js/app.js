@@ -1,6 +1,7 @@
 import { store } from './store.js';
 import { setSpace, spaceSwitch, spaceMenu, spaceViews, SPACE_KEYS } from './spaces.js';
 import * as clinic from './clinic.js';
+import * as ideas from './ideas.js';
 import { formatNumberInputs } from './util.js';
 import * as goodnews from './goodnews.js';
 import * as goals from './goals.js';
@@ -857,8 +858,16 @@ views.more = () => {
 // À chaque ouverture de l'app : « Ma journée »
 let space = 'today';
 
+let locked = false;
 function render() {
   const main = $('#main');
+  // Idée de boîte IA du jour pas encore saisie après 21 h : l'app est bloquée sur cet écran
+  locked = ideas.mustLock();
+  if (locked) {
+    main.innerHTML = ideas.lockView();
+    document.body.classList.add('no-tabbar');
+    return;
+  }
   const y = window.scrollY;
   const page = space === 'muscu' ? views[current]() : spaceViews[space]();
   main.innerHTML = spaceSwitch(space) + page;
@@ -1174,6 +1183,7 @@ function journeeView() {
 
   return `
     <header class="page-head"><h1>Ma journée</h1><p>${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</p></header>
+    ${ideas.todayCard()}
     ${quickActions()}
 
     <section class="card j-muscu">
@@ -1252,6 +1262,7 @@ spaceViews.esthetique = esthetique.view;
 spaceViews.atom = atom.view;
 spaceViews.goodnews = goodnews.view;
 spaceViews.clinique = clinic.view;
+spaceViews.ideas = ideas.view;
 // Objectifs de vie + suivi financier en bas
 spaceViews.goals = () => goals.view() + finance.view();
 function wrapSpace(handlers) {
@@ -1262,8 +1273,8 @@ function wrapSpace(handlers) {
     render();
   }]));
 }
-Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions), wrapSpace(todo.actions), wrapSpace(esthetique.actions), wrapSpace(atom.actions), wrapSpace(finance.actions), wrapSpace(clinic.actions));
-Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms), wrapSpace(todo.forms), wrapSpace(esthetique.forms), wrapSpace(atom.forms), wrapSpace(finance.forms), wrapSpace(clinic.forms));
+Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions), wrapSpace(todo.actions), wrapSpace(esthetique.actions), wrapSpace(atom.actions), wrapSpace(finance.actions), wrapSpace(clinic.actions), wrapSpace(ideas.actions));
+Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms), wrapSpace(todo.forms), wrapSpace(esthetique.forms), wrapSpace(atom.forms), wrapSpace(finance.forms), wrapSpace(clinic.forms), wrapSpace(ideas.forms));
 
 // ---------- Retour sur aujourd'hui ----------
 // L'app reste ouverte en arrière-plan sur l'iPhone : au changement de jour, et à chaque changement
@@ -1275,9 +1286,14 @@ function backToToday() {
   openedDay = today();
 }
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && today() !== openedDay) { backToToday(); render(); }
+  if (document.visibilityState !== 'visible') return;
+  if (today() !== openedDay) { backToToday(); render(); }
+  else if (ideas.mustLock() !== locked) render();
 });
-setInterval(() => { if (today() !== openedDay) { backToToday(); render(); } }, 60000);
+setInterval(() => {
+  if (today() !== openedDay) { backToToday(); render(); }
+  else if (ideas.mustLock() !== locked) render(); // 21 h passées : blocage sans attendre une action
+}, 60000);
 
 // ---------- Événements (délégation) ----------
 document.addEventListener('click', (e) => {

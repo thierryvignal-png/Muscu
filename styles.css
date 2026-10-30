@@ -670,3 +670,18 @@ small.warn { color: var(--warn); }
 .obj-row.cap > span:nth-child(2) { font-weight: 700; color: var(--text); }
 .obj-row.cap .cap-note { grid-column: 1 / -1; text-align: left; margin-top: -2px; }
 .doc-burn .extras-line { display: block; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 11px; line-height: 1.5; opacity: .85; }
+
+/* Idée de boîte IA du jour */
+.idea-form textarea { width: 100%; margin: 6px 0 8px; font-size: 15px; }
+.idea-card { border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+.idea-card.done { border-color: var(--line); }
+.idea-card.done p { margin: 4px 0; }
+.idea-lock { min-height: 80vh; display: flex; flex-direction: column; justify-content: center; text-align: center; gap: 8px; }
+.idea-lock-icon { font-size: 56px; }
+.idea-lock h1 { font-size: 26px; }
+.idea-lock .idea-form textarea { text-align: left; }
+.idea-list { list-style: none; padding: 0; margin: 0; }
+.idea-list li { display: flex; gap: 8px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.idea-list li > div { flex: 1; min-width: 0; }
+.idea-list small { color: var(--muted); }
+.idea-list p { margin: 2px 0 0; white-space: pre-wrap; }
