@@ -454,22 +454,32 @@ function objBurn(d) {
       <small>soit ${euros(Math.abs(target.res) / 12)} / mois · avec ce qui est obtenu à ce jour (${j(got)} j/sem) : ${label(now.res)} / an</small>
     </div>`;
 }
-// Capacité max : tous les bureaux (+ appoint) pleins tous les jours d'ouverture, en jours-médecins / sem
-// (même unité que les candidats : jours-bureau / an ÷ semaines travaillées par un ETP)
+// Capacité du centre en jours-médecins / sem (même unité que les candidats).
+// Max théorique : tous les bureaux (+ appoint) pleins tous les jours d'ouverture.
+// Réaliste : les médecins veulent surtout le lundi-vendredi et un demi-samedi (5,5 j / sem), on ne remplit
+// qu'à 85 % (chevauchements, vacances imprévisibles), et chaque médecin n'est là que 40 semaines sur 52 :
+// il faut donc signer 52/40 jours / sem pour occuper une place chaque semaine.
+const BUSY_DAYS = 5.5;
 function capacity(d) {
   const offices = REVENUES.filter((r) => r.offices).reduce((s, r) => s + (d.rev[r.key].count || 0), 0) + (d.spareOffices || 0);
   if (!offices || !d.days) return null;
-  return { offices, perWeek: (offices * d.days) / ((d.etpDays || 200) / 5) };
+  const weeks = (d.etpDays || 200) / 5; // semaines travaillées par un médecin
+  return {
+    offices, weeks,
+    max: (offices * d.days) / weeks,
+    real: offices * BUSY_DAYS * (TO_MAX / 100) * (52 / weeks),
+  };
 }
 function capRow(d) {
   const cap = capacity(d);
-  if (!cap) return '<span>Max</span><span>–</span><span class="hint">bureaux et jours d\'ouverture à saisir</span><span></span>';
+  if (!cap) return '<span>Réaliste</span><span>–</span><span class="hint">bureaux et jours d\'ouverture à saisir</span><span></span>';
   const got = totalDays(d.doctors);
   const obj = (d.recruitObj.kamel || 0) + (d.recruitObj.perso || 0);
-  return `<span>Max</span><span>${j(cap.perWeek)}</span>
-    <span><b>${j(got)}</b> <small>${fr((got / cap.perWeek) * 100)} %</small></span>
-    <span><b class="warn">${signed1(got - cap.perWeek)}</b></span>
-    <small class="cap-note">Capacité max du centre : ${fr(cap.offices, cap.offices % 1 ? 1 : 0)} bureaux × ${fr(d.days)} j${obj ? ` · objectif = ${fr((obj / cap.perWeek) * 100)} % de la capacité (écart ${signed1(obj - cap.perWeek)})` : ''}</small>`;
+  const off = fr(cap.offices, cap.offices % 1 ? 1 : 0);
+  return `<span>Réaliste</span><span>${j(cap.real)}</span>
+    <span><b>${j(got)}</b> <small>${fr((got / cap.real) * 100)} %</small></span>
+    <span><b class="${got >= cap.real ? 'good' : 'warn'}">${signed1(got - cap.real)}</b></span>
+    <small class="cap-note">Potentiel réaliste ≈ ${fr(cap.real / 5, 1)} ETP : ${off} bureaux × ${fr(BUSY_DAYS, 1)} j / sem (lun-ven + ½ samedi) remplis à ${TO_MAX} %, médecins présents ${fr(cap.weeks)} sem / 52.${obj ? ` Objectif = ${fr((obj / cap.real) * 100)} % du potentiel (écart ${signed1(obj - cap.real)}).` : ''} Max théorique, tout plein ${fr(d.days)} j / an : ${j(cap.max)}.</small>`;
 }
 
 function objBlock(d) {
