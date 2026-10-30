@@ -1,6 +1,7 @@
 // Espace « Idées de boîte IA » : une idée par jour. Rappel sur Ma journée toute la journée,
 // et l'app se bloque à partir de 21 h tant que l'idée du jour n'est pas saisie.
 // La journée se termine à 4 h du matin (après minuit, on est encore « hier »).
+// On peut ajouter d'autres idées dans l'espace dédié : datées du jour, elles n'avancent pas les jours suivants.
 import { esc, uid, read, write, isoOf, addDays, fmtDate } from './util.js';
 
 export const KEY = 'ideas.data.v1';
@@ -28,10 +29,10 @@ export function mustLock() {
   return (h >= LOCK_HOUR || h < DAY_END_HOUR) && !doneToday(load());
 }
 
-const ideaForm = (big) => `
+const ideaForm = (big, label = "Enregistrer l'idée du jour") => `
   <form data-form="idea" class="idea-form">
     <textarea name="text" rows="${big ? 5 : 3}" required placeholder="Quel métier, quel process, quelle industrie l'IA peut-elle disrupter ? Le problème, la cible, comment l'IA le résout…"></textarea>
-    <button class="primary block">Enregistrer l'idée du jour</button>
+    <button class="primary block">${label}</button>
   </form>`;
 
 // Écran de blocage (remplace toute l'app)
@@ -75,7 +76,7 @@ export function view() {
   return `
     <header class="page-head"><h1>Idées de boîte IA</h1>
       <p>${items.length} idée${items.length > 1 ? 's' : ''}${s ? ` · 🔥 ${s} jour${s > 1 ? 's' : ''} d'affilée` : ''}</p></header>
-    ${doneToday(d) ? '' : `<section class="card">${ideaForm(false)}</section>`}
+    <section class="card">${doneToday(d) ? ideaForm(false, '＋ Ajouter une idée') : ideaForm(false)}</section>
     ${items.length ? `
       <section class="card">
         <ul class="idea-list">${items.map((x) => `
