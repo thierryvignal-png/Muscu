@@ -308,6 +308,9 @@ const docDays = (docs, etpDays) => DOC_TYPES.map((t) => {
 // CA / jour = moyenne min-max, coûts « mid », devices et bilans à leur taux d'occupation actuel.
 const DOC_OFFICE = { singulier: 'esth', cm28: 'med' }; // Singulier → bureaux esthétiques, CM28 → bureaux médicaux
 // Chiffres du modèle si les bureaux tournent avec ces médecins (ETP pondérés)
+// Lien médecins → devices et bilans : 1 point d'occupation des bureaux = ½ point pour devices et bilans
+const DEVICE_LINK = 0.5;
+
 // extraCm28 : jours-médecins / sem CM28 en plus (pour calculer ce qu'apporte un jour de plus)
 function docFin(d, extraCm28 = 0) {
   const etpDays = d.etpDays || 200;
@@ -321,12 +324,12 @@ function docFin(d, extraCm28 = 0) {
     return { t, ca, cap, officeDays, year: ca == null ? null : officeDays * ca, to: cap ? (officeDays / cap) * 100 : null };
   });
   if (offices.some((o) => o.year == null)) return null;
-  // Devices et bilans tournent au même taux d'occupation que l'ensemble des bureaux remplis par ces médecins
+  // Devices et bilans suivent les médecins, à moitié : leur taux d'occupation = la moitié de celui des bureaux
   const capAll = offices.reduce((s, o) => s + (o.cap || 0), 0);
   const officeTo = capAll ? Math.min(1, offices.reduce((s, o) => s + o.officeDays, 0) / capAll) : 0;
   const others = REVENUES.filter((r) => !r.offices).reduce((s, r) => {
     const ca = d.rev[r.key].ca;
-    return s + (ca != null && d.days != null ? officeTo * ca * d.days : 0);
+    return s + (ca != null && d.days != null ? officeTo * DEVICE_LINK * ca * d.days : 0);
   }, 0);
   const caYear = offices.reduce((s, o) => s + o.year, 0) + others;
   const costYear = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0); // scénario de coûts choisi
@@ -345,7 +348,7 @@ function docBurn(d) {
       <b class="${res < 0 ? 'warn' : 'good'}">${euros(res < 0 ? -res : res)}</b>
       <small>soit ${euros(Math.abs(res) / 12)} / mois · CA ${euros(caYear)} − coûts ${euros(costYear)}</small>
     </div>
-    <p class="hint">Hypothèses : CA / jour saisi, coûts ${d.scn.cost === 'mid' ? 'mid' : d.scn.cost}, devices et bilans au même taux d'occupation que les bureaux (${fr(f.officeTo * 100)} %).${tos ? ` Taux d'occupation des bureaux : ${tos}.` : ''}</p>
+    <p class="hint">Hypothèses : CA / jour saisi, coûts ${d.scn.cost === 'mid' ? 'mid' : d.scn.cost}, devices et bilans à la moitié du taux d'occupation des bureaux (${fr(f.officeTo * DEVICE_LINK * 100)} % vs ${fr(f.officeTo * 100)} %).${tos ? ` Taux d'occupation des bureaux : ${tos}.` : ''}</p>
     ${over ? '<p class="hint warn">⚠️ Plus de jours-médecins que de bureaux disponibles : il faut plus de bureaux.</p>' : ''}`;
 }
 
@@ -410,7 +413,7 @@ function docPlan(d) {
           <li class="hint"><span>Aujourd'hui</span><b>${j(now)}</b><small>obj. ${j(expected)}</small></li>
           ${steps.map((iso) => `<li><span>${iso === open ? '🚀 ' : ''}${shortDate(iso)}</span><b>${j(goalAt(iso))}</b><small>+${j(Math.max(0, goalAt(iso) - now))}</small></li>`).join('')}
         </ul>
-        <p class="hint">Jours-médecins / sem pondérés (Singulier + CM28) à avoir signés à chaque date. Un jour-médecin / sem de plus en CM28 rapporte ${euros(perDay)} / an (${fr(f.etpDays / 5)} sem × ${euros(med.ca)} au bureau, plus devices et bilans qui suivent l'occupation). Cadence linéaire depuis le ${shortDate(start)}.</p>
+        <p class="hint">Jours-médecins / sem pondérés (Singulier + CM28) à avoir signés à chaque date. Un jour-médecin / sem de plus en CM28 rapporte ${euros(perDay)} / an (${fr(f.etpDays / 5)} sem × ${euros(med.ca)} au bureau, plus devices et bilans qui suivent à moitié l'occupation). Cadence linéaire depuis le ${shortDate(start)}.</p>
         ${capWarn ? '<p class="hint warn">⚠️ Pas assez de bureaux médicaux pour absorber ces jours : il faudra aussi plus de bureaux.</p>' : ''}`}
     </div>`;
 }
