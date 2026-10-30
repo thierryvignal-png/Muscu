@@ -47,7 +47,8 @@ const load = () => {
   d.recruit ??= { open: '2027-02-01' }; // roadmap de recrutement : ouverture, point de départ
   if (!d.recruit.start && d.doctors?.length) { d.recruit.start = today(); d.recruit.startDays = totalDays(d.doctors); write(KEY, d); }
   d.recruit.start ??= today(); d.recruit.startDays ??= 0;
-  d.doctors ??= []; // médecins candidats : {id, name, type: 'singulier' | 'cm28', days: jours / semaine, status: 'sur' | 'reflexion' | 'prospectif'}
+  d.doctors ??= []; // médecins candidats : {id, name, type: 'singulier' | 'cm28', days: jours / semaine, status: 'sur' | 'reflexion' | 'prospectif', source: 'kamel' | 'perso'}
+  d.recruitObj ??= { kamel: null, perso: null }; // objectifs de jours-médecins / sem par source
   return d;
 };
 const save = (d) => write(KEY, d);
@@ -312,7 +313,7 @@ function docFin(d, extraCm28 = 0) {
   const offices = DOC_TYPES.map((t) => {
     const r = REVENUES.find((x) => x.key === DOC_OFFICE[t.key]);
     const line = d.rev[r.key];
-    const days = weightedDays(d.doctors, t.key) + (t.key === 'cm28' ? extraCm28 : 0);
+    const days = Math.max(0, weightedDays(d.doctors, t.key) + (t.key === 'cm28' ? extraCm28 : 0));
     const officeDays = (days / 5) * etpDays; // jours-bureau / an
     const ca = line.ca;
     const cap = line.count != null && d.days ? line.count * d.days : null; // capacité à 100 % de TO
@@ -417,6 +418,52 @@ function docPlan(d) {
 const docCount = (docs) => `${docs.length} candidat${docs.length > 1 ? 's' : ''} · ` +
   DOC_STATUS.map((t) => `${t.label} ${docs.filter((x) => docStatus(x) === t.key).length}`).join(' · ');
 
+// Source du médecin : chasseur (Kamel) ou réseau perso
+const DOC_SOURCES = [
+  { key: 'kamel', label: 'Kamel' },
+  { key: 'perso', label: 'Perso' },
+];
+const docSource = (x) => x.source || 'perso';
+const sourceSelect = (attrs, value) => `<select ${attrs}>${options(DOC_SOURCES, value)}</select>`;
+const sourceDays = (docs, src) => docs.filter((x) => docSource(x) === src).reduce((s, x) => s + (x.days || 0) * DOC_WEIGHT[docStatus(x)], 0);
+
+// Objectifs : jours-médecins / sem à trouver d'ici l'ouverture, par source, vs total pondéré obtenu
+function objSoFar(d, src) {
+  const got = sourceDays(d.doctors, src);
+  const obj = d.recruitObj[src];
+  return `<b>${j(got)}</b> pondérés${obj ? ` · <span class="${got >= obj ? 'good' : 'warn'}">${fr(Math.min(999, (got / obj) * 100))} %</span>` : ''}`;
+}
+function objBurn(d) {
+  const obj = (d.recruitObj.kamel || 0) + (d.recruitObj.perso || 0);
+  if (!obj) return '<p class="hint">Renseigne les objectifs pour voir le burn à l\'ouverture.</p>';
+  const now = docFin(d);
+  if (!now) return '<p class="hint">Renseigne le CA / jour des bureaux (plus haut) pour voir le burn.</p>';
+  const got = totalDays(d.doctors);
+  const target = docFin(d, obj - got); // jours manquants comptés en CM28
+  const label = (r) => (r < 0 ? `burn ${euros(-r)}` : `résultat +${euros(r)}`);
+  return `
+    <div class="doc-burn">
+      <span>${target.res < 0 ? '🔥 Burn à l\'ouverture' : '✅ Résultat à l\'ouverture'} avec l'objectif (${j(obj)} j/sem)</span>
+      <b class="${target.res < 0 ? 'warn' : 'good'}">${euros(Math.abs(target.res))} / an</b>
+      <small>soit ${euros(Math.abs(target.res) / 12)} / mois · avec ce qui est obtenu à ce jour (${j(got)} j/sem) : ${label(now.res)} / an</small>
+    </div>`;
+}
+function objBlock(d) {
+  const row = (src, label) => `
+    <div class="obj-row">
+      <span>${label}</span>
+      <input data-doc="obj" data-src="${src}" inputmode="decimal" value="${d.recruitObj[src] ?? ''}" placeholder="objectif" aria-label="Objectif ${label}" autocomplete="off">
+      <span data-obj-sofar="${src}">${objSoFar(d, src)}</span>
+    </div>`;
+  return `
+    <div class="doc-obj">
+      <h3>🎯 Objectifs d'ici l'ouverture <small class="hint">(jours-médecins / sem)</small></h3>
+      ${row('kamel', 'Kamel')}
+      ${row('perso', 'Perso')}
+      <div data-obj-burn>${objBurn(d)}</div>
+    </div>`;
+}
+
 function doctorsCard(d) {
   const docs = d.doctors, etpDays = d.etpDays;
   return `
@@ -425,20 +472,23 @@ function doctorsCard(d) {
       ${docs.length ? `
         <div class="doc-days" data-doc-days>${docDays(docs, etpDays)}</div>
         <p class="hint center">Pondéré : sûr 90 % · réflexion 50 % · prospectif 10 %<br>1 ETP = 5 j/sem × ${fr(etpDays / 5)} semaines = ${fr(etpDays)} j/an</p>
+        ${objBlock(d)}
         <div data-doc-burn>${docBurn(d)}</div>
         <div data-doc-plan>${docPlan(d)}</div>
         <p class="hint" data-doc-count>${docCount(docs)}</p>` : ''}
       ${docs.map((x) => `
         <div class="doc-row">
           <input class="doc-name" data-doc="name" data-id="${x.id}" value="${esc(x.name)}" autocomplete="off">
+          ${sourceSelect(`data-doc="source" data-id="${x.id}"`, docSource(x))}
           <button type="button" class="icon-btn" data-action="clinic-doc-del" data-id="${x.id}" aria-label="Supprimer">✕</button>
           <input data-doc="days" data-id="${x.id}" inputmode="decimal" value="${x.days ?? ''}" placeholder="j/sem" aria-label="Jours par semaine" autocomplete="off">
           ${docSelect(`data-doc="type" data-id="${x.id}"`, x.type)}
           ${statusSelect(`data-doc="status" data-id="${x.id}"`, x.status || 'prospectif')}
         </div>`).join('')}
-      ${docs.length ? '' : '<p class="hint">Nom, jours par semaine, Singulier (esthétique) ou CM28 (médical) et statut.</p>'}
+      ${docs.length ? '' : '<p class="hint">Nom, source (Kamel ou perso), jours par semaine, Singulier (esthétique) ou CM28 (médical) et statut.</p>'}
       <form data-form="clinicDocAdd" class="doc-row doc-add">
         <input class="doc-name" name="name" required placeholder="Nouveau candidat" autocomplete="off">
+        ${sourceSelect('name="source"', 'kamel')}
         <button class="primary" aria-label="Ajouter">＋</button>
         <input name="days" inputmode="decimal" placeholder="j/sem" aria-label="Jours par semaine" autocomplete="off">
         ${docSelect('name="type"', 'singulier')}
@@ -460,13 +510,29 @@ if (typeof document !== 'undefined') {
       document.querySelector('[data-doc-plan]').innerHTML = docPlan(d);
       return;
     }
+    const refreshObj = () => {
+      for (const src of ['kamel', 'perso']) {
+        const el = document.querySelector(`[data-obj-sofar="${src}"]`);
+        if (el) el.innerHTML = objSoFar(d, src);
+      }
+      const b = document.querySelector('[data-obj-burn]');
+      if (b) b.innerHTML = objBurn(d);
+    };
+    if (field === 'obj') {
+      d.recruitObj[e.target.dataset.src] = num(e.target.value);
+      save(d);
+      refreshObj();
+      return;
+    }
     const x = d.doctors.find((y) => y.id === e.target.dataset.id);
     if (!x) return;
     if (field === 'name') { if (e.target.value.trim()) x.name = e.target.value.trim(); }
     else if (field === 'days') x.days = num(e.target.value);
     else if (field === 'status') x.status = e.target.value;
+    else if (field === 'source') x.source = e.target.value;
     else x.type = e.target.value;
     save(d);
+    refreshObj();
     const c = document.querySelector('[data-doc-count]');
     if (c) c.textContent = docCount(d.doctors);
     const days = document.querySelector('[data-doc-days]');
@@ -572,7 +638,8 @@ export const forms = {
     if (!name) return false;
     const d = load();
     d.doctors.push({ id: uid(), name, type: f.type === 'cm28' ? 'cm28' : 'singulier', days: num(f.days),
-      status: DOC_STATUS.some((t) => t.key === f.status) ? f.status : 'prospectif' });
+      status: DOC_STATUS.some((t) => t.key === f.status) ? f.status : 'prospectif',
+      source: f.source === 'perso' ? 'perso' : 'kamel' });
     save(d);
     return 'Candidat ajouté';
   },
