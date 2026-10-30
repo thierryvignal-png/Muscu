@@ -327,14 +327,20 @@ function docFin(d, extraCm28 = 0) {
   // Devices et bilans suivent les médecins, à moitié : leur taux d'occupation = la moitié de celui des bureaux
   const capAll = offices.reduce((s, o) => s + (o.cap || 0), 0);
   const officeTo = capAll ? Math.min(1, offices.reduce((s, o) => s + o.officeDays, 0) / capAll) : 0;
-  const others = REVENUES.filter((r) => !r.offices).reduce((s, r) => {
-    const ca = d.rev[r.key].ca;
-    return s + (ca != null && d.days != null ? officeTo * DEVICE_LINK * ca * d.days : 0);
-  }, 0);
+  // Détail devices / bilans : CA par an, CA par jour et actes par jour (si un prix par acte est saisi)
+  const extras = REVENUES.filter((r) => !r.offices).map((r) => {
+    const { ca, price } = d.rev[r.key];
+    const perDay = ca != null ? officeTo * DEVICE_LINK * ca : null;
+    return { r, perDay, year: perDay != null && d.days != null ? perDay * d.days : 0, acts: perDay != null && price ? perDay / price : null };
+  });
+  const others = extras.reduce((s, x) => s + x.year, 0);
   const caYear = offices.reduce((s, o) => s + o.year, 0) + others;
   const costYear = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0); // scénario de coûts choisi
-  return { etpDays, offices, officeTo, others, caYear, costYear, res: caYear - costYear };
+  return { etpDays, offices, officeTo, extras, others, caYear, costYear, res: caYear - costYear };
 }
+
+// Ligne discrète sous un résultat : ce que font devices et bilans dans ce scénario
+const extrasLine = (f) => `<small class="extras-line">${f.extras.map((x) => `${x.r.key === 'devices' ? '⚡ Devices' : '🧪 Bilans'} : ${euros(x.year)}/an · ${euros(x.perDay)}/j${x.acts != null ? ` · ${fr(x.acts, 1)} acte${x.acts >= 2 ? 's' : ''}/j` : ''}`).join('<br>')}</small>`;
 
 function docBurn(d) {
   const f = docFin(d);
@@ -347,6 +353,7 @@ function docBurn(d) {
       <span>${res < 0 ? '🔥 Burn annuel avec ces médecins' : '✅ Résultat annuel avec ces médecins'}</span>
       <b class="${res < 0 ? 'warn' : 'good'}">${euros(res < 0 ? -res : res)}</b>
       <small>soit ${euros(Math.abs(res) / 12)} / mois · CA ${euros(caYear)} − coûts ${euros(costYear)}</small>
+      ${extrasLine(f)}
     </div>
     <p class="hint">Hypothèses : CA / jour saisi, coûts ${d.scn.cost === 'mid' ? 'mid' : d.scn.cost}, devices et bilans à la moitié du taux d'occupation des bureaux (${fr(f.officeTo * DEVICE_LINK * 100)} % vs ${fr(f.officeTo * 100)} %).${tos ? ` Taux d'occupation des bureaux : ${tos}.` : ''}</p>
     ${over ? '<p class="hint warn">⚠️ Plus de jours-médecins que de bureaux disponibles : il faut plus de bureaux.</p>' : ''}`;
@@ -455,6 +462,7 @@ function objBurn(d) {
       <span>${target.res < 0 ? '🔥 Burn à l\'ouverture' : '✅ Résultat à l\'ouverture'} avec l'objectif (${j(obj)} j/sem)</span>
       <b class="${target.res < 0 ? 'warn' : 'good'}">${euros(Math.abs(target.res))} / an</b>
       <small>soit ${euros(Math.abs(target.res) / 12)} / mois · avec ce qui est obtenu à ce jour (${j(got)} j/sem) : ${label(now.res)} / an</small>
+      ${extrasLine(target)}
     </div>`;
 }
 // Capacité du centre en jours-médecins / sem (même unité que les candidats).

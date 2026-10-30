@@ -669,3 +669,4 @@ small.warn { color: var(--warn); }
 .obj-row.cap { border-top: 1px dashed var(--line); color: var(--muted); }
 .obj-row.cap > span:nth-child(2) { font-weight: 700; color: var(--text); }
 .obj-row.cap .cap-note { grid-column: 1 / -1; text-align: left; margin-top: -2px; }
+.doc-burn .extras-line { display: block; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 11px; line-height: 1.5; opacity: .85; }
