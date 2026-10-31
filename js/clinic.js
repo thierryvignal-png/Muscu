@@ -8,16 +8,27 @@ export const KEY = 'clinique.data.v1';
 export const BUS = [
   { key: 'cm28', label: 'CM28' },
   { key: 'singulier', label: 'Singulier' },
-  { key: 'devices', label: 'Devices' },
-  { key: 'bilans', label: 'Bilans & Vitamino' },
+  { key: 'devices', label: 'Lignes business' }, // (clé historique « devices » : ses coûts sont ceux des lignes business)
+];
+
+// Lignes business : activités qui tournent sans médecin dans la salle, chacune avec une estimation de CA annuel.
+// Estimations de départ (régime de croisière, à ajuster dans l'app) :
+// Cellulite & Poids ≈ 25 patients / mois × 1 200 € ; Vitamino ≈ 4 perfusions / jour × 180 € × 280 j ;
+// Bilans ≈ 1,5 bilan / jour × 600 € × 280 j ; Hyperbare ≈ 6 séances / jour × 120 € × 280 j ;
+// Em Sella ≈ 4 séances / jour × 250 € × 250 j ; Caractère : valeur prudente à préciser.
+const LINE_SEED = [
+  { name: '✨ Caractère', ca: 150000 },
+  { name: '⚖️ Cellulite & Poids', ca: 360000 },
+  { name: '💧 Vitamino', ca: 200000 },
+  { name: '🧪 Bilans', ca: 250000 },
+  { name: '🫧 Hyperbare', ca: 200000 },
+  { name: '💺 Em Sella', ca: 250000 },
 ];
 
 // Lignes de revenus : bureaux (nombre × TO × CA/bureau/jour × jours) ou activité (CA/jour × TO × jours)
 const REVENUES = [
   { key: 'esth', label: '💆 Bureaux esthétiques', offices: true, bu: 'cm28' },
   { key: 'med', label: '🩺 Bureaux médicaux', offices: true, bu: 'cm28' },
-  { key: 'devices', label: '⚡ Cabines devices', offices: false, cabins: true, bu: 'devices' },
-  { key: 'bilans', label: '🧪 Bilans & vitamino', offices: false, bu: 'bilans' },
 ];
 
 const mid = (a, b) => (a == null ? b : b == null ? a : (a + b) / 2);
@@ -41,7 +52,15 @@ const load = () => {
   }
   if (!d.singleCa) { d.singleCa = true; write(KEY, d); }
   d.costs ??= [];
-  d.themes ??= []; // cliniques thématiques : {id, name, patients (/ mois), basket (€ / patient), margin (%), bu}
+  // Lignes business : {id, name, ca (€ / an)}. Remplacent les anciennes lignes devices / bilans et cliniques thématiques.
+  if (!d.lines) {
+    d.lines = LINE_SEED.map((x) => ({ id: uid(), ...x }));
+    (d.themes || []).forEach((t) => d.lines.push({ id: uid(), name: t.name, ca: (t.patients || 0) * (t.basket || 0) * 12 || null }));
+    delete d.themes;
+    d.costs.forEach((c) => { if (c.bu === 'bilans') c.bu = 'devices'; });
+    d.targetBase = null;
+    write(KEY, d);
+  }
   d.costs.forEach((c) => { c.min ??= c.monthly ?? null; c.max ??= c.monthly ?? null; });
   d.scn ??= { cost: 'max' }; // coûts : scénario prudent par défaut
   d.etpDays ??= 200; // jours travaillés par an par un praticien à temps plein
@@ -65,7 +84,7 @@ const euros = (v) => (v == null || !Number.isFinite(v) ? '–' : `${fr(Math.roun
 function revenueYear(r, line, days) {
   const to = line.to;
   const ca = line.ca;
-  const count = r.offices ? line.count : r.cabins ? line.count ?? 1 : 1;
+  const count = r.offices ? line.count : 1;
   if (days == null || to == null || ca == null || count == null) return null;
   return count * (to / 100) * ca * days;
 }
@@ -88,18 +107,15 @@ const TARGETS = [
 // 2. Au-delà, un même effort f fait monter ensemble le taux d'occupation (100 − 30 / f², sans atteindre 100 %),
 //    le CA / jour (× f) et le nombre de bureaux (× f, arrondi).
 const TO_FILL = 70;
-// Plafond réaliste : 8 actes par jour et par cabine devices (CA / jour × TO ≤ 8 × prix par acte)
-export const MAX_ACTS = 8;
-const devCap = (d, key) => (key === 'devices' && d.rev.devices.price ? MAX_ACTS * d.rev.devices.price : Infinity); // CA réalisé max / cabine / jour
 const snapRev = (d) => Object.fromEntries(REVENUES.map((r) => [r.key, { count: d.rev[r.key].count, to: d.rev[r.key].to, ca: d.rev[r.key].ca }]));
 function solveTarget(d, target) {
   const costYear = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
-  const needed = target + costYear - (themesCa(d) - themesVar(d)); // CA à faire par les bureaux, devices et bilans
+  const needed = target + costYear - linesCa(d); // CA à faire par les bureaux (les lignes business gardent leur estimation)
   const base = d.targetBase || snapRev(d);
   const lines = REVENUES.map((r) => ({ r, b: base[r.key] }))
     .filter((x) => x.b.ca != null && d.days != null && (!x.r.offices || x.b.count));
   if (!lines.length) return null;
-  const caOf = (plan) => lines.reduce((s, x) => { const p = plan(x); return s + (x.r.offices ? p.count : x.r.cabins ? d.rev[x.r.key].count ?? 1 : 1) * Math.min((p.to / 100) * p.ca, devCap(d, x.r.key)) * d.days; }, 0);
+  const caOf = (plan) => lines.reduce((s, x) => { const p = plan(x); return s + (x.r.offices ? p.count : 1) * (p.to / 100) * p.ca * d.days; }, 0);
   const bisect = (fn, lo, hi) => {
     while (caOf(fn(hi)) < needed && hi < 1e4) hi *= 2;
     for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (caOf(fn(m)) < needed) lo = m; else hi = m; }
@@ -116,8 +132,7 @@ function solveTarget(d, target) {
     if (caOf(up(counts)(1)) >= needed) plan = fill(counts)(bisect(fill(counts), 0, TO_FILL));
     else { g = bisect(up(counts), 1, 2); plan = up(counts)(g); }
   }
-  // Devices au plafond d'actes : leur CA / jour est ramené à 8 actes × prix
-  return { base, g, lines: lines.map((x) => { const p = plan(x); const cap = devCap(d, x.r.key); return { x, p: (p.to / 100) * p.ca > cap ? { ...p, ca: cap / (p.to / 100) } : p }; }) };
+  return { base, g, needed, lines: lines.map((x) => ({ x, p: plan(x) })) };
 }
 
 // Prévient une fois que le CA / jour des devices gonflé par l'ancien calcul a été remis à 2 000 €
@@ -129,12 +144,8 @@ export function devicesResetNotice() {
   return true;
 }
 
-const themeRes = (t) => `CA ${euros(themeCa(t))} / an · marge ${euros(themeCa(t) - themeVar(t))} / an`;
-// Cliniques thématiques (poids, cellulite, acné…) : patients / mois × panier moyen × 12 ; coûts variables = CA × (1 − marge)
-const themeCa = (t) => (t.patients || 0) * (t.basket || 0) * 12;
-const themeVar = (t) => themeCa(t) * (1 - (t.margin ?? 100) / 100);
-const themesCa = (d) => d.themes.reduce((s, t) => s + themeCa(t), 0);
-const themesVar = (d) => d.themes.reduce((s, t) => s + themeVar(t), 0);
+// Lignes business : CA annuel estimé, coûts = ceux affectés à la BU « Lignes business »
+const linesCa = (d) => d.lines.reduce((s, x) => s + (x.ca || 0), 0);
 
 function model(d) {
   const { cost } = d.scn;
@@ -142,12 +153,11 @@ function model(d) {
     const line = d.rev[r.key];
     return { r, line, year: revenueYear(r, line, d.days) };
   });
-  const caYear = lines.reduce((s, x) => s + (x.year || 0), 0) + themesCa(d);
-  const costYear = d.costs.reduce((s, c) => s + costMonth(c, cost) * 12, 0) + themesVar(d);
+  const caYear = lines.reduce((s, x) => s + (x.year || 0), 0) + linesCa(d);
+  const costYear = d.costs.reduce((s, c) => s + costMonth(c, cost) * 12, 0);
   const byBu = BUS.map((b) => {
-    const th = d.themes.filter((t) => (t.bu || 'singulier') === b.key);
-    const ca = lines.filter((x) => (x.line.bu || x.r.bu) === b.key).reduce((s, x) => s + (x.year || 0), 0) + th.reduce((s, t) => s + themeCa(t), 0);
-    const cst = d.costs.filter((c) => c.bu === b.key).reduce((s, c) => s + costMonth(c, cost) * 12, 0) + th.reduce((s, t) => s + themeVar(t), 0);
+    const ca = lines.filter((x) => (x.line.bu || x.r.bu) === b.key).reduce((s, x) => s + (x.year || 0), 0) + (b.key === 'devices' ? linesCa(d) : 0);
+    const cst = d.costs.filter((c) => c.bu === b.key).reduce((s, c) => s + costMonth(c, cost) * 12, 0);
     return { b, ca, cost: cst, res: ca - cst };
   });
   const totMin = d.costs.reduce((s, c) => s + costMonth(c, 'min'), 0);
@@ -219,15 +229,11 @@ if (typeof window !== 'undefined') {
 }
 
 function revImpl(d, r, line) {
-  // Ce que ça implique : ETP pour les bureaux, actes / jour pour devices et bilans
+  // Ce que ça implique : ETP à recruter pour les bureaux
   let impl = '';
   if (r.offices && line.count != null && line.to != null && d.days != null && d.etpDays) {
     const etp = (line.count * (line.to / 100) * d.days) / d.etpDays;
     impl = `👩‍⚕️ ≈ <b>${fr(etp, 1)} ${r.key === 'med' ? 'médecins' : 'praticiens'} ETP</b> à recruter <small>(${fr(line.count)} bureaux × ${fr(line.to)} % × ${fr(d.days)} j ÷ ${fr(d.etpDays)} j/ETP)</small>`;
-  }
-  if (!r.offices && line.to != null) {
-    const a = line.ca != null && line.price ? (line.ca * (line.to / 100)) / line.price : null;
-    if (a != null) impl = `🔢 <b>${fr(a, 1)} actes / jour</b>${r.cabins ? ' par cabine' : ''} à ${fr(line.price)} € <small>(CA / jour × TO ÷ prix ; ≈ ${fr(a * (d.days || 0) * (r.cabins ? line.count ?? 1 : 1), 0)} actes / an)</small>${r.cabins && a > MAX_ACTS + 0.05 ? `<br><b class="warn">⚠️ Au-delà de ${MAX_ACTS} actes / jour par cabine : pas réaliste, ajoute une cabine ou baisse le CA / jour.</b>` : ''}`;
   }
   return impl;
 }
@@ -266,11 +272,10 @@ export function view() {
         <section class="card">
           <h2>${r.label} <small class="hint" data-rev-range="${r.key}">${euros(year)} / an</small></h2>
           <div class="form">
-            ${r.offices ? field(`${r.key}_count`, 'Nombre de bureaux', line.count) : r.cabins ? field(`${r.key}_count`, 'Nombre de cabines', line.count ?? 1) : ''}
-            <label class="field ${r.offices || r.cabins ? '' : 'full'}"><span>Business unit</span>${buSelect(`${r.key}_bu`, line.bu || r.bu)}</label>
+            ${field(`${r.key}_count`, 'Nombre de bureaux', line.count)}
+            <label class="field"><span>Business unit</span>${buSelect(`${r.key}_bu`, line.bu || r.bu)}</label>
             ${field(`${r.key}_to`, "Taux d'occupation (%)", line.to, 'ex : 70')}
-            ${field(`${r.key}_ca`, r.offices ? 'CA / bureau / jour (€)' : r.cabins ? 'CA / cabine / jour (€)' : 'CA / jour (€)', line.ca)}
-            ${r.offices ? '' : field(`${r.key}_price`, 'Prix / acte (€)', line.price, 'ex : 150')}
+            ${field(`${r.key}_ca`, 'CA / bureau / jour (€)', line.ca)}
           </div>
           <p class="clinic-impl" data-rev-impl="${r.key}" ${impl ? '' : 'hidden'}>${impl}</p>
         </section>`;
@@ -278,24 +283,19 @@ export function view() {
       <p class="hint center">Enregistré et recalculé à chaque saisie.</p>
     </form>
 
-    <h2 class="section-title">🎯 Cliniques thématiques</h2>
+    <h2 class="section-title">🚀 Lignes business <small class="hint" data-lines-total>${euros(linesCa(d))} / an</small></h2>
     <section class="card">
-      <p class="hint">Programmes vendus en direct (poids, cellulite, acné, cheveux…) : CA = patients / mois × panier moyen × 12. La marge couvre les coûts variables (infirmières, produits, devices).</p>
-      ${d.themes.length ? `
-        <form data-form="clinicThemes">
-          ${d.themes.map((t) => `
-            <div class="theme-row">
-              <input class="cost-name" name="name_${t.id}" value="${esc(t.name)}" autocomplete="off">
-              <span class="cost-bu">${buSelect(`bu_${t.id}`, t.bu || 'singulier')}</span>
-              <button type="button" class="icon-btn" data-action="clinic-theme-del" data-id="${t.id}" aria-label="Supprimer">✕</button>
-              ${field(`patients_${t.id}`, 'Patients / mois', t.patients, 'ex : 30')}
-              ${field(`basket_${t.id}`, 'Panier moyen (€)', t.basket, 'ex : 1 500')}
-              ${field(`margin_${t.id}`, 'Marge (%)', t.margin, 'ex : 60')}
-              <p class="hint theme-res" data-theme-res="${t.id}">${themeRes(t)}</p>
-            </div>`).join('')}
-        </form>` : ''}
-      <form data-form="clinicThemeAdd" class="deal-add">
-        <input name="name" required placeholder="Nouvelle clinique (ex : Clinique du poids)" autocomplete="off">
+      <p class="hint">Activités qui tournent sans médecin dans la salle, avec une estimation de CA annuel. Leurs coûts : ceux affectés à « Lignes business » dans Coûts.</p>
+      <form data-form="clinicLines">
+        ${d.lines.map((x) => `
+          <div class="bline-row">
+            <input name="name_${x.id}" value="${esc(x.name)}" aria-label="Nom" autocomplete="off">
+            <input name="ca_${x.id}" inputmode="decimal" value="${x.ca ?? ''}" placeholder="€ / an" aria-label="CA annuel" autocomplete="off">
+            <button type="button" class="icon-btn" data-action="clinic-line-del" data-id="${x.id}" aria-label="Supprimer">✕</button>
+          </div>`).join('')}
+      </form>
+      <form data-form="clinicLineAdd" class="deal-add">
+        <input name="name" required placeholder="Nouvelle ligne business" autocomplete="off">
         <button class="primary" aria-label="Ajouter">＋</button>
       </form>
     </section>
@@ -356,8 +356,6 @@ const docDays = (docs, etpDays) => DOC_TYPES.map((t) => {
 // CA / jour = moyenne min-max, coûts « mid », devices et bilans à leur taux d'occupation actuel.
 const DOC_OFFICE = { singulier: 'esth', cm28: 'med' }; // Singulier → bureaux esthétiques, CM28 → bureaux médicaux
 // Chiffres du modèle si les bureaux tournent avec ces médecins (ETP pondérés)
-// Lien médecins → devices et bilans : 1 point d'occupation des bureaux = ½ point pour devices et bilans
-const DEVICE_LINK = 0.5;
 
 // extraCm28 : jours-médecins / sem CM28 en plus (pour calculer ce qu'apporte un jour de plus)
 function docFin(d, extraCm28 = 0) {
@@ -372,24 +370,17 @@ function docFin(d, extraCm28 = 0) {
     return { t, ca, cap, officeDays, year: ca == null ? null : officeDays * ca, to: cap ? (officeDays / cap) * 100 : null };
   });
   if (offices.some((o) => o.year == null)) return null;
-  // Devices et bilans suivent les médecins, à moitié : leur taux d'occupation = la moitié de celui des bureaux
   const capAll = offices.reduce((s, o) => s + (o.cap || 0), 0);
   const officeTo = capAll ? Math.min(1, offices.reduce((s, o) => s + o.officeDays, 0) / capAll) : 0;
-  // Détail devices / bilans : CA par an, CA par jour et actes par jour (si un prix par acte est saisi)
-  const extras = REVENUES.filter((r) => !r.offices).map((r) => {
-    const { ca, price } = d.rev[r.key];
-    const perDay = ca != null ? Math.min(officeTo * DEVICE_LINK * ca, devCap(d, r.key)) : null;
-    const n = r.cabins ? d.rev[r.key].count ?? 1 : 1;
-    return { r, perDay, year: perDay != null && d.days != null ? perDay * d.days * n : 0, acts: perDay != null && price ? perDay / price : null };
-  });
-  const others = extras.reduce((s, x) => s + x.year, 0);
-  const caYear = offices.reduce((s, o) => s + o.year, 0) + others + themesCa(d);
-  const costYear = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0) + themesVar(d); // scénario de coûts choisi
-  return { etpDays, offices, officeTo, extras, others, caYear, costYear, res: caYear - costYear };
+  // Lignes business : indépendantes des médecins, comptées à leur estimation annuelle
+  const others = linesCa(d);
+  const caYear = offices.reduce((s, o) => s + o.year, 0) + others;
+  const costYear = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0); // scénario de coûts choisi
+  return { etpDays, offices, officeTo, others, caYear, costYear, res: caYear - costYear };
 }
 
-// Ligne discrète sous un résultat : ce que font devices et bilans dans ce scénario
-const extrasLine = (f) => `<small class="extras-line">${f.extras.map((x) => `${x.r.key === 'devices' ? '⚡ Devices' : '🧪 Bilans'} : ${euros(x.year)}/an · ${euros(x.perDay)}/j${x.acts != null ? ` · ${fr(x.acts, 1)} acte${x.acts >= 2 ? 's' : ''}/j` : ''}`).join('<br>')}</small>`;
+// Ligne discrète sous un résultat : CA des bureaux et des lignes business
+const extrasLine = (f) => `<small class="extras-line">Bureaux : ${euros(f.caYear - f.others)}/an · 🚀 Lignes business : ${euros(f.others)}/an</small>`;
 
 function docBurn(d) {
   const f = docFin(d);
@@ -404,7 +395,7 @@ function docBurn(d) {
       <small>soit ${euros(Math.abs(res) / 12)} / mois · CA ${euros(caYear)} − coûts ${euros(costYear)}</small>
       ${extrasLine(f)}
     </div>
-    <p class="hint">Hypothèses : CA / jour saisi, coûts ${d.scn.cost === 'mid' ? 'mid' : d.scn.cost}, devices et bilans à la moitié du taux d'occupation des bureaux (${fr(f.officeTo * DEVICE_LINK * 100)} % vs ${fr(f.officeTo * 100)} %).${tos ? ` Taux d'occupation des bureaux : ${tos}.` : ''}</p>
+    <p class="hint">Hypothèses : CA / jour saisi, coûts ${d.scn.cost === 'mid' ? 'mid' : d.scn.cost}, lignes business à leur estimation annuelle.${tos ? ` Taux d'occupation des bureaux : ${tos}.` : ''}</p>
     ${over ? '<p class="hint warn">⚠️ Plus de jours-médecins que de bureaux disponibles : il faut plus de bureaux.</p>' : ''}`;
 }
 
@@ -423,7 +414,7 @@ function planCalc(d) {
   if (!f) return null;
   const { open, start, startDays } = d.recruit;
   const med = f.offices.find((o) => o.t.key === 'cm28');
-  // CA / an apporté par 1 jour-médecin / sem de plus en CM28 (bureau + devices et bilans qui suivent)
+  // CA / an apporté par 1 jour-médecin / sem de plus en CM28
   const perDay = docFin(d, 1).caYear - f.caYear;
   const missing = f.res < 0 ? -f.res / perDay : 0; // jours-médecins / sem à ajouter
   const now = totalDays(d.doctors);
@@ -469,7 +460,7 @@ function docPlan(d) {
           <li class="hint"><span>Aujourd'hui</span><b>${j(now)}</b><small>obj. ${j(expected)}</small></li>
           ${steps.map((iso) => `<li><span>${iso === open ? '🚀 ' : ''}${shortDate(iso)}</span><b>${j(goalAt(iso))}</b><small>+${j(Math.max(0, goalAt(iso) - now))}</small></li>`).join('')}
         </ul>
-        <p class="hint">Jours-médecins / sem pondérés (Singulier + CM28) à avoir signés à chaque date. Un jour-médecin / sem de plus en CM28 rapporte ${euros(perDay)} / an (${fr(f.etpDays / 5)} sem × ${euros(med.ca)} au bureau, plus devices et bilans qui suivent à moitié l'occupation). Cadence linéaire depuis le ${shortDate(start)}.</p>
+        <p class="hint">Jours-médecins / sem pondérés (Singulier + CM28) à avoir signés à chaque date. Un jour-médecin / sem de plus en CM28 rapporte ${euros(perDay)} / an (${fr(f.etpDays / 5)} sem × ${euros(med.ca)} au bureau). Cadence linéaire depuis le ${shortDate(start)}.</p>
         ${capWarn ? '<p class="hint warn">⚠️ Pas assez de bureaux médicaux pour absorber ces jours : il faudra aussi plus de bureaux.</p>' : ''}`}
     </div>`;
 }
@@ -665,7 +656,7 @@ if (typeof document !== 'undefined') {
 // Revenus et coûts : enregistrés à chaque saisie, synthèse recalculée sans redessiner (le clavier reste ouvert)
 if (typeof document !== 'undefined') {
   const live = (e) => {
-    const form = e.target.closest?.('form[data-form="clinicRev"], form[data-form="clinicCosts"], form[data-form="clinicThemes"]');
+    const form = e.target.closest?.('form[data-form="clinicRev"], form[data-form="clinicCosts"], form[data-form="clinicLines"]');
     if (!form) return;
     const values = Object.fromEntries(new FormData(form).entries());
     forms[form.dataset.form](values);
@@ -681,7 +672,7 @@ if (typeof document !== 'undefined') {
       if (el) { el.innerHTML = impl; el.hidden = !impl; }
     }
     set('[data-cost-total]', range(m.totMin, m.totMax));
-    d.themes.forEach((t) => set(`[data-theme-res="${t.id}"]`, themeRes(t)));
+    set('[data-lines-total]', `${euros(linesCa(d))} / an`);
     set('[data-doc-burn]', docBurn(d));
     set('[data-obj-cap]', capRow(d));
     set('[data-doc-plan]', docPlan(d));
@@ -731,35 +722,30 @@ export const forms = {
     for (const r of REVENUES) {
       const line = d.rev[r.key];
       if (r.offices) line.count = num(f[`${r.key}_count`]);
-      if (r.cabins) line.count = num(f[`${r.key}_count`]) ?? 1;
       line.to = num(f[`${r.key}_to`]);
       line.ca = num(f[`${r.key}_ca`]);
-      if (`${r.key}_price` in f) line.price = num(f[`${r.key}_price`]);
       line.bu = f[`${r.key}_bu`] || r.bu;
     }
     d.targetBase = null; // les valeurs saisies deviennent la base des objectifs d'EBITDA
     save(d);
     return 'Revenus enregistrés';
   },
-  clinicThemes(f) {
+  clinicLines(f) {
     const d = load();
-    d.themes.forEach((t) => {
-      t.name = (f[`name_${t.id}`] || '').trim() || t.name;
-      t.patients = num(f[`patients_${t.id}`]);
-      t.basket = num(f[`basket_${t.id}`]);
-      t.margin = num(f[`margin_${t.id}`]);
-      t.bu = f[`bu_${t.id}`] || t.bu;
+    d.lines.forEach((x) => {
+      x.name = (f[`name_${x.id}`] || '').trim() || x.name;
+      x.ca = num(f[`ca_${x.id}`]);
     });
     save(d);
-    return 'Cliniques enregistrées';
+    return 'Lignes business enregistrées';
   },
-  clinicThemeAdd(f) {
+  clinicLineAdd(f) {
     const name = (f.name || '').trim();
     if (!name) return false;
     const d = load();
-    d.themes.push({ id: uid(), name, patients: null, basket: null, margin: null, bu: 'singulier' });
+    d.lines.push({ id: uid(), name, ca: null });
     save(d);
-    return 'Clinique ajoutée : renseigne patients, panier et marge';
+    return 'Ligne ajoutée : renseigne son CA annuel';
   },
   clinicCosts(f) {
     const d = load();
@@ -799,6 +785,7 @@ export const actions = {
     const target = Number(el.dataset.v);
     const sol = solveTarget(d, target);
     if (!sol) return 'Renseigne d\'abord les jours d\'ouverture, bureaux et CA / jour';
+    if (sol.needed <= 0) return `${TARGETS.find((t) => t.v === target).label} : déjà atteint avec les seules lignes business`;
     d.targetBase = sol.base; // les prochains objectifs repartent de la même base
     for (const { x, p } of sol.lines) {
       const line = d.rev[x.r.key];
@@ -824,10 +811,10 @@ export const actions = {
     d.doctors = d.doctors.filter((x) => x.id !== el.dataset.id);
     save(d);
   },
-  'clinic-theme-del'(el) {
-    if (!confirm('Supprimer cette clinique ?')) return false;
+  'clinic-line-del'(el) {
+    if (!confirm('Supprimer cette ligne business ?')) return false;
     const d = load();
-    d.themes = d.themes.filter((t) => t.id !== el.dataset.id);
+    d.lines = d.lines.filter((x) => x.id !== el.dataset.id);
     save(d);
   },
   'clinic-cost-del'(el) {

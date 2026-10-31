@@ -705,3 +705,8 @@ small.warn { color: var(--warn); }
 .theme-row .field:nth-of-type(3) { grid-column: 1 / 2; }
 .theme-row .theme-res { grid-column: 1 / -1; margin: 2px 0 0; }
 .theme-row input { padding: 9px 8px; font-size: 15px; }
+
+/* Clinique : lignes business */
+.bline-row { display: grid; grid-template-columns: 1fr 120px 28px; gap: 6px; align-items: center; margin-bottom: 6px; }
+.bline-row input { margin: 0; padding: 9px 8px; font-size: 15px; }
+.bline-row input[name^=ca_] { text-align: right; }
