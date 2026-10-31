@@ -298,7 +298,10 @@ export function view() {
         <input name="name" required placeholder="Nouvelle ligne business" autocomplete="off">
         <button class="primary" aria-label="Ajouter">＋</button>
       </form>
-      ${d.lines.some((x) => x.ca) ? '<button class="chip lines-zero" data-action="clinic-lines-zero">↺ Tout mettre à zéro</button>' : ''}
+      <div class="lines-btns">
+        <button class="chip" data-action="clinic-lines-breakeven">⚖️ Mettre breakeven</button>
+        ${d.lines.some((x) => x.ca) ? '<button class="chip" data-action="clinic-lines-zero">↺ Tout mettre à zéro</button>' : ''}
+      </div>
     </section>
 
     <h2 class="section-title">📉 Coûts</h2>
@@ -811,6 +814,23 @@ export const actions = {
     const d = load();
     d.doctors = d.doctors.filter((x) => x.id !== el.dataset.id);
     save(d);
+  },
+  // Breakeven : le CA des lignes business couvre pile leurs coûts fixes (scénario de coûts choisi).
+  // Ventilation selon le poids habituel de chaque activité (estimations de départ) ; lignes inconnues : poids moyen.
+  'clinic-lines-breakeven'() {
+    const d = load();
+    const costs = d.costs.filter((c) => c.bu === 'devices').reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
+    if (!costs) return 'Aucun coût affecté à « Lignes business » dans Coûts';
+    if (!d.lines.length) return 'Ajoute d\'abord des lignes business';
+    const key = (n) => n.replace(/[^\p{L}\s&]/gu, '').trim().toLowerCase();
+    const seed = Object.fromEntries(LINE_SEED.map((x) => [key(x.name), x.ca]));
+    const avg = LINE_SEED.reduce((s, x) => s + x.ca, 0) / LINE_SEED.length;
+    const w = d.lines.map((x) => seed[key(x.name)] ?? avg);
+    const total = w.reduce((s, v) => s + v, 0);
+    d.lines.forEach((x, i) => { x.ca = Math.round((costs * w[i]) / total / 1000) * 1000; });
+    d.lines[d.lines.length - 1].ca += costs - d.lines.reduce((s, x) => s + x.ca, 0); // total exact
+    save(d);
+    return `⚖️ Lignes business = ${euros(costs)} / an, leurs coûts fixes`;
   },
   'clinic-lines-zero'() {
     if (!confirm('Mettre le CA de toutes les lignes business à zéro ?')) return false;
