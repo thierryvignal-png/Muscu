@@ -116,14 +116,13 @@ function streamCard(s) {
   const today = d.items.filter((x) => x.date === ideaDay());
   const todo = pending(d).length;
   const pickHint = todo ? `<p class="hint warn">🏆 ${todo} meilleure${todo > 1 ? 's' : ''} idée${todo > 1 ? 's' : ''} à choisir avant 21 h <button class="chip" data-action="space" data-space="${c.space}">Choisir ›</button></p>` : '';
+  // Idée du jour notée : la carte disparaît de Ma journée (sauf s'il reste une meilleure idée à choisir)
   if (today.length) {
-    return `
+    return todo ? `
       <section class="card idea-card done">
-        <div class="j-head"><h2>${c.icon} ${c.short} du jour ✅</h2><button class="chip" data-action="space" data-space="${c.space}">Toutes ›</button></div>
-        <p>${esc(today[today.length - 1].text)}</p>
-        ${st > 1 ? `<p class="hint">🔥 ${st} jours d'affilée</p>` : ''}
+        <div class="j-head"><h2>${c.icon} ${c.short} du jour ✅</h2></div>
         ${pickHint}
-      </section>`;
+      </section>` : '';
   }
   return `
     <section class="card idea-card">
