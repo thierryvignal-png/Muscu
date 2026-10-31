@@ -144,6 +144,22 @@ export function devicesResetNotice() {
   return true;
 }
 
+// Breakeven des lignes business : leur CA couvre pile leurs coûts fixes (scénario de coûts choisi).
+// Ventilation selon le poids habituel de chaque activité (estimations de départ) ; lignes inconnues : poids moyen.
+// Renvoie le montant réparti, ou null s'il n'y a ni coûts ni lignes.
+function linesBreakeven(d) {
+  const costs = d.costs.filter((c) => c.bu === 'devices').reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
+  if (!costs || !d.lines.length) return null;
+  const key = (n) => n.replace(/[^\p{L}\s&]/gu, '').trim().toLowerCase();
+  const seed = Object.fromEntries(LINE_SEED.map((x) => [key(x.name), x.ca]));
+  const avg = LINE_SEED.reduce((s, x) => s + x.ca, 0) / LINE_SEED.length;
+  const w = d.lines.map((x) => seed[key(x.name)] ?? avg);
+  const total = w.reduce((s, v) => s + v, 0);
+  d.lines.forEach((x, i) => { x.ca = Math.round((costs * w[i]) / total / 1000) * 1000; });
+  d.lines[d.lines.length - 1].ca += costs - d.lines.reduce((s, x) => s + x.ca, 0); // total exact
+  return costs;
+}
+
 // Lignes business : CA annuel estimé, coûts = ceux affectés à la BU « Lignes business »
 const linesCa = (d) => d.lines.reduce((s, x) => s + (x.ca || 0), 0);
 
@@ -787,6 +803,7 @@ export const actions = {
   'clinic-target'(el) {
     const d = load();
     const target = Number(el.dataset.v);
+    linesBreakeven(d); // lignes business à l'équilibre : l'objectif se joue sur les bureaux
     const sol = solveTarget(d, target);
     if (!sol) return 'Renseigne d\'abord les jours d\'ouverture, bureaux et CA / jour';
     if (sol.needed <= 0) return `${TARGETS.find((t) => t.v === target).label} : déjà atteint avec les seules lignes business`;
@@ -815,20 +832,10 @@ export const actions = {
     d.doctors = d.doctors.filter((x) => x.id !== el.dataset.id);
     save(d);
   },
-  // Breakeven : le CA des lignes business couvre pile leurs coûts fixes (scénario de coûts choisi).
-  // Ventilation selon le poids habituel de chaque activité (estimations de départ) ; lignes inconnues : poids moyen.
   'clinic-lines-breakeven'() {
     const d = load();
-    const costs = d.costs.filter((c) => c.bu === 'devices').reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
-    if (!costs) return 'Aucun coût affecté à « Lignes business » dans Coûts';
-    if (!d.lines.length) return 'Ajoute d\'abord des lignes business';
-    const key = (n) => n.replace(/[^\p{L}\s&]/gu, '').trim().toLowerCase();
-    const seed = Object.fromEntries(LINE_SEED.map((x) => [key(x.name), x.ca]));
-    const avg = LINE_SEED.reduce((s, x) => s + x.ca, 0) / LINE_SEED.length;
-    const w = d.lines.map((x) => seed[key(x.name)] ?? avg);
-    const total = w.reduce((s, v) => s + v, 0);
-    d.lines.forEach((x, i) => { x.ca = Math.round((costs * w[i]) / total / 1000) * 1000; });
-    d.lines[d.lines.length - 1].ca += costs - d.lines.reduce((s, x) => s + x.ca, 0); // total exact
+    const costs = linesBreakeven(d);
+    if (costs == null) return d.lines.length ? 'Aucun coût affecté à « Lignes business » dans Coûts' : 'Ajoute d\'abord des lignes business';
     save(d);
     return `⚖️ Lignes business = ${euros(costs)} / an, leurs coûts fixes`;
   },
