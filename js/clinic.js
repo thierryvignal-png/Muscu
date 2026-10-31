@@ -298,6 +298,7 @@ export function view() {
         <input name="name" required placeholder="Nouvelle ligne business" autocomplete="off">
         <button class="primary" aria-label="Ajouter">＋</button>
       </form>
+      ${d.lines.some((x) => x.ca) ? '<button class="chip lines-zero" data-action="clinic-lines-zero">↺ Tout mettre à zéro</button>' : ''}
     </section>
 
     <h2 class="section-title">📉 Coûts</h2>
@@ -810,6 +811,13 @@ export const actions = {
     const d = load();
     d.doctors = d.doctors.filter((x) => x.id !== el.dataset.id);
     save(d);
+  },
+  'clinic-lines-zero'() {
+    if (!confirm('Mettre le CA de toutes les lignes business à zéro ?')) return false;
+    const d = load();
+    d.lines.forEach((x) => { x.ca = 0; });
+    save(d);
+    return 'Lignes business remises à zéro';
   },
   'clinic-line-del'(el) {
     if (!confirm('Supprimer cette ligne business ?')) return false;

@@ -710,3 +710,4 @@ small.warn { color: var(--warn); }
 .bline-row { display: grid; grid-template-columns: 1fr 120px 28px; gap: 6px; align-items: center; margin-bottom: 6px; }
 .bline-row input { margin: 0; padding: 9px 8px; font-size: 15px; }
 .bline-row input[name^=ca_] { text-align: right; }
+.lines-zero { margin-top: 10px; }
