@@ -718,3 +718,7 @@ small.warn { color: var(--warn); }
 .bline-row input[name^=ca_] { text-align: right; }
 .lines-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .ref-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; } .ref-btns small { opacity: .75; }
+/* Objectif de poids modifiable sur la carte */
+.goal-edit-btn { float: right; padding: 4px 10px; font-size: 13px; }
+.goal-edit { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: end; }
+.goal-edit .field input { margin: 0; }

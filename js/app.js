@@ -220,10 +220,21 @@ function goalProjection() {
   return { goal, target, cur, start, avg, cal, basis, daysLeft, projected, eta, required, margin, progress, toLose };
 }
 
+// Objectif de poids modifiable directement depuis la carte (✎)
+const goalEditForm = (g) => `
+  <form data-form="goalEdit" class="goal-edit">
+    <label class="field"><span>Poids cible (kg)</span><input name="weightGoal" inputmode="decimal" value="${g.goal ?? ''}" autocomplete="off"></label>
+    <label class="field"><span>Date</span><input type="date" name="targetDate" value="${g.target}"></label>
+    <button class="primary">OK</button>
+    <button type="button" data-action="weight-goal-cancel">Annuler</button>
+  </form>`;
+
 function goalCard() {
   const g = goalProjection();
   const title = `Objectif ${fr(g.goal, 1)} kg au ${fmtDay(g.target)}`;
-  if (g.missing) return card(title, `<p class="hint">${g.missing}</p>`);
+  const edit = ` <button class="chip goal-edit-btn" data-action="weight-goal-edit" aria-label="Modifier l'objectif">✎</button>`;
+  if (state.goalEdit) return card(title, goalEditForm(g));
+  if (g.missing) return card(title, `<p class="hint">${g.missing}</p>`, edit);
 
   let status, cls;
   if (g.toLose <= 0) { status = 'Objectif atteint 🎉'; cls = 'good'; }
@@ -245,7 +256,7 @@ function goalCard() {
     <p class="hint">${g.toLose > 0
       ? `Il te faut un déficit moyen de <b>${fr(g.required)} kcal/j</b> d'ici le ${fmtDay(g.target)} (${g.daysLeft} j). Ton rythme actuel : <b>${g.avg >= 0 ? `déficit de ${fr(g.avg)}` : `excédent de ${fr(-g.avg)}`} kcal/j</b> (moy. ${g.basis}${g.cal.ready ? ', corrigé' : ''}).`
       : 'Tu es sous ton objectif, garde le cap !'}</p>
-  `);
+  `, edit);
 }
 
 const avgOf = (arr) => (arr.length ? sum(arr, (x) => x) / arr.length : null);
@@ -915,6 +926,13 @@ const forms = {
     store.setBurn(f.date || state.homeDate, n == null ? null : Math.round(n));
     toast(n == null ? 'Dépense effacée' : 'Dépense enregistrée');
   },
+  goalEdit(f) {
+    const w = num(f.weightGoal);
+    if (w == null) return toast('Entre un poids cible');
+    state.goalEdit = false;
+    store.setSettings({ weightGoal: w, targetDate: f.targetDate || store.settings().targetDate });
+    toast('Objectif mis à jour');
+  },
   settings(f) {
     store.setSettings({
       proteinGoal: num(f.proteinGoal) || 150,
@@ -985,6 +1003,8 @@ const actions = {
     const field = tab === 'food' ? 'form[data-form="meal"] input[name="name"]' : tab === 'body' ? 'form[data-form="body"] input[name="weight"]' : null;
     if (field) document.querySelector(field)?.focus();
   },
+  'weight-goal-edit'() { state.goalEdit = true; render(); },
+  'weight-goal-cancel'() { state.goalEdit = false; render(); },
   'open-muscu'(el) {
     backToToday();
     $('#sheet').hidden = true;
