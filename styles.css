@@ -711,3 +711,4 @@ small.warn { color: var(--warn); }
 .bline-row input { margin: 0; padding: 9px 8px; font-size: 15px; }
 .bline-row input[name^=ca_] { text-align: right; }
 .lines-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.ref-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; } .ref-btns small { opacity: .75; }

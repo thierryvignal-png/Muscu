@@ -211,6 +211,10 @@ function sumInner(d, m) {
       <div class="target-pick">
         <span class="hint">🎯 EBITDA visé</span>
         <div class="alcohol scn targets">${TARGETS.map((t) => `<button class="seg ${Math.abs(m.res - t.v) < 5000 ? 'on good' : ''}" data-action="clinic-target" data-v="${t.v}">${t.label}</button>`).join('')}</div>
+        <div class="ref-btns">
+          ${d.preset ? `<button class="chip" data-action="clinic-preset-load">↺ Scénario de référence <small>(${euros(d.preset.res)} / an)</small></button>` : ''}
+          <button class="chip" data-action="clinic-preset-save">📌 ${d.preset ? 'Remplacer la référence' : 'Garder comme référence'}</button>
+        </div>
       </div>
       <div class="clinic-sum-grid">
         <div><span>CA</span><b>${euros(m.caYear / 12)}</b><small>${euros(m.caYear)} / an</small></div>
@@ -838,6 +842,28 @@ export const actions = {
     const toTxt = Math.min(...tos) === Math.max(...tos) ? `${tos[0]} %` : `${Math.min(...tos)}–${Math.max(...tos)} %`;
     const more = sol.lines.filter(({ x, p }) => x.r.offices && p.count > x.b.count).map(({ x, p }) => `${p.count} ${x.r.key === 'esth' ? 'esthé' : 'médicaux'}`);
     return `${label} : lignes business ${euros(linesCa(d))} · TO bureaux ${toTxt}${sol.g > 1.005 ? ` · CA / jour +${fr((sol.g - 1) * 100)} %` : ''}${more.length ? ` · bureaux : ${more.join(', ')}` : ''}`;
+  },
+  // Scénario de référence : jours, bureaux (nombre, TO, CA / jour), lignes business et scénario de coûts
+  'clinic-preset-save'() {
+    const d = load();
+    if (d.preset && !confirm('Remplacer le scénario de référence par les valeurs actuelles ?')) return false;
+    d.preset = {
+      days: d.days, etpDays: d.etpDays, cost: d.scn.cost, res: model(d).res,
+      rev: snapRev(d), lines: d.lines.map((x) => ({ ...x })),
+    };
+    save(d);
+    return '📌 Scénario de référence enregistré';
+  },
+  'clinic-preset-load'() {
+    const d = load();
+    const p = d.preset;
+    if (!p) return false;
+    d.days = p.days; d.etpDays = p.etpDays; d.scn.cost = p.cost;
+    for (const [k, v] of Object.entries(p.rev)) if (d.rev[k]) Object.assign(d.rev[k], v);
+    d.lines = p.lines.map((x) => ({ ...x }));
+    d.targetBase = null;
+    save(d);
+    return '↺ Scénario de référence rétabli';
   },
   'clinic-scn'(el) {
     const d = load();
