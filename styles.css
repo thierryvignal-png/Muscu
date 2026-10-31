@@ -707,7 +707,13 @@ small.warn { color: var(--warn); }
 .theme-row input { padding: 9px 8px; font-size: 15px; }
 
 /* Clinique : lignes business */
-.bline-row { display: grid; grid-template-columns: 1fr 120px 28px; gap: 6px; align-items: center; margin-bottom: 6px; }
+.bline-row { display: grid; grid-template-columns: 1fr 64px 92px 28px; gap: 6px; align-items: center; margin-bottom: 6px; }
+.bline-row.head { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+.bline-row.head span:nth-child(n+2) { text-align: center; }
+.bline-row input[name^=pct_] { text-align: center; }
+.bline-ca { text-align: right; font-weight: 600; font-size: 14px; white-space: nowrap; }
+.lines-total { margin-bottom: 10px; }
+.lines-total input { font-weight: 700; }
 .bline-row input { margin: 0; padding: 9px 8px; font-size: 15px; }
 .bline-row input[name^=ca_] { text-align: right; }
 .lines-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }

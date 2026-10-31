@@ -70,6 +70,13 @@ const load = () => {
     d.solverV2 = true;
     write(KEY, d);
   }
+  if (d.linesTotal === undefined && d.lines) {
+    const t = d.lines.reduce((s, x) => s + (x.ca || 0), 0);
+    d.linesTotal = t;
+    d.lines.forEach((x) => { x.pct = t ? Math.round(((x.ca || 0) / t) * 1000) / 10 : 0; });
+    if (t && d.lines.length) { const last = d.lines[d.lines.length - 1]; last.pct = Math.round((last.pct + 100 - pctSum(d)) * 10) / 10; } // arrondis : total à 100 %
+    write(KEY, d);
+  }
   d.recruit ??= { open: '2027-02-01' }; // roadmap de recrutement : ouverture, point de départ
   if (!d.recruit.start && d.doctors?.length) { d.recruit.start = today(); d.recruit.startDays = totalDays(d.doctors); write(KEY, d); }
   d.recruit.start ??= today(); d.recruit.startDays ??= 0;
@@ -147,25 +154,38 @@ export function devicesResetNotice() {
 }
 
 // Breakeven des lignes business : leur CA couvre pile leurs coûts fixes (scénario de coûts choisi).
-// Ventilation selon le poids habituel de chaque activité (estimations de départ) ; lignes inconnues : poids moyen.
-// Renvoie le montant réparti, ou null s'il n'y a ni coûts ni lignes.
-// margin : marge nette visée (résultat / CA), 0 = breakeven ; CA total = coûts ÷ (1 − marge).
-// total : CA total imposé (ex : 1 M€), réparti de la même façon.
-function linesBreakeven(d, margin = 0, total = null) {
-  const fixed = d.costs.filter((c) => c.bu === 'devices').reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
-  if ((!fixed && !total) || !d.lines.length) return null;
-  const costs = total ?? Math.round(fixed / (1 - margin) / 1000) * 1000;
+// Lignes business : un CA total (d.linesTotal) ventilé en % par ligne ; CA d'une ligne = total × % (stocké dans x.ca).
+const pctSum = (d) => d.lines.reduce((s, x) => s + (x.pct || 0), 0);
+function applyLines(d) {
+  d.lines.forEach((x) => { x.ca = Math.round(((d.linesTotal || 0) * (x.pct || 0)) / 100); });
+}
+// Si aucun % n'est saisi : ventilation selon le poids habituel de chaque activité (lignes inconnues : poids moyen)
+function ensurePcts(d) {
+  if (pctSum(d) > 0 || !d.lines.length) return;
   const key = (n) => n.replace(/[^\p{L}\s&]/gu, '').trim().toLowerCase();
   const seed = Object.fromEntries(LINE_SEED.map((x) => [key(x.name), x.ca]));
   const avg = LINE_SEED.reduce((s, x) => s + x.ca, 0) / LINE_SEED.length;
   const w = d.lines.map((x) => seed[key(x.name)] ?? avg);
   const wSum = w.reduce((s, v) => s + v, 0);
-  d.lines.forEach((x, i) => { x.ca = Math.round((costs * w[i]) / wSum / 1000) * 1000; });
-  d.lines[d.lines.length - 1].ca += costs - d.lines.reduce((s, x) => s + x.ca, 0); // total exact
-  return costs;
+  d.lines.forEach((x, i) => { x.pct = Math.round((w[i] / wSum) * 1000) / 10; });
+  d.lines[d.lines.length - 1].pct = Math.round((d.lines[d.lines.length - 1].pct + 100 - pctSum(d)) * 10) / 10;
+}
+// Fixe le CA total des lignes business : breakeven (coûts fixes), marge nette visée (coûts ÷ (1 − marge))
+// ou montant imposé (total). La ventilation en % est conservée. Renvoie le total, ou null.
+function linesBreakeven(d, margin = 0, total = null) {
+  const fixed = d.costs.filter((c) => c.bu === 'devices').reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
+  if ((!fixed && !total) || !d.lines.length) return null;
+  d.linesTotal = total ?? Math.round(fixed / (1 - margin) / 1000) * 1000;
+  ensurePcts(d);
+  applyLines(d);
+  return d.linesTotal;
 }
 
 // Lignes business : CA annuel estimé, coûts = ceux affectés à la BU « Lignes business »
+const pctHint = (d) => {
+  const t = Math.round(pctSum(d) * 10) / 10;
+  return Math.abs(t - 100) < 0.05 ? `Total des % : 100 % ✅` : `<span class="warn">⚠️ Total des % : ${fr(t, t % 1 ? 1 : 0)} % — doit faire 100 % pour répartir tout le CA</span>`;
+};
 const linesCa = (d) => d.lines.reduce((s, x) => s + (x.ca || 0), 0);
 
 function model(d) {
@@ -310,14 +330,18 @@ export function view() {
 
     <h2 class="section-title">🚀 Lignes business <small class="hint" data-lines-total>${euros(linesCa(d))} / an</small></h2>
     <section class="card">
-      <p class="hint">Activités qui tournent sans médecin dans la salle, avec une estimation de CA annuel. Leurs coûts : ceux affectés à « Lignes business » dans Coûts.</p>
+      <p class="hint">Activités qui tournent sans médecin dans la salle. Leurs coûts : ceux affectés à « Lignes business » dans Coûts.</p>
       <form data-form="clinicLines">
+        <label class="field lines-total"><span>CA total des lignes business (€ / an)</span><input name="total" inputmode="decimal" value="${d.linesTotal ?? ''}" placeholder="ex : 750 000" autocomplete="off"></label>
+        <div class="bline-row head"><span>Ligne</span><span>%</span><span>CA / an</span><span></span></div>
         ${d.lines.map((x) => `
           <div class="bline-row">
             <input name="name_${x.id}" value="${esc(x.name)}" aria-label="Nom" autocomplete="off">
-            <input name="ca_${x.id}" inputmode="decimal" value="${x.ca ?? ''}" placeholder="€ / an" aria-label="CA annuel" autocomplete="off">
+            <input name="pct_${x.id}" inputmode="decimal" value="${x.pct ?? ''}" placeholder="%" aria-label="Part en %" autocomplete="off">
+            <span class="bline-ca" data-line-ca="${x.id}">${euros(x.ca || 0)}</span>
             <button type="button" class="icon-btn" data-action="clinic-line-del" data-id="${x.id}" aria-label="Supprimer">✕</button>
           </div>`).join('')}
+        <p class="hint" data-pct-sum>${pctHint(d)}</p>
       </form>
       <form data-form="clinicLineAdd" class="deal-add">
         <input name="name" required placeholder="Nouvelle ligne business" autocomplete="off">
@@ -327,7 +351,7 @@ export function view() {
         <button class="chip" data-action="clinic-lines-breakeven">⚖️ Mettre breakeven</button>
         <button class="chip" data-action="clinic-lines-breakeven" data-margin="0.25">📈 Marge nette 25 %</button>
         <button class="chip" data-action="clinic-lines-breakeven" data-total="1000000">💰 1 M€ de CA</button>
-        ${d.lines.some((x) => x.ca) ? '<button class="chip" data-action="clinic-lines-zero">↺ Tout mettre à zéro</button>' : ''}
+        ${d.linesTotal ? '<button class="chip" data-action="clinic-lines-zero">↺ Tout mettre à zéro</button>' : ''}
       </div>
     </section>
 
@@ -704,6 +728,8 @@ if (typeof document !== 'undefined') {
     }
     set('[data-cost-total]', range(m.totMin, m.totMax));
     set('[data-lines-total]', `${euros(linesCa(d))} / an`);
+    d.lines.forEach((x) => set(`[data-line-ca="${x.id}"]`, euros(x.ca || 0)));
+    set('[data-pct-sum]', pctHint(d));
     set('[data-doc-burn]', docBurn(d));
     set('[data-obj-cap]', capRow(d));
     set('[data-doc-plan]', docPlan(d));
@@ -763,10 +789,12 @@ export const forms = {
   },
   clinicLines(f) {
     const d = load();
+    d.linesTotal = num(f.total);
     d.lines.forEach((x) => {
       x.name = (f[`name_${x.id}`] || '').trim() || x.name;
-      x.ca = num(f[`ca_${x.id}`]);
+      x.pct = num(f[`pct_${x.id}`]);
     });
+    applyLines(d);
     save(d);
     return 'Lignes business enregistrées';
   },
@@ -774,9 +802,9 @@ export const forms = {
     const name = (f.name || '').trim();
     if (!name) return false;
     const d = load();
-    d.lines.push({ id: uid(), name, ca: null });
+    d.lines.push({ id: uid(), name, pct: 0, ca: 0 });
     save(d);
-    return 'Ligne ajoutée : renseigne son CA annuel';
+    return 'Ligne ajoutée : donne-lui un % (le total doit faire 100 %)';
   },
   clinicCosts(f) {
     const d = load();
@@ -849,7 +877,7 @@ export const actions = {
     if (d.preset && !confirm('Remplacer le scénario de référence par les valeurs actuelles ?')) return false;
     d.preset = {
       days: d.days, etpDays: d.etpDays, cost: d.scn.cost, res: model(d).res,
-      rev: snapRev(d), lines: d.lines.map((x) => ({ ...x })),
+      rev: snapRev(d), lines: d.lines.map((x) => ({ ...x })), linesTotal: d.linesTotal,
     };
     save(d);
     return '📌 Scénario de référence enregistré';
@@ -861,6 +889,7 @@ export const actions = {
     d.days = p.days; d.etpDays = p.etpDays; d.scn.cost = p.cost;
     for (const [k, v] of Object.entries(p.rev)) if (d.rev[k]) Object.assign(d.rev[k], v);
     d.lines = p.lines.map((x) => ({ ...x }));
+    d.linesTotal = p.linesTotal ?? p.lines.reduce((s, x) => s + (x.ca || 0), 0);
     d.targetBase = null;
     save(d);
     return '↺ Scénario de référence rétabli';
@@ -883,13 +912,14 @@ export const actions = {
     const ca = linesBreakeven(d, margin, total);
     if (ca == null) return d.lines.length ? 'Aucun coût affecté à « Lignes business » dans Coûts' : 'Ajoute d\'abord des lignes business';
     save(d);
-    if (total) return `💰 Lignes business = ${euros(ca)} / an, réparti selon le poids de chaque activité`;
+    if (total) return `💰 Lignes business = ${euros(ca)} / an, réparti selon tes %`;
     return margin ? `📈 Lignes business = ${euros(ca)} / an : ${fr(margin * 100)} % de marge nette` : `⚖️ Lignes business = ${euros(ca)} / an, leurs coûts fixes`;
   },
   'clinic-lines-zero'() {
     if (!confirm('Mettre le CA de toutes les lignes business à zéro ?')) return false;
     const d = load();
-    d.lines.forEach((x) => { x.ca = 0; });
+    d.linesTotal = 0;
+    applyLines(d);
     save(d);
     return 'Lignes business remises à zéro';
   },
@@ -897,6 +927,7 @@ export const actions = {
     if (!confirm('Supprimer cette ligne business ?')) return false;
     const d = load();
     d.lines = d.lines.filter((x) => x.id !== el.dataset.id);
+    applyLines(d);
     save(d);
   },
   'clinic-cost-del'(el) {
