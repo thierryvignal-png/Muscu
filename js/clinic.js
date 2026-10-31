@@ -708,6 +708,22 @@ if (typeof document !== 'undefined') {
   document.addEventListener('change', onDoc);
 }
 
+// Lignes business : reclassées par % décroissant pendant la saisie (le champ en cours garde le focus et le curseur)
+function sortLineRows(form, d) {
+  const rows = [...form.querySelectorAll('.bline-row:not(.head)')];
+  const pctOf = (row) => d.lines.find((x) => row.querySelector(`[name="pct_${x.id}"]`))?.pct || 0;
+  const sorted = [...rows].sort((a, b) => pctOf(b) - pctOf(a));
+  if (sorted.every((r, i) => r === rows[i])) return;
+  const el = document.activeElement;
+  const pos = el?.selectionStart;
+  const anchor = rows[rows.length - 1].nextSibling;
+  sorted.forEach((r) => form.insertBefore(r, anchor));
+  if (el && document.activeElement !== el) {
+    el.focus();
+    try { el.setSelectionRange(pos, pos); } catch {}
+  }
+}
+
 // Revenus et coûts : enregistrés à chaque saisie, synthèse recalculée sans redessiner (le clavier reste ouvert)
 if (typeof document !== 'undefined') {
   const live = (e) => {
@@ -729,6 +745,7 @@ if (typeof document !== 'undefined') {
     set('[data-cost-total]', range(m.totMin, m.totMax));
     set('[data-lines-total]', `${euros(linesCa(d))} / an`);
     d.lines.forEach((x) => set(`[data-line-ca="${x.id}"]`, euros(x.ca || 0)));
+    if (form.dataset.form === 'clinicLines') sortLineRows(form, d);
     set('[data-pct-sum]', pctHint(d));
     set('[data-doc-burn]', docBurn(d));
     set('[data-obj-cap]', capRow(d));
