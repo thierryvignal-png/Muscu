@@ -685,3 +685,10 @@ small.warn { color: var(--warn); }
 .idea-list li > div { flex: 1; min-width: 0; }
 .idea-list small { color: var(--muted); }
 .idea-list p { margin: 2px 0 0; white-space: pre-wrap; }
+.idea-stars { display: inline-flex; gap: 2px; margin-top: 4px; }
+.idea-stars button { background: none; border: 0; padding: 0 2px; font-size: 20px; line-height: 1; color: var(--line); }
+.idea-stars button.on { color: #f5b301; }
+.idea-stars.ro { color: #f5b301; font-size: 12px; margin: 0 6px 0 0; }
+.idea-pick { border: 1px solid color-mix(in srgb, #f5b301 50%, transparent); }
+.idea-choice { display: block; width: 100%; text-align: left; margin-top: 8px; padding: 10px 12px; font-size: 15px; line-height: 1.35; white-space: normal; }
+.idea-lock.compact { min-height: 0; padding: 40px 0 8px; }
