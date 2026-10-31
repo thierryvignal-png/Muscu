@@ -275,6 +275,21 @@ if (typeof window !== 'undefined') {
   if (vv) { vv.addEventListener('scroll', follow); vv.addEventListener('resize', follow); }
 }
 
+// Bureaux esthétiques + médicaux ensemble : occupation moyenne un jour d'ouverture, et jours d'ouverture par semaine
+function officeSum(d) {
+  const offices = REVENUES.filter((r) => r.offices).map((r) => d.rev[r.key]);
+  const total = offices.reduce((s, l) => s + (l.count || 0), 0);
+  const busy = offices.reduce((s, l) => s + (l.count || 0) * ((l.to || 0) / 100), 0);
+  if (!total || !d.days) return '<p class="hint">Renseigne les bureaux et les jours d\'ouverture.</p>';
+  const perWeek = d.days / 52;
+  return `
+    <div class="office-sum-grid">
+      <div><b>${fr(busy, 1)}</b><span>bureaux occupés sur ${fr(total)} en moyenne</span></div>
+      <div><b>${fr(perWeek, 1)}</b><span>jours par semaine</span></div>
+    </div>
+    <p class="hint center">Un jour d'ouverture type : ≈ ${fr(busy, 1)} médecins en bureau (${fr((busy / total) * 100)} % d'occupation), ${fr(d.days)} jours d'ouverture par an soit ${fr(perWeek, 1)} jours sur 7.</p>`;
+}
+
 function revImpl(d, r, line) {
   // Ce que ça implique : ETP à recruter pour les bureaux
   let impl = '';
@@ -327,6 +342,7 @@ export function view() {
           <p class="clinic-impl" data-rev-impl="${r.key}" ${impl ? '' : 'hidden'}>${impl}</p>
         </section>`;
       }).join('')}
+      <section class="card office-sum" data-office-sum>${officeSum(d)}</section>
       <p class="hint center">Enregistré et recalculé à chaque saisie.</p>
     </form>
 
@@ -750,6 +766,7 @@ if (typeof document !== 'undefined') {
     const set = (sel, html) => { const el = document.querySelector(sel); if (el) el.innerHTML = html; };
     set('[data-clinic-sum]', sumInner(d, m));
     set('[data-clinic-sticky]', stickyInner(m));
+    set('[data-office-sum]', officeSum(d));
     for (const { r, line, year } of m.lines) {
       set(`[data-rev-range="${r.key}"]`, `${euros(year)} / an`);
       const impl = revImpl(d, r, line);
