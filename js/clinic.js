@@ -157,8 +157,8 @@ function linesBreakeven(d, margin = 0, total = null) {
   const seed = Object.fromEntries(LINE_SEED.map((x) => [key(x.name), x.ca]));
   const avg = LINE_SEED.reduce((s, x) => s + x.ca, 0) / LINE_SEED.length;
   const w = d.lines.map((x) => seed[key(x.name)] ?? avg);
-  const total = w.reduce((s, v) => s + v, 0);
-  d.lines.forEach((x, i) => { x.ca = Math.round((costs * w[i]) / total / 1000) * 1000; });
+  const wSum = w.reduce((s, v) => s + v, 0);
+  d.lines.forEach((x, i) => { x.ca = Math.round((costs * w[i]) / wSum / 1000) * 1000; });
   d.lines[d.lines.length - 1].ca += costs - d.lines.reduce((s, x) => s + x.ca, 0); // total exact
   return costs;
 }
