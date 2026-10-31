@@ -88,6 +88,9 @@ const TARGETS = [
 // 2. Au-delà, un même effort f fait monter ensemble le taux d'occupation (100 − 30 / f², sans atteindre 100 %),
 //    le CA / jour (× f) et le nombre de bureaux (× f, arrondi).
 const TO_FILL = 70;
+// Plafond réaliste : 8 actes par jour et par cabine devices (CA / jour × TO ≤ 8 × prix par acte)
+export const MAX_ACTS = 8;
+const devCap = (d, key) => (key === 'devices' && d.rev.devices.price ? MAX_ACTS * d.rev.devices.price : Infinity); // CA réalisé max / cabine / jour
 const snapRev = (d) => Object.fromEntries(REVENUES.map((r) => [r.key, { count: d.rev[r.key].count, to: d.rev[r.key].to, ca: d.rev[r.key].ca }]));
 function solveTarget(d, target) {
   const costYear = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
@@ -96,7 +99,7 @@ function solveTarget(d, target) {
   const lines = REVENUES.map((r) => ({ r, b: base[r.key] }))
     .filter((x) => x.b.ca != null && d.days != null && (!x.r.offices || x.b.count));
   if (!lines.length) return null;
-  const caOf = (plan) => lines.reduce((s, x) => { const p = plan(x); return s + (x.r.offices ? p.count : x.r.cabins ? d.rev[x.r.key].count ?? 1 : 1) * (p.to / 100) * p.ca * d.days; }, 0);
+  const caOf = (plan) => lines.reduce((s, x) => { const p = plan(x); return s + (x.r.offices ? p.count : x.r.cabins ? d.rev[x.r.key].count ?? 1 : 1) * Math.min((p.to / 100) * p.ca, devCap(d, x.r.key)) * d.days; }, 0);
   const bisect = (fn, lo, hi) => {
     while (caOf(fn(hi)) < needed && hi < 1e4) hi *= 2;
     for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (caOf(fn(m)) < needed) lo = m; else hi = m; }
@@ -113,7 +116,8 @@ function solveTarget(d, target) {
     if (caOf(up(counts)(1)) >= needed) plan = fill(counts)(bisect(fill(counts), 0, TO_FILL));
     else { g = bisect(up(counts), 1, 2); plan = up(counts)(g); }
   }
-  return { base, g, lines: lines.map((x) => ({ x, p: plan(x) })) };
+  // Devices au plafond d'actes : leur CA / jour est ramené à 8 actes × prix
+  return { base, g, lines: lines.map((x) => { const p = plan(x); const cap = devCap(d, x.r.key); return { x, p: (p.to / 100) * p.ca > cap ? { ...p, ca: cap / (p.to / 100) } : p }; }) };
 }
 
 // Prévient une fois que le CA / jour des devices gonflé par l'ancien calcul a été remis à 2 000 €
@@ -223,7 +227,7 @@ function revImpl(d, r, line) {
   }
   if (!r.offices && line.to != null) {
     const a = line.ca != null && line.price ? (line.ca * (line.to / 100)) / line.price : null;
-    if (a != null) impl = `🔢 <b>${fr(a, 1)} actes / jour</b> à ${fr(line.price)} € <small>(CA / jour × TO ÷ prix ; ≈ ${fr(a * (d.days || 0), 0)} actes / an)</small>`;
+    if (a != null) impl = `🔢 <b>${fr(a, 1)} actes / jour</b>${r.cabins ? ' par cabine' : ''} à ${fr(line.price)} € <small>(CA / jour × TO ÷ prix ; ≈ ${fr(a * (d.days || 0) * (r.cabins ? line.count ?? 1 : 1), 0)} actes / an)</small>${r.cabins && a > MAX_ACTS + 0.05 ? `<br><b class="warn">⚠️ Au-delà de ${MAX_ACTS} actes / jour par cabine : pas réaliste, ajoute une cabine ou baisse le CA / jour.</b>` : ''}`;
   }
   return impl;
 }
@@ -374,7 +378,7 @@ function docFin(d, extraCm28 = 0) {
   // Détail devices / bilans : CA par an, CA par jour et actes par jour (si un prix par acte est saisi)
   const extras = REVENUES.filter((r) => !r.offices).map((r) => {
     const { ca, price } = d.rev[r.key];
-    const perDay = ca != null ? officeTo * DEVICE_LINK * ca : null;
+    const perDay = ca != null ? Math.min(officeTo * DEVICE_LINK * ca, devCap(d, r.key)) : null;
     const n = r.cabins ? d.rev[r.key].count ?? 1 : 1;
     return { r, perDay, year: perDay != null && d.days != null ? perDay * d.days * n : 0, acts: perDay != null && price ? perDay / price : null };
   });
