@@ -692,3 +692,7 @@ small.warn { color: var(--warn); }
 .idea-pick { border: 1px solid color-mix(in srgb, #f5b301 50%, transparent); }
 .idea-choice { display: block; width: 100%; text-align: left; margin-top: 8px; padding: 10px 12px; font-size: 15px; line-height: 1.35; white-space: normal; }
 .idea-lock.compact { min-height: 0; padding: 40px 0 8px; }
+.idea-row-btns { display: flex; flex-direction: column; gap: 2px; }
+.idea-list li > form { flex: 1; }
+.idea-edit textarea { min-height: 120px; }
+.idea-edit-actions { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }

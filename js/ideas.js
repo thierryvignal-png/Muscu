@@ -128,6 +128,8 @@ function ranking(d, kind) {
     </section>`;
 }
 
+let editing = null; // idée en cours de modification
+
 // Onglet dédié : à choisir, toutes les idées, puis les classements
 export function view() {
   const d = load();
@@ -144,9 +146,18 @@ export function view() {
     <section class="card">${doneToday(d) ? ideaForm(false, '＋ Ajouter une idée') : ideaForm(false)}</section>
     ${items.length ? `
       <section class="card">
-        <ul class="idea-list">${items.map((x) => `
+        <ul class="idea-list">${items.map((x) => editing === x.id ? `
+          <li><form data-form="ideaEdit" class="idea-form idea-edit">
+            <input type="hidden" name="id" value="${x.id}">
+            <small>${fmtDate(x.date)} ${crowned(x)}</small>
+            <textarea name="text" rows="6" required>${esc(x.text)}</textarea>
+            <div class="idea-edit-actions"><button class="primary">Enregistrer</button><button type="button" data-action="idea-cancel">Annuler</button></div>
+          </form></li>` : `
           <li><div><small>${fmtDate(x.date)} ${crowned(x)}</small><p>${esc(x.text)}</p>${starsOf(x)}</div>
-            <button class="icon-btn" data-action="idea-del" data-id="${x.id}" aria-label="Supprimer">✕</button></li>`).join('')}
+            <span class="idea-row-btns">
+              <button class="icon-btn" data-action="idea-edit" data-id="${x.id}" aria-label="Modifier">✎</button>
+              <button class="icon-btn" data-action="idea-del" data-id="${x.id}" aria-label="Supprimer">✕</button>
+            </span></li>`).join('')}
         </ul>
       </section>` : '<p class="hint center">Ta première idée apparaîtra ici.</p>'}
     ${ranking(d, 'weeks')}
@@ -154,6 +165,16 @@ export function view() {
 }
 
 export const forms = {
+  ideaEdit(f) {
+    const text = (f.text || '').trim();
+    if (text.length < 10) return 'Développe un peu ton idée (10 caractères minimum)';
+    const d = load();
+    const x = d.items.find((y) => y.id === f.id);
+    if (x) x.text = text;
+    editing = null;
+    save(d);
+    return 'Idée modifiée';
+  },
   idea(f) {
     const text = (f.text || '').trim();
     if (text.length < 10) return 'Développe un peu ton idée (10 caractères minimum)';
@@ -185,6 +206,8 @@ export const actions = {
     delete d.picks[el.dataset.kind][el.dataset.key];
     save(d);
   },
+  'idea-edit'(el) { editing = el.dataset.id; },
+  'idea-cancel'() { editing = null; },
   'idea-del'(el) {
     if (!confirm('Supprimer cette idée ?')) return false;
     const d = load();
