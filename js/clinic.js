@@ -82,6 +82,8 @@ const load = () => {
   d.recruit.start ??= today(); d.recruit.startDays ??= 0;
   d.doctors ??= []; // médecins candidats : {id, name, type: 'singulier' | 'cm28', days: jours / semaine, status: 'sur' | 'reflexion' | 'prospectif', source: 'kamel' | 'perso'}
   d.recruitObj ??= { kamel: null, perso: null }; // objectifs de jours-médecins / sem par source
+  // CA des lignes business retenu pour les scénarios médecins : avec les médecins obtenus / avec l'objectif
+  d.docLines ??= { now: 250000, obj: 500000 };
   return d;
 };
 const save = (d) => write(KEY, d);
@@ -413,7 +415,8 @@ const DOC_OFFICE = { singulier: 'esth', cm28: 'med' }; // Singulier → bureaux 
 // Chiffres du modèle si les bureaux tournent avec ces médecins (ETP pondérés)
 
 // extraCm28 : jours-médecins / sem CM28 en plus (pour calculer ce qu'apporte un jour de plus)
-function docFin(d, extraCm28 = 0) {
+// lines : CA annuel des lignes business retenu pour ce scénario (par défaut, celui des médecins obtenus)
+function docFin(d, extraCm28 = 0, lines = d.docLines.now) {
   const etpDays = d.etpDays || 200;
   const offices = DOC_TYPES.map((t) => {
     const r = REVENUES.find((x) => x.key === DOC_OFFICE[t.key]);
@@ -428,14 +431,14 @@ function docFin(d, extraCm28 = 0) {
   const capAll = offices.reduce((s, o) => s + (o.cap || 0), 0);
   const officeTo = capAll ? Math.min(1, offices.reduce((s, o) => s + o.officeDays, 0) / capAll) : 0;
   // Lignes business : indépendantes des médecins, comptées à leur estimation annuelle
-  const others = linesCa(d);
+  const others = lines ?? 0;
   const caYear = offices.reduce((s, o) => s + o.year, 0) + others;
   const costYear = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0); // scénario de coûts choisi
   return { etpDays, offices, officeTo, others, caYear, costYear, res: caYear - costYear };
 }
 
 // Ligne discrète sous un résultat : CA des bureaux et des lignes business
-const extrasLine = (f) => `<small class="extras-line">Bureaux : ${euros(f.caYear - f.others)}/an · 🚀 Lignes business : ${euros(f.others)}/an</small>`;
+const extrasLine = (f, key) => `<small class="extras-line">Bureaux : ${euros(f.caYear - f.others)}/an · 🚀 Lignes business : <input class="doc-lines-input" data-doc="lines" data-key="${key}" inputmode="decimal" value="${fr(f.others)}" aria-label="CA lignes business" autocomplete="off"> €/an</small>`;
 
 function docBurn(d) {
   const f = docFin(d);
@@ -448,9 +451,9 @@ function docBurn(d) {
       <span>${res < 0 ? '🔥 Burn annuel avec ces médecins' : '✅ Résultat annuel avec ces médecins'}</span>
       <b class="${res < 0 ? 'warn' : 'good'}">${euros(res < 0 ? -res : res)}</b>
       <small>soit ${euros(Math.abs(res) / 12)} / mois · CA ${euros(caYear)} − coûts ${euros(costYear)}</small>
-      ${extrasLine(f)}
+      ${extrasLine(f, 'now')}
     </div>
-    <p class="hint">Hypothèses : CA / jour saisi, coûts ${d.scn.cost === 'mid' ? 'mid' : d.scn.cost}, lignes business à leur estimation annuelle.${tos ? ` Taux d'occupation des bureaux : ${tos}.` : ''}</p>
+    <p class="hint">Hypothèses : CA / jour saisi, coûts ${d.scn.cost === 'mid' ? 'mid' : d.scn.cost}, lignes business au montant indiqué dans chaque encadré.${tos ? ` Taux d'occupation des bureaux : ${tos}.` : ''}</p>
     ${over ? '<p class="hint warn">⚠️ Plus de jours-médecins que de bureaux disponibles : il faut plus de bureaux.</p>' : ''}`;
 }
 
@@ -550,14 +553,14 @@ function objBurn(d) {
   const now = docFin(d);
   if (!now) return '<p class="hint">Renseigne le CA / jour des bureaux (plus haut) pour voir le burn.</p>';
   const got = totalDays(d.doctors);
-  const target = docFin(d, obj - got); // jours manquants comptés en CM28
+  const target = docFin(d, obj - got, d.docLines.obj); // jours manquants comptés en CM28
   const label = (r) => (r < 0 ? `burn ${euros(-r)}` : `résultat +${euros(r)}`);
   return `
     <div class="doc-burn">
       <span>${target.res < 0 ? '🔥 Burn à l\'ouverture' : '✅ Résultat à l\'ouverture'} avec l'objectif (${j(obj)} j/sem)</span>
       <b class="${target.res < 0 ? 'warn' : 'good'}">${euros(Math.abs(target.res))} / an</b>
       <small>soit ${euros(Math.abs(target.res) / 12)} / mois · avec ce qui est obtenu à ce jour (${j(got)} j/sem) : ${label(now.res)} / an</small>
-      ${extrasLine(target)}
+      ${extrasLine(target, 'obj')}
     </div>`;
 }
 // Capacité du centre en jours-médecins / sem (même unité que les candidats).
@@ -680,6 +683,17 @@ if (typeof document !== 'undefined') {
       const b = document.querySelector('[data-obj-burn]');
       if (b) b.innerHTML = objBurn(d);
     };
+    if (field === 'lines') {
+      if (e.type !== 'change') return; // recalcul en quittant la case (l'encadré est redessiné)
+      d.docLines[e.target.dataset.key] = num(e.target.value) ?? 0;
+      save(d);
+      refreshObj();
+      const burn = document.querySelector('[data-doc-burn]');
+      if (burn) burn.innerHTML = docBurn(d);
+      const plan = document.querySelector('[data-doc-plan]');
+      if (plan) plan.innerHTML = docPlan(d);
+      return;
+    }
     if (field === 'obj') {
       d.recruitObj[e.target.dataset.src] = num(e.target.value);
       save(d);

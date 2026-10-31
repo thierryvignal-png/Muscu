@@ -722,3 +722,4 @@ small.warn { color: var(--warn); }
 .goal-edit-btn { float: right; padding: 4px 10px; font-size: 13px; }
 .goal-edit { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: end; }
 .goal-edit .field input { margin: 0; }
+.doc-lines-input { display: inline-block; width: 92px; margin: 0 2px; padding: 3px 6px; font-size: 12px; text-align: right; }
