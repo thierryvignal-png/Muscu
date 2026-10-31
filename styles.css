@@ -697,3 +697,11 @@ small.warn { color: var(--warn); }
 .idea-edit textarea { min-height: 120px; }
 .idea-edit-actions { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
 .idea-lock-card { border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+/* Clinique : cliniques thématiques */
+.theme-row { display: grid; grid-template-columns: 1fr 1fr 28px; gap: 6px; align-items: end; padding: 10px 0; border-top: 1px solid var(--line); }
+.theme-row:first-child { border-top: 0; padding-top: 0; }
+.theme-row .cost-name, .theme-row .cost-bu { grid-area: auto; }
+.theme-row .field { margin: 0; }
+.theme-row .field:nth-of-type(3) { grid-column: 1 / 2; }
+.theme-row .theme-res { grid-column: 1 / -1; margin: 2px 0 0; }
+.theme-row input { padding: 9px 8px; font-size: 15px; }
