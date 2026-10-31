@@ -696,3 +696,4 @@ small.warn { color: var(--warn); }
 .idea-list li > form { flex: 1; }
 .idea-edit textarea { min-height: 120px; }
 .idea-edit-actions { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
+.idea-lock-card { border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }

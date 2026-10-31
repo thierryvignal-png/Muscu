@@ -1262,7 +1262,8 @@ spaceViews.esthetique = esthetique.view;
 spaceViews.atom = atom.view;
 spaceViews.goodnews = goodnews.view;
 spaceViews.clinique = clinic.view;
-spaceViews.ideas = ideas.view;
+spaceViews.ideas = () => ideas.view('ai');
+spaceViews.ideasSing = () => ideas.view('sing');
 // Objectifs de vie + suivi financier en bas
 spaceViews.goals = () => goals.view() + finance.view();
 function wrapSpace(handlers) {
