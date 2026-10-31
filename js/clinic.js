@@ -75,34 +75,37 @@ const TARGETS = [
   { v: 1000000, label: '1 M€' },
 ];
 
-// Taux d'occupation et CA / jour pour un EBITDA annuel donné.
-// 1. Même taux d'occupation pour toutes les lignes, sans jamais dépasser 85 %.
-// 2. Si 85 % partout ne suffit pas, seul le CA / jour des devices augmente pour combler le reste
-//    (les autres CA / jour restent ceux saisis).
-export const TO_MAX = 85;
-function solveTO(d, target) {
+// Objectif d'EBITDA : on fait bouger tous les leviers ensemble, de façon réaliste, à partir d'un scénario de base
+// (les valeurs saisies à la main ; un clic sur un objectif repart toujours de cette base).
+// - Objectif plus bas que la base : seuls les taux d'occupation baissent (on ne retire ni bureaux ni prix).
+// - Objectif plus haut : un même effort f fait monter le CA / jour (× f), le nombre de bureaux (× f, arrondi)
+//   et le taux d'occupation, levier le plus naturel, qui monte plus vite et se rapproche de 100 % sans l'atteindre (100 − (100 − TO) / f²).
+const snapRev = (d) => Object.fromEntries(REVENUES.map((r) => [r.key, { count: d.rev[r.key].count, to: d.rev[r.key].to, ca: d.rev[r.key].ca }]));
+function solveTarget(d, target) {
   const costYear = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
   const needed = target + costYear; // CA annuel à atteindre
-  const lines = REVENUES.map((r) => {
-    const line = d.rev[r.key];
-    const count = r.offices ? line.count : 1;
-    const k = d.days != null && line.ca != null && count != null ? count * line.ca * d.days : null; // CA à 100 % de TO
-    return { r, line, count, k };
-  }).filter((x) => x.k);
+  const base = d.targetBase || snapRev(d);
+  const lines = REVENUES.map((r) => ({ r, b: base[r.key], to0: base[r.key].to > 0 ? Math.min(base[r.key].to, 99) : 50 }))
+    .filter((x) => x.b.ca != null && d.days != null && (!x.r.offices || x.b.count));
   if (!lines.length) return null;
-  const to = {}, ca = {};
-  const total = lines.reduce((s, x) => s + x.k, 0);
-  const t = (needed / total) * 100; // TO commun nécessaire
-  if (t <= TO_MAX) {
-    lines.forEach((x) => { to[x.r.key] = Math.max(0, t); });
-    return { to, ca };
+  const caOf = (plan) => lines.reduce((s, x) => { const p = plan(x); return s + (x.r.offices ? p.count : 1) * (p.to / 100) * p.ca * d.days; }, 0);
+  const bisect = (fn, lo, hi) => {
+    while (caOf(fn(hi)) < needed && hi < 1e4) hi *= 2;
+    for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (caOf(fn(m)) < needed) lo = m; else hi = m; }
+    return hi;
+  };
+  const down = (counts) => (f) => (x) => ({ count: counts[x.r.key], to: x.to0 * f, ca: x.b.ca });
+  const up = (counts) => (f) => (x) => ({ count: counts ? counts[x.r.key] : x.b.count * f, to: 100 - (100 - x.to0) / (f * f), ca: x.b.ca * f });
+  const baseCounts = Object.fromEntries(lines.map((x) => [x.r.key, x.b.count]));
+  let plan, g = 1;
+  if (caOf(down(baseCounts)(1)) >= needed) plan = down(baseCounts)(bisect(down(baseCounts), 0, 1));
+  else {
+    const f = bisect(up(null), 1, 2);
+    const counts = Object.fromEntries(lines.map((x) => [x.r.key, x.r.offices ? Math.max(x.b.count, Math.round(x.b.count * f)) : 1]));
+    if (caOf(up(counts)(1)) >= needed) plan = down(counts)(bisect(down(counts), 0, 1));
+    else { g = bisect(up(counts), 1, 2); plan = up(counts)(g); }
   }
-  const dev = lines.find((x) => x.r.key === 'devices');
-  if (!dev) return { to, ca, impossible: true };
-  const others = lines.filter((x) => x !== dev).reduce((s, x) => s + x.k * TO_MAX / 100, 0);
-  lines.forEach((x) => { to[x.r.key] = TO_MAX; });
-  ca.devices = Math.ceil((needed - others) / (dev.count * d.days * TO_MAX / 100));
-  return { to, ca };
+  return { base, g, lines: lines.map((x) => ({ x, p: plan(x) })) };
 }
 
 function model(d) {
@@ -148,11 +151,6 @@ function sumInner(d, m) {
       <div class="target-pick">
         <span class="hint">🎯 EBITDA visé</span>
         <div class="alcohol scn targets">${TARGETS.map((t) => `<button class="seg ${Math.abs(m.res - t.v) < 5000 ? 'on good' : ''}" data-action="clinic-target" data-v="${t.v}">${t.label}</button>`).join('')}</div>
-        ${(() => {
-          const name = (r) => r.label.replace(/^\S+ /, '');
-          const over = REVENUES.filter((r) => d.rev[r.key].to > TO_MAX);
-          return over.length ? `<p class="hint warn">⚠️ TO au-dessus de ${TO_MAX} % (${over.map(name).join(', ')}) : pas réaliste.</p>` : '';
-        })()}
       </div>
       <div class="clinic-sum-grid">
         <div><span>CA</span><b>${euros(m.caYear / 12)}</b><small>${euros(m.caYear)} / an</small></div>
@@ -685,6 +683,7 @@ export const forms = {
       if (`${r.key}_price` in f) line.price = num(f[`${r.key}_price`]);
       line.bu = f[`${r.key}_bu`] || r.bu;
     }
+    d.targetBase = null; // les valeurs saisies deviennent la base des objectifs d'EBITDA
     save(d);
     return 'Revenus enregistrés';
   },
@@ -724,16 +723,21 @@ export const actions = {
   'clinic-target'(el) {
     const d = load();
     const target = Number(el.dataset.v);
-    const sol = solveTO(d, target);
+    const sol = solveTarget(d, target);
     if (!sol) return 'Renseigne d\'abord les jours d\'ouverture, bureaux et CA / jour';
-    if (sol.impossible) return 'Objectif impossible à 85 % : renseigne le CA / jour des devices';
-    for (const [k, v] of Object.entries(sol.to)) d.rev[k].to = Math.round(v * 10) / 10;
-    for (const [k, v] of Object.entries(sol.ca)) d.rev[k].ca = v;
+    d.targetBase = sol.base; // les prochains objectifs repartent de la même base
+    for (const { x, p } of sol.lines) {
+      const line = d.rev[x.r.key];
+      line.to = Math.round(p.to * 10) / 10;
+      line.ca = Math.round(p.ca);
+      if (x.r.offices) line.count = p.count;
+    }
     save(d);
     const label = TARGETS.find((t) => t.v === target).label;
-    return sol.ca.devices != null
-      ? `${label} : TO à ${TO_MAX} % partout · CA / jour devices ${fr(sol.ca.devices)} €`
-      : `${label} : TO à ${fr(Object.values(sol.to)[0], 1)} % partout`;
+    const tos = sol.lines.map(({ p }) => Math.round(p.to));
+    const toTxt = Math.min(...tos) === Math.max(...tos) ? `${tos[0]} %` : `${Math.min(...tos)}–${Math.max(...tos)} %`;
+    const more = sol.lines.filter(({ x, p }) => x.r.offices && p.count > x.b.count).map(({ x, p }) => `${p.count} ${x.r.key === 'esth' ? 'esthé' : 'médicaux'}`);
+    return `${label} : TO ${toTxt}${sol.g > 1.005 ? ` · CA / jour +${fr((sol.g - 1) * 100)} %` : ''}${more.length ? ` · bureaux : ${more.join(', ')}` : ''}`;
   },
   'clinic-scn'(el) {
     const d = load();
