@@ -1358,6 +1358,7 @@ document.addEventListener('change', (e) => {
 esthetique.importFromGoodnews();
 const estPoints = esthetique.applyEstimatedPointsV2();
 if (esthetique.fixTretRoutine()) setTimeout(() => toast('✨ Protocole Tret corrigé : +6 pts, doublon retiré'), 2600);
+if (clinic.devicesResetNotice()) setTimeout(() => toast('🏥 CA / jour devices remis à 2 000 € (l\'ancien calcul l\'avait gonflé)'), 1800);
 if (esthetique.fitTo100Once()) setTimeout(() => toast('✨ Roadmap ajustée : score final ramené à 100 pile'), 1200);
 if (estPoints) setTimeout(() => toast(`✨ Roadmap esthétique mise à jour : ${estPoints} notes, départ 50/100`), 600);
 

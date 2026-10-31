@@ -44,6 +44,12 @@ const load = () => {
   d.costs.forEach((c) => { c.min ??= c.monthly ?? null; c.max ??= c.monthly ?? null; });
   d.scn ??= { cost: 'max' }; // coûts : scénario prudent par défaut
   d.etpDays ??= 200; // jours travaillés par an par un praticien à temps plein
+  if (!d.solverV2) {
+    const r = d.rev;
+    if (['esth', 'med', 'devices', 'bilans'].every((k) => r[k]?.to === 85) && r.devices?.ca > 2000) { r.devices.ca = 2000; d.devicesReset = true; }
+    d.solverV2 = true;
+    write(KEY, d);
+  }
   d.recruit ??= { open: '2027-02-01' }; // roadmap de recrutement : ouverture, point de départ
   if (!d.recruit.start && d.doctors?.length) { d.recruit.start = today(); d.recruit.startDays = totalDays(d.doctors); write(KEY, d); }
   d.recruit.start ??= today(); d.recruit.startDays ??= 0;
@@ -75,17 +81,18 @@ const TARGETS = [
   { v: 1000000, label: '1 M€' },
 ];
 
-// Objectif d'EBITDA : on fait bouger tous les leviers ensemble, de façon réaliste, à partir d'un scénario de base
-// (les valeurs saisies à la main ; un clic sur un objectif repart toujours de cette base).
-// - Objectif plus bas que la base : seuls les taux d'occupation baissent (on ne retire ni bureaux ni prix).
-// - Objectif plus haut : un même effort f fait monter le CA / jour (× f), le nombre de bureaux (× f, arrondi)
-//   et le taux d'occupation, levier le plus naturel, qui monte plus vite et se rapproche de 100 % sans l'atteindre (100 − (100 − TO) / f²).
+// Objectif d'EBITDA : tous les leviers bougent ensemble, de façon réaliste.
+// Base = CA / jour et nombre de bureaux saisis à la main (le taux d'occupation, lui, est le résultat du scénario).
+// 1. On remplit d'abord les bureaux : même taux d'occupation partout, jusqu'à 70 %.
+// 2. Au-delà, un même effort f fait monter ensemble le taux d'occupation (100 − 30 / f², sans atteindre 100 %),
+//    le CA / jour (× f) et le nombre de bureaux (× f, arrondi).
+const TO_FILL = 70;
 const snapRev = (d) => Object.fromEntries(REVENUES.map((r) => [r.key, { count: d.rev[r.key].count, to: d.rev[r.key].to, ca: d.rev[r.key].ca }]));
 function solveTarget(d, target) {
   const costYear = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
   const needed = target + costYear; // CA annuel à atteindre
   const base = d.targetBase || snapRev(d);
-  const lines = REVENUES.map((r) => ({ r, b: base[r.key], to0: base[r.key].to > 0 ? Math.min(base[r.key].to, 99) : 50 }))
+  const lines = REVENUES.map((r) => ({ r, b: base[r.key] }))
     .filter((x) => x.b.ca != null && d.days != null && (!x.r.offices || x.b.count));
   if (!lines.length) return null;
   const caOf = (plan) => lines.reduce((s, x) => { const p = plan(x); return s + (x.r.offices ? p.count : 1) * (p.to / 100) * p.ca * d.days; }, 0);
@@ -94,18 +101,27 @@ function solveTarget(d, target) {
     for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (caOf(fn(m)) < needed) lo = m; else hi = m; }
     return hi;
   };
-  const down = (counts) => (f) => (x) => ({ count: counts[x.r.key], to: x.to0 * f, ca: x.b.ca });
-  const up = (counts) => (f) => (x) => ({ count: counts ? counts[x.r.key] : x.b.count * f, to: 100 - (100 - x.to0) / (f * f), ca: x.b.ca * f });
+  const fill = (counts) => (t) => (x) => ({ count: counts[x.r.key], to: t, ca: x.b.ca }); // TO commun t
+  const up = (counts) => (f) => (x) => ({ count: counts ? counts[x.r.key] : x.b.count * f, to: 100 - (100 - TO_FILL) / (f * f), ca: x.b.ca * f });
   const baseCounts = Object.fromEntries(lines.map((x) => [x.r.key, x.b.count]));
   let plan, g = 1;
-  if (caOf(down(baseCounts)(1)) >= needed) plan = down(baseCounts)(bisect(down(baseCounts), 0, 1));
+  if (caOf(fill(baseCounts)(TO_FILL)) >= needed) plan = fill(baseCounts)(bisect(fill(baseCounts), 0, TO_FILL));
   else {
     const f = bisect(up(null), 1, 2);
     const counts = Object.fromEntries(lines.map((x) => [x.r.key, x.r.offices ? Math.max(x.b.count, Math.round(x.b.count * f)) : 1]));
-    if (caOf(up(counts)(1)) >= needed) plan = down(counts)(bisect(down(counts), 0, 1));
+    if (caOf(up(counts)(1)) >= needed) plan = fill(counts)(bisect(fill(counts), 0, TO_FILL));
     else { g = bisect(up(counts), 1, 2); plan = up(counts)(g); }
   }
   return { base, g, lines: lines.map((x) => ({ x, p: plan(x) })) };
+}
+
+// Prévient une fois que le CA / jour des devices gonflé par l'ancien calcul a été remis à 2 000 €
+export function devicesResetNotice() {
+  const d = load();
+  if (!d.devicesReset) return false;
+  delete d.devicesReset;
+  save(d);
+  return true;
 }
 
 function model(d) {
