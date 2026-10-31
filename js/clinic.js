@@ -334,7 +334,7 @@ export function view() {
       <form data-form="clinicLines">
         <label class="field lines-total"><span>CA total des lignes business (€ / an)</span><input name="total" inputmode="decimal" value="${d.linesTotal ?? ''}" placeholder="ex : 750 000" autocomplete="off"></label>
         <div class="bline-row head"><span>Ligne</span><span>%</span><span>CA / an</span><span></span></div>
-        ${d.lines.map((x) => `
+        ${[...d.lines].sort((a, b) => (b.pct || 0) - (a.pct || 0)).map((x) => `
           <div class="bline-row">
             <input name="name_${x.id}" value="${esc(x.name)}" aria-label="Nom" autocomplete="off">
             <input name="pct_${x.id}" inputmode="decimal" value="${x.pct ?? ''}" placeholder="%" aria-label="Part en %" autocomplete="off">
