@@ -147,9 +147,11 @@ export function devicesResetNotice() {
 // Breakeven des lignes business : leur CA couvre pile leurs coûts fixes (scénario de coûts choisi).
 // Ventilation selon le poids habituel de chaque activité (estimations de départ) ; lignes inconnues : poids moyen.
 // Renvoie le montant réparti, ou null s'il n'y a ni coûts ni lignes.
-function linesBreakeven(d) {
-  const costs = d.costs.filter((c) => c.bu === 'devices').reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
-  if (!costs || !d.lines.length) return null;
+// margin : marge nette visée (résultat / CA), 0 = breakeven ; CA total = coûts ÷ (1 − marge).
+function linesBreakeven(d, margin = 0) {
+  const fixed = d.costs.filter((c) => c.bu === 'devices').reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
+  if (!fixed || !d.lines.length) return null;
+  const costs = Math.round(fixed / (1 - margin) / 1000) * 1000;
   const key = (n) => n.replace(/[^\p{L}\s&]/gu, '').trim().toLowerCase();
   const seed = Object.fromEntries(LINE_SEED.map((x) => [key(x.name), x.ca]));
   const avg = LINE_SEED.reduce((s, x) => s + x.ca, 0) / LINE_SEED.length;
@@ -316,6 +318,7 @@ export function view() {
       </form>
       <div class="lines-btns">
         <button class="chip" data-action="clinic-lines-breakeven">⚖️ Mettre breakeven</button>
+        <button class="chip" data-action="clinic-lines-breakeven" data-margin="0.25">📈 Marge nette 25 %</button>
         ${d.lines.some((x) => x.ca) ? '<button class="chip" data-action="clinic-lines-zero">↺ Tout mettre à zéro</button>' : ''}
       </div>
     </section>
@@ -832,12 +835,13 @@ export const actions = {
     d.doctors = d.doctors.filter((x) => x.id !== el.dataset.id);
     save(d);
   },
-  'clinic-lines-breakeven'() {
+  'clinic-lines-breakeven'(el) {
     const d = load();
-    const costs = linesBreakeven(d);
-    if (costs == null) return d.lines.length ? 'Aucun coût affecté à « Lignes business » dans Coûts' : 'Ajoute d\'abord des lignes business';
+    const margin = Number(el.dataset.margin || 0);
+    const ca = linesBreakeven(d, margin);
+    if (ca == null) return d.lines.length ? 'Aucun coût affecté à « Lignes business » dans Coûts' : 'Ajoute d\'abord des lignes business';
     save(d);
-    return `⚖️ Lignes business = ${euros(costs)} / an, leurs coûts fixes`;
+    return margin ? `📈 Lignes business = ${euros(ca)} / an : ${fr(margin * 100)} % de marge nette` : `⚖️ Lignes business = ${euros(ca)} / an, leurs coûts fixes`;
   },
   'clinic-lines-zero'() {
     if (!confirm('Mettre le CA de toutes les lignes business à zéro ?')) return false;
