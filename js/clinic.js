@@ -107,6 +107,8 @@ const TARGETS = [
 // 2. Au-delà, un même effort f fait monter ensemble le taux d'occupation (100 − 30 / f², sans atteindre 100 %),
 //    le CA / jour (× f) et le nombre de bureaux (× f, arrondi).
 const TO_FILL = 70;
+const LINES_SHARE = 0.7; // part de l'effort portée par les lignes business au-delà du point de départ
+const LINES_MAX = 1000000; // CA total maximum des lignes business
 const snapRev = (d) => Object.fromEntries(REVENUES.map((r) => [r.key, { count: d.rev[r.key].count, to: d.rev[r.key].to, ca: d.rev[r.key].ca }]));
 function solveTarget(d, target) {
   const costYear = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
@@ -808,7 +810,18 @@ export const actions = {
   'clinic-target'(el) {
     const d = load();
     const target = Number(el.dataset.v);
-    linesBreakeven(d); // lignes business à l'équilibre : l'objectif se joue sur les bureaux
+    // 1. Lignes business à l'équilibre, bureaux remplis à 70 % : point de départ « confortable ».
+    // 2. Ce qui manque au-delà est porté à 70 % par les lignes business (plafonnées à 1 M€ de CA au total),
+    //    le reste par les bureaux : on y va mollo sur le médical et l'esthétique.
+    linesBreakeven(d);
+    const allCosts = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
+    const base = d.targetBase || snapRev(d);
+    const officesFill = REVENUES.reduce((s, r) => s + (base[r.key].count || 0) * (TO_FILL / 100) * (base[r.key].ca || 0) * (d.days || 0), 0);
+    const gap = target + allCosts - linesCa(d) - officesFill;
+    if (gap > 0 && d.lines.length) {
+      const L = Math.min(LINES_MAX, linesCa(d) + LINES_SHARE * gap);
+      if (L > linesCa(d)) linesBreakeven(d, 0, Math.round(L / 1000) * 1000);
+    }
     const sol = solveTarget(d, target);
     if (!sol) return 'Renseigne d\'abord les jours d\'ouverture, bureaux et CA / jour';
     if (sol.needed <= 0) return `${TARGETS.find((t) => t.v === target).label} : déjà atteint avec les seules lignes business`;
@@ -824,7 +837,7 @@ export const actions = {
     const tos = sol.lines.map(({ p }) => Math.round(p.to));
     const toTxt = Math.min(...tos) === Math.max(...tos) ? `${tos[0]} %` : `${Math.min(...tos)}–${Math.max(...tos)} %`;
     const more = sol.lines.filter(({ x, p }) => x.r.offices && p.count > x.b.count).map(({ x, p }) => `${p.count} ${x.r.key === 'esth' ? 'esthé' : 'médicaux'}`);
-    return `${label} : TO ${toTxt}${sol.g > 1.005 ? ` · CA / jour +${fr((sol.g - 1) * 100)} %` : ''}${more.length ? ` · bureaux : ${more.join(', ')}` : ''}`;
+    return `${label} : lignes business ${euros(linesCa(d))} · TO bureaux ${toTxt}${sol.g > 1.005 ? ` · CA / jour +${fr((sol.g - 1) * 100)} %` : ''}${more.length ? ` · bureaux : ${more.join(', ')}` : ''}`;
   },
   'clinic-scn'(el) {
     const d = load();
