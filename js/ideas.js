@@ -8,12 +8,12 @@ import { esc, uid, read, write, isoOf, addDays, fmtDate } from './util.js';
 
 export const STREAMS = {
   ai: {
-    key: 'ideas.data.v1', space: 'ideas', icon: '💡', title: 'Idées de boîte IA', short: 'Idée IA',
+    key: 'ideas.data.v1', space: 'ideas', icon: '💡', title: 'Idées de boîte IA', short: 'Idée IA', lower: 'idée IA',
     today: 'Idée de boîte IA du jour',
     placeholder: "Quel métier, quel process, quelle industrie l'IA peut-elle disrupter ? Le problème, la cible, comment l'IA le résout…",
   },
   sing: {
-    key: 'ideas-singulier.data.v1', space: 'ideasSing', icon: '🌟', title: 'Idées Singulier', short: 'Idée Singulier',
+    key: 'ideas-singulier.data.v1', space: 'ideasSing', icon: '🌟', title: 'Idées Singulier', short: 'Idée Singulier', lower: 'idée Singulier',
     today: 'Idée Singulier du jour',
     placeholder: 'Une idée pour Singulier : nouveau soin, offre, partenariat, marketing, expérience patient, recrutement, organisation…',
   },
@@ -78,7 +78,7 @@ function pickCard(s, d, p) {
   const list = d.items.filter((x) => inPeriod(x, p)).sort((a, b) => (b.stars || 0) - (a.stars || 0));
   return `
     <section class="card idea-pick">
-      <h2>${p.kind === 'weeks' ? `🏆 Meilleure ${STREAMS[s].short.toLowerCase()} de la ${weekName(p.key)}` : `👑 Meilleure ${STREAMS[s].short.toLowerCase()} du mois · ${monthName(p.key)}`}</h2>
+      <h2>${p.kind === 'weeks' ? `🏆 Meilleure ${STREAMS[s].lower} de la ${weekName(p.key)}` : `👑 Meilleure ${STREAMS[s].lower} du mois · ${monthName(p.key)}`}</h2>
       <p class="hint">Touche l'idée que tu gardes.</p>
       ${list.map((x) => `<button class="idea-choice" data-action="idea-pick" data-stream="${s}" data-kind="${p.kind}" data-key="${p.key}" data-id="${x.id}">
         ${x.stars ? `<span class="idea-stars ro">${'★'.repeat(x.stars)}</span>` : ''}${esc(x.text)}</button>`).join('')}
