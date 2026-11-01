@@ -764,10 +764,10 @@ small.warn { color: var(--warn); }
 .tester-preset .chip { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 7px 4px; font-size: 13px; font-weight: 700; }
 .tester-preset .chip small { font-weight: 400; font-size: 11px; opacity: .8; }
 .tester-preset .icon-btn { padding: 4px; }
-.tester-kpi { display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
-.tester-kpi span { font-weight: 600; }
-.tester-kpi b { font-size: 22px; }
+.tester-kpi { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.tester-kpi span { display: block; font-size: 12px; color: var(--muted); }
+.tester-kpi b { display: block; font-size: 22px; }
 .tester-kpi b.good { color: var(--good); } .tester-kpi b.warn { color: var(--warn); }
-.tester-kpi small { text-align: right; color: var(--muted); font-size: 11px; }
+.tester-kpi small { color: var(--muted); font-size: 11px; }
 .tester-targets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .tester-targets .seg { font-size: 12px; padding: 9px 2px; }

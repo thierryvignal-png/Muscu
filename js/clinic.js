@@ -358,12 +358,20 @@ function testerHead(d) {
       <small class="hint">${euros(r.ebitda / 12)} par mois</small></div>
     <div class="tester-chg"><span class="hint">Charges</span><b>${euros(r.chg)}</b></div>`;
 }
-// Marge nette = EBITDA ÷ ce qui rentre (CM28 + Singulier + marge Caractère)
+// Deux marges nettes :
+// - sur notre CA : contributions CM28 + Singulier + CA Caractère (avant marge, d'après la marge du scénario)
+// - sur le volume d'affaires : honoraires des médecins (CM28 : redevance = 25 % ; Singulier : notre part = 30 %) + CA Caractère
+const SHARE = { cm: 0.25, sg: 0.3 };
 function testerKpi(d) {
   const r = testCalc(d, tester);
-  const m = r.income ? (r.ebitda / r.income) * 100 : 0;
-  return `<span>Marge nette</span><b class="${m < 0 ? 'warn' : 'good'}">${fr(m, 1)} %</b><small>EBITDA ÷ ${euros(r.income)} encaissés</small>`;
+  const carCa = r.car / (lineMargin(d) || 1);
+  const ca = r.cm + r.sg + carCa;
+  const vol = r.cm / SHARE.cm + r.sg / SHARE.sg + carCa;
+  const pct = (x) => (x ? (r.ebitda / x) * 100 : 0);
+  const cell = (label, base) => `<div><span>${label}</span><b class="${pct(base) < 0 ? 'warn' : 'good'}">${fr(pct(base), 1)} %</b><small>EBITDA ÷ ${kEuros(base)}</small></div>`;
+  return cell('Marge nette / notre CA', ca) + cell('Marge nette / vol. d\'affaires', vol);
 }
+const kEuros = (v) => `${fr(Math.round(v / 1000))} k€`;
 const testerTargets = (d) => TEST_TARGETS.map((v) => `<button class="seg ${Math.abs(testCalc(d, tester).ebitda - v) < 5000 ? 'on good' : ''}" data-action="clinic-test-target" data-v="${v}">${tLabel(v)}</button>`).join('');
 function testerView(d) {
   return `
