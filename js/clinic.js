@@ -308,34 +308,48 @@ function revImpl(d, r, line) {
   return impl;
 }
 
-// ---------- Écran « Tester » : 6 curseurs, rien n'est enregistré dans le scénario ----------
-// EBITDA = CM28 + Singulier + Caractère × marge − charges
+// ---------- Écran « Tester » : 5 curseurs, rien n'est enregistré dans le scénario ----------
+// EBITDA = CM28 + Singulier + marge Caractère − charges
 // CM28 = bureaux médicaux × occupation × jours × contribution CM28 ; Singulier = bureaux esthétiques × occupation × jours × contribution Singulier
 const TEST_SLIDERS = [
   { k: 'occ', label: 'Occupation (CM28 + Singulier)', min: 40, max: 90, step: 0.1, fmt: (v) => `${fr(v, 1)} %` },
   { k: 'cm', label: 'Contribution CM28 / jour', min: 300, max: 600, step: 1, fmt: (v) => `${fr(v)} €` },
   { k: 'sg', label: 'Contribution Singulier / jour', min: 400, max: 700, step: 1, fmt: (v) => `${fr(v)} €` },
-  { k: 'car', label: 'Caractère / an', min: 300000, max: 2000000, step: 1000, fmt: (v) => `${fr(Math.round(v / 1000))} k€` },
-  { k: 'mar', label: 'Marge Caractère', min: 50, max: 100, step: 1, fmt: (v) => `${fr(v)} %` },
+  { k: 'car', label: 'Marge Caractère / an', min: 100000, max: 2000000, step: 1000, fmt: (v) => `${fr(Math.round(v / 1000))} k€` },
   { k: 'chg', label: 'Charges / an', min: 700000, max: 1500000, step: 1000, fmt: (v) => `${fr(Math.round(v / 1000))} k€` },
 ];
-const TEST_PRESETS = [{ k: 'mine', label: 'Mon 1 M€' }, { k: 'claude', label: 'Claude réaliste' }];
+// Objectifs d'EBITDA : les charges restent celles du scénario ; occupation, contributions et marge Caractère
+// montent ensemble entre un bas et un haut réalistes (même effort t pour tous), t trouvé par dichotomie.
+const TEST_TARGETS = [-600000, -300000, 0, 300000, 500000, 700000, 1000000];
+const T_LOW = { occ: 25, cm: 280, sg: 380, car: 100000 };
+const T_HIGH = { occ: 90, cm: 600, sg: 700, car: 1200000 };
 let tester = null; // valeurs des curseurs (null = écran fermé)
 
 // Valeurs de départ : celles du scénario en cours
 const fixedCosts = (d) => d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
 const testFromScenario = (d) => ({
   occ: d.rev.med.to ?? 70, cm: d.rev.med.ca ?? 400, sg: d.rev.esth.ca ?? 500,
-  car: linesCa(d), mar: d.linesMargin ?? 100, chg: fixedCosts(d),
+  car: Math.round(linesCa(d) * lineMargin(d)), chg: fixedCosts(d),
 });
 export function testCalc(d, t) {
   const days = d.days || 0;
   const cm = (d.rev.med.count || 0) * (t.occ / 100) * days * t.cm;
   const sg = (d.rev.esth.count || 0) * (t.occ / 100) * days * t.sg;
-  const car = t.car * (t.mar / 100);
-  return { cm, sg, car, chg: t.chg, ebitda: cm + sg + car - t.chg };
+  const car = t.car;
+  const income = cm + sg + car;
+  return { cm, sg, car, chg: t.chg, income, ebitda: income - t.chg };
 }
-const kEuros = (v) => `${fr(Math.round(v / 1000))} k€`;
+function testTarget(d, target) {
+  const at = (t) => {
+    const v = (k) => T_LOW[k] + (T_HIGH[k] - T_LOW[k]) * t;
+    return { occ: Math.min(95, v('occ')), cm: v('cm'), sg: v('sg'), car: v('car'), chg: tester.chg };
+  };
+  let lo = 0, hi = 1.5;
+  for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (testCalc(d, at(m)).ebitda < target) lo = m; else hi = m; }
+  const x = at(hi);
+  return { occ: Math.round(x.occ * 10) / 10, cm: Math.round(x.cm), sg: Math.round(x.sg), car: Math.round(x.car / 1000) * 1000, chg: x.chg };
+}
+const tLabel = (v) => (v === 0 ? 'Breakeven' : `${v > 0 ? '+' : '−'}${Math.abs(v) >= 1000000 ? `${fr(Math.abs(v) / 1000000)} M€` : `${fr(Math.abs(v) / 1000)} k€`}`);
 function testerHead(d) {
   const r = testCalc(d, tester);
   return `
@@ -344,16 +358,14 @@ function testerHead(d) {
       <small class="hint">${euros(r.ebitda / 12)} par mois</small></div>
     <div class="tester-chg"><span class="hint">Charges</span><b>${euros(r.chg)}</b></div>`;
 }
-function testerTiles(d) {
+// Marge nette = EBITDA ÷ ce qui rentre (CM28 + Singulier + marge Caractère)
+function testerKpi(d) {
   const r = testCalc(d, tester);
-  return `
-    <div><span>CM28 · ${fr(d.rev.med.count || 0)} bureaux</span><b>${kEuros(r.cm)}</b></div>
-    <div><span>Singulier · ${fr(d.rev.esth.count || 0)} bureaux</span><b>${kEuros(r.sg)}</b></div>
-    <div><span>Caractère après marge</span><b>${kEuros(r.car)}</b></div>
-    <div><span>Charges</span><b>−${kEuros(r.chg)}</b></div>`;
+  const m = r.income ? (r.ebitda / r.income) * 100 : 0;
+  return `<span>Marge nette</span><b class="${m < 0 ? 'warn' : 'good'}">${fr(m, 1)} %</b><small>EBITDA ÷ ${euros(r.income)} encaissés</small>`;
 }
+const testerTargets = (d) => TEST_TARGETS.map((v) => `<button class="seg ${Math.abs(testCalc(d, tester).ebitda - v) < 5000 ? 'on good' : ''}" data-action="clinic-test-target" data-v="${v}">${tLabel(v)}</button>`).join('');
 function testerView(d) {
-  const presets = d.testPresets || {};
   return `
     <div class="tester">
       <div class="tester-bar">
@@ -370,17 +382,8 @@ function testerView(d) {
           <input type="range" data-test-k="${x.k}" min="${Math.min(x.min, v)}" max="${Math.max(x.max, v)}" step="${x.step}" value="${v}">
         </div>`;
       }).join('')}
-      <div class="tester-tiles" data-tester-tiles>${testerTiles(d)}</div>
-      <div class="tester-presets">
-        ${TEST_PRESETS.map((p) => {
-          const v = presets[p.k];
-          return `
-          <div class="tester-preset">
-            <button class="chip" data-action="clinic-test-preset" data-k="${p.k}">${p.label}<small>${v ? euros(testCalc(d, v).ebitda) : 'à enregistrer'}</small></button>
-            <button class="icon-btn" data-action="clinic-test-save" data-k="${p.k}" aria-label="Enregistrer les curseurs dans ${p.label}">📌</button>
-          </div>`;
-        }).join('')}
-      </div>
+      <div class="tester-kpi" data-tester-kpi>${testerKpi(d)}</div>
+      <div class="tester-targets" data-tester-targets>${testerTargets(d)}</div>
     </div>`;
 }
 // Curseur bougé : mise à jour sur place (sans redessiner l'écran)
@@ -395,8 +398,10 @@ if (typeof document !== 'undefined') {
     if (val) val.textContent = x.fmt(tester[k]);
     const head = document.querySelector('[data-tester-head]');
     if (head) head.innerHTML = testerHead(d);
-    const tiles = document.querySelector('[data-tester-tiles]');
-    if (tiles) tiles.innerHTML = testerTiles(d);
+    const kpi = document.querySelector('[data-tester-kpi]');
+    if (kpi) kpi.innerHTML = testerKpi(d);
+    const tg = document.querySelector('[data-tester-targets]');
+    if (tg) tg.innerHTML = testerTargets(d);
   });
 }
 
@@ -1075,18 +1080,8 @@ export const actions = {
     if (v == null) return false;
     tester[x.k] = big ? v * 1000 : v;
   },
-  'clinic-test-preset'(el) {
-    const p = (load().testPresets || {})[el.dataset.k];
-    if (!p) return 'Règle les curseurs puis touche 📌 pour enregistrer ce jeu de valeurs';
-    tester = { ...p };
-  },
-  'clinic-test-save'(el) {
-    const label = TEST_PRESETS.find((p) => p.k === el.dataset.k).label;
-    if (!confirm(`Enregistrer les curseurs actuels dans « ${label} » ?`)) return false;
-    const d = load();
-    d.testPresets = { ...(d.testPresets || {}), [el.dataset.k]: { ...tester } };
-    save(d);
-    return `📌 « ${label} » enregistré`;
+  'clinic-test-target'(el) {
+    tester = testTarget(load(), Number(el.dataset.v));
   },
   'clinic-scn'(el) {
     const d = load();
