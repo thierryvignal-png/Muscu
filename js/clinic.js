@@ -77,6 +77,11 @@ const load = () => {
     if (t && d.lines.length) { const last = d.lines[d.lines.length - 1]; last.pct = Math.round((last.pct + 100 - pctSum(d)) * 10) / 10; } // arrondis : total à 100 %
     write(KEY, d);
   }
+  if (!d.presets) {
+    d.presets = d.preset ? [{ id: uid(), name: 'Référence', ...d.preset }] : [];
+    delete d.preset;
+    write(KEY, d);
+  }
   d.recruit ??= { open: '2027-02-01' }; // roadmap de recrutement : ouverture, point de départ
   if (!d.recruit.start && d.doctors?.length) { d.recruit.start = today(); d.recruit.startDays = totalDays(d.doctors); write(KEY, d); }
   d.recruit.start ??= today(); d.recruit.startDays ??= 0;
@@ -234,8 +239,8 @@ function sumInner(d, m) {
         <span class="hint">🎯 EBITDA visé</span>
         <div class="alcohol scn targets">${TARGETS.map((t) => `<button class="seg ${Math.abs(m.res - t.v) < 5000 ? 'on good' : ''}" data-action="clinic-target" data-v="${t.v}">${t.label}</button>`).join('')}</div>
         <div class="ref-btns">
-          ${d.preset ? `<button class="chip" data-action="clinic-preset-load">↺ Scénario de référence <small>(${euros(d.preset.res)} / an)</small></button>` : ''}
-          <button class="chip" data-action="clinic-preset-save">📌 ${d.preset ? 'Remplacer la référence' : 'Garder comme référence'}</button>
+          ${d.presets.map((p) => `<span class="preset-chip"><button class="chip" data-action="clinic-preset-load" data-id="${p.id}">↺ ${esc(p.name)} <small>(${euros(p.res)} / an)</small></button><button class="icon-btn" data-action="clinic-preset-del" data-id="${p.id}" aria-label="Supprimer le scénario">✕</button></span>`).join('')}
+          <button class="chip" data-action="clinic-preset-save">📌 Enregistrer comme scénario…</button>
         </div>
       </div>
       <div class="clinic-sum-grid">
@@ -919,28 +924,42 @@ export const actions = {
     const more = sol.lines.filter(({ x, p }) => x.r.offices && p.count > x.b.count).map(({ x, p }) => `${p.count} ${x.r.key === 'esth' ? 'esthé' : 'médicaux'}`);
     return `${label} : lignes business ${euros(linesCa(d))} · TO bureaux ${toTxt}${sol.g > 1.005 ? ` · CA / jour +${fr((sol.g - 1) * 100)} %` : ''}${more.length ? ` · bureaux : ${more.join(', ')}` : ''}`;
   },
-  // Scénario de référence : jours, bureaux (nombre, TO, CA / jour), lignes business et scénario de coûts
+  // Scénarios nommés : jours, bureaux (nombre, TO, CA / jour), lignes business, coûts et scénario de coûts
   'clinic-preset-save'() {
     const d = load();
-    if (d.preset && !confirm('Remplacer le scénario de référence par les valeurs actuelles ?')) return false;
-    d.preset = {
+    const name = (prompt('Nom du scénario (ex : ChatGPT)', 'ChatGPT') || '').trim();
+    if (!name) return false;
+    const same = d.presets.find((p) => p.name.toLowerCase() === name.toLowerCase());
+    if (same && !confirm(`Remplacer le scénario « ${same.name} » par les valeurs actuelles ?`)) return false;
+    const snap = {
+      id: same?.id || uid(), name,
       days: d.days, etpDays: d.etpDays, cost: d.scn.cost, res: model(d).res,
       rev: snapRev(d), lines: d.lines.map((x) => ({ ...x })), linesTotal: d.linesTotal,
+      costs: d.costs.map((c) => ({ ...c })),
     };
+    d.presets = same ? d.presets.map((p) => (p === same ? snap : p)) : [...d.presets, snap];
     save(d);
-    return '📌 Scénario de référence enregistré';
+    return `📌 Scénario « ${name} » enregistré`;
   },
-  'clinic-preset-load'() {
+  'clinic-preset-load'(el) {
     const d = load();
-    const p = d.preset;
+    const p = d.presets.find((x) => x.id === el.dataset.id);
     if (!p) return false;
     d.days = p.days; d.etpDays = p.etpDays; d.scn.cost = p.cost;
     for (const [k, v] of Object.entries(p.rev)) if (d.rev[k]) Object.assign(d.rev[k], v);
     d.lines = p.lines.map((x) => ({ ...x }));
     d.linesTotal = p.linesTotal ?? p.lines.reduce((s, x) => s + (x.ca || 0), 0);
+    if (p.costs) d.costs = p.costs.map((c) => ({ ...c }));
     d.targetBase = null;
     save(d);
-    return '↺ Scénario de référence rétabli';
+    return `↺ Scénario « ${p.name} » rétabli`;
+  },
+  'clinic-preset-del'(el) {
+    const d = load();
+    const p = d.presets.find((x) => x.id === el.dataset.id);
+    if (!p || !confirm(`Supprimer le scénario « ${p.name} » ?`)) return false;
+    d.presets = d.presets.filter((x) => x !== p);
+    save(d);
   },
   'clinic-scn'(el) {
     const d = load();
