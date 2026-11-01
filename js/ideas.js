@@ -150,6 +150,27 @@ function ranking(s, d, kind) {
 }
 
 let editing = null; // idée en cours de modification
+let exporting = null; // flux dont le texte d'export est affiché (si la copie automatique échoue)
+
+// Texte prêt à coller dans une IA : consigne + toutes les idées (date, note, distinctions)
+function exportText(s) {
+  const c = STREAMS[s];
+  const d = load(s);
+  const items = [...d.items].sort((a, b) => (a.date < b.date ? -1 : 1));
+  const tag = (x) => [
+    x.stars ? `${x.stars}/5 ★` : '',
+    Object.values(d.picks.weeks).includes(x.id) ? 'meilleure de sa semaine' : '',
+    Object.values(d.picks.months).includes(x.id) ? 'meilleure de son mois' : '',
+  ].filter(Boolean).join(', ');
+  const intro = s === 'sing'
+    ? "Voici mes idées pour Singulier, mon centre de médecine esthétique et de bien-être à Paris (ouverture prévue en 2027)."
+    : "Voici mes idées de business utilisant l'IA, notées une par jour.";
+  return `${intro}
+Classe-les de la plus prometteuse à la moins prometteuse. Pour chacune : potentiel de CA, facilité et coût de mise en œuvre, risques, et mon avantage à la porter. Termine par les 3 idées à creuser en priorité et le premier test concret à faire pour chacune.
+
+${c.title} (${items.length}) :
+${items.map((x, i) => `${i + 1}. [${x.date}${tag(x) ? ' · ' + tag(x) : ''}] ${x.text.replace(/\s*\n\s*/g, ' ')}`).join('\n')}`;
+}
 
 // Espace dédié d'un flux : à choisir, ajout, toutes les idées, puis les classements
 export function view(s) {
@@ -163,9 +184,16 @@ export function view(s) {
   ].join('');
   return `
     <header class="page-head"><h1>${c.title}</h1>
-      <p>${items.length} idée${items.length > 1 ? 's' : ''}${st ? ` · 🔥 ${st} jour${st > 1 ? 's' : ''} d'affilée` : ''}</p></header>
-    ${pending(d).map((p) => pickCard(s, d, p)).join('')}
+      <p>${items.length} idée${items.length > 1 ? 's' : ''}${st ? ` · 🔥 ${st} jour${st > 1 ? 's' : ''} d'affilée` : ''}
+      ${items.length ? `<button class="chip idea-export-btn" data-action="idea-export" data-stream="${s}">📋 Exporter pour une IA</button>` : ''}</p></header>
     <section class="card">${doneToday(d) ? ideaForm(s, false, '＋ Ajouter une idée') : ideaForm(s, false)}</section>
+    ${exporting === s ? `
+      <section class="card">
+        <p class="hint">Copie ce texte (appui long → Tout sélectionner → Copier) et colle-le dans ton IA.</p>
+        <textarea class="idea-export" rows="8" readonly>${esc(exportText(s))}</textarea>
+        <button class="chip" data-action="idea-export-close">Fermer</button>
+      </section>` : ''}
+    ${pending(d).map((p) => pickCard(s, d, p)).join('')}
     ${items.length ? `
       <section class="card">
         <ul class="idea-list">${items.map((x) => editing === x.id ? `
@@ -237,6 +265,20 @@ export const actions = {
     save(s, d);
   },
   'idea-edit'(el) { editing = el.dataset.id; },
+  // Copie le texte d'export ; si le presse-papiers refuse, on l'affiche pour copie manuelle
+  'idea-export'(el) {
+    const s = streamOf(el.dataset.stream);
+    const text = exportText(s);
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(
+        () => document.dispatchEvent(new CustomEvent('toast', { detail: '📋 Idées copiées : colle-les dans ton IA' })),
+        () => { exporting = s; document.dispatchEvent(new CustomEvent('space-changed')); },
+      );
+      return false;
+    }
+    exporting = s;
+  },
+  'idea-export-close'() { exporting = null; },
   'idea-cancel'() { editing = null; },
   'idea-del'(el) {
     if (!confirm('Supprimer cette idée ?')) return false;

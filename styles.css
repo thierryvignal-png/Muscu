@@ -727,3 +727,5 @@ small.warn { color: var(--warn); }
 .office-sum-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: center; }
 .office-sum-grid b { display: block; font-size: 30px; color: var(--accent); line-height: 1.15; }
 .office-sum-grid span { font-size: 12px; color: var(--muted); }
+.idea-export-btn { margin-left: 6px; vertical-align: middle; }
+.idea-export { width: 100%; font-size: 13px; margin: 6px 0; }

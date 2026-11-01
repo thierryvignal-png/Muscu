@@ -1414,6 +1414,7 @@ if (!store.settings().lastDrinkSeeded) {
 
 store.onChange(render);
 document.addEventListener('space-changed', render); // un espace a modifié ses données hors action (ex : liste déroulante)
+document.addEventListener('toast', (e) => toast(e.detail)); // message envoyé par un espace (ex : copie terminée)
 
 const initial = location.hash.slice(1);
 if (views[initial]) current = initial;
