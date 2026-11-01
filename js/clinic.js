@@ -126,7 +126,7 @@ const LINES_MAX = 1000000; // CA total maximum des lignes business
 const snapRev = (d) => Object.fromEntries(REVENUES.map((r) => [r.key, { count: d.rev[r.key].count, to: d.rev[r.key].to, ca: d.rev[r.key].ca }]));
 function solveTarget(d, target) {
   const costYear = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
-  const needed = target + costYear - linesCa(d); // CA à faire par les bureaux (les lignes business gardent leur estimation)
+  const needed = target + costYear - linesCa(d) * lineMargin(d); // CA à faire par les bureaux (les lignes business gardent leur estimation)
   const base = d.targetBase || snapRev(d);
   const lines = REVENUES.map((r) => ({ r, b: base[r.key] }))
     .filter((x) => x.b.ca != null && d.days != null && (!x.r.offices || x.b.count));
@@ -182,7 +182,7 @@ function ensurePcts(d) {
 function linesBreakeven(d, margin = 0, total = null) {
   const fixed = d.costs.filter((c) => c.bu === 'devices').reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
   if ((!fixed && !total) || !d.lines.length) return null;
-  d.linesTotal = total ?? Math.round(fixed / (1 - margin) / 1000) * 1000;
+  d.linesTotal = total ?? Math.round(fixed / lineMargin(d) / (1 - margin) / 1000) * 1000;
   ensurePcts(d);
   applyLines(d);
   return d.linesTotal;
@@ -194,6 +194,9 @@ const pctHint = (d) => {
   return Math.abs(t - 100) < 0.05 ? `Total des % : 100 % ✅` : `<span class="warn">⚠️ Total des % : ${fr(t, t % 1 ? 1 : 0)} % — doit faire 100 % pour répartir tout le CA</span>`;
 };
 const linesCa = (d) => d.lines.reduce((s, x) => s + (x.ca || 0), 0);
+// Marge Caractère : ce qui reste du CA des lignes business après consommables, labo et produits (100 % par défaut)
+const lineMargin = (d) => (d.linesMargin ?? 100) / 100;
+const linesVar = (d, ca = linesCa(d)) => ca * (1 - lineMargin(d)); // coûts variables des lignes business
 
 function model(d) {
   const { cost } = d.scn;
@@ -202,10 +205,10 @@ function model(d) {
     return { r, line, year: revenueYear(r, line, d.days) };
   });
   const caYear = lines.reduce((s, x) => s + (x.year || 0), 0) + linesCa(d);
-  const costYear = d.costs.reduce((s, c) => s + costMonth(c, cost) * 12, 0);
+  const costYear = d.costs.reduce((s, c) => s + costMonth(c, cost) * 12, 0) + linesVar(d);
   const byBu = BUS.map((b) => {
     const ca = lines.filter((x) => (x.line.bu || x.r.bu) === b.key).reduce((s, x) => s + (x.year || 0), 0) + (b.key === 'devices' ? linesCa(d) : 0);
-    const cst = d.costs.filter((c) => c.bu === b.key).reduce((s, c) => s + costMonth(c, cost) * 12, 0);
+    const cst = d.costs.filter((c) => c.bu === b.key).reduce((s, c) => s + costMonth(c, cost) * 12, 0) + (b.key === 'devices' ? linesVar(d) : 0);
     return { b, ca, cost: cst, res: ca - cst };
   });
   const totMin = d.costs.reduce((s, c) => s + costMonth(c, 'min'), 0);
@@ -305,13 +308,106 @@ function revImpl(d, r, line) {
   return impl;
 }
 
+// ---------- Écran « Tester » : 6 curseurs, rien n'est enregistré dans le scénario ----------
+// EBITDA = CM28 + Singulier + Caractère × marge − charges
+// CM28 = bureaux médicaux × occupation × jours × contribution CM28 ; Singulier = bureaux esthétiques × occupation × jours × contribution Singulier
+const TEST_SLIDERS = [
+  { k: 'occ', label: 'Occupation (CM28 + Singulier)', min: 40, max: 90, step: 0.1, fmt: (v) => `${fr(v, 1)} %` },
+  { k: 'cm', label: 'Contribution CM28 / jour', min: 300, max: 600, step: 1, fmt: (v) => `${fr(v)} €` },
+  { k: 'sg', label: 'Contribution Singulier / jour', min: 400, max: 700, step: 1, fmt: (v) => `${fr(v)} €` },
+  { k: 'car', label: 'Caractère / an', min: 300000, max: 2000000, step: 1000, fmt: (v) => `${fr(Math.round(v / 1000))} k€` },
+  { k: 'mar', label: 'Marge Caractère', min: 50, max: 100, step: 1, fmt: (v) => `${fr(v)} %` },
+  { k: 'chg', label: 'Charges / an', min: 700000, max: 1500000, step: 1000, fmt: (v) => `${fr(Math.round(v / 1000))} k€` },
+];
+const TEST_PRESETS = [{ k: 'mine', label: 'Mon 1 M€' }, { k: 'claude', label: 'Claude réaliste' }];
+let tester = null; // valeurs des curseurs (null = écran fermé)
+
+// Valeurs de départ : celles du scénario en cours
+const fixedCosts = (d) => d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
+const testFromScenario = (d) => ({
+  occ: d.rev.med.to ?? 70, cm: d.rev.med.ca ?? 400, sg: d.rev.esth.ca ?? 500,
+  car: linesCa(d), mar: d.linesMargin ?? 100, chg: fixedCosts(d),
+});
+export function testCalc(d, t) {
+  const days = d.days || 0;
+  const cm = (d.rev.med.count || 0) * (t.occ / 100) * days * t.cm;
+  const sg = (d.rev.esth.count || 0) * (t.occ / 100) * days * t.sg;
+  const car = t.car * (t.mar / 100);
+  return { cm, sg, car, chg: t.chg, ebitda: cm + sg + car - t.chg };
+}
+const kEuros = (v) => `${fr(Math.round(v / 1000))} k€`;
+function testerHead(d) {
+  const r = testCalc(d, tester);
+  return `
+    <div><span class="hint">EBITDA par an, ce qui rentre en caisse</span>
+      <b class="tester-big ${r.ebitda < 0 ? 'warn' : 'good'}">${euros(r.ebitda)}</b>
+      <small class="hint">${euros(r.ebitda / 12)} par mois</small></div>
+    <div class="tester-chg"><span class="hint">Charges</span><b>${euros(r.chg)}</b></div>`;
+}
+function testerTiles(d) {
+  const r = testCalc(d, tester);
+  return `
+    <div><span>CM28 · ${fr(d.rev.med.count || 0)} bureaux</span><b>${kEuros(r.cm)}</b></div>
+    <div><span>Singulier · ${fr(d.rev.esth.count || 0)} bureaux</span><b>${kEuros(r.sg)}</b></div>
+    <div><span>Caractère après marge</span><b>${kEuros(r.car)}</b></div>
+    <div><span>Charges</span><b>−${kEuros(r.chg)}</b></div>`;
+}
+function testerView(d) {
+  const presets = d.testPresets || {};
+  return `
+    <div class="tester">
+      <div class="tester-bar">
+        <button class="icon-btn" data-action="clinic-test-close" aria-label="Fermer">✕</button>
+        <button class="tester-link" data-action="clinic-test-reset">Revenir à mon scénario</button>
+      </div>
+      <div class="tester-head" data-tester-head>${testerHead(d)}</div>
+      ${TEST_SLIDERS.map((x) => {
+        const v = tester[x.k];
+        return `
+        <div class="tester-row">
+          <span>${x.label}</span>
+          <button class="tester-val" data-action="clinic-test-edit" data-k="${x.k}" data-tester-val="${x.k}">${x.fmt(v)}</button>
+          <input type="range" data-test-k="${x.k}" min="${Math.min(x.min, v)}" max="${Math.max(x.max, v)}" step="${x.step}" value="${v}">
+        </div>`;
+      }).join('')}
+      <div class="tester-tiles" data-tester-tiles>${testerTiles(d)}</div>
+      <div class="tester-presets">
+        ${TEST_PRESETS.map((p) => {
+          const v = presets[p.k];
+          return `
+          <div class="tester-preset">
+            <button class="chip" data-action="clinic-test-preset" data-k="${p.k}">${p.label}<small>${v ? euros(testCalc(d, v).ebitda) : 'à enregistrer'}</small></button>
+            <button class="icon-btn" data-action="clinic-test-save" data-k="${p.k}" aria-label="Enregistrer les curseurs dans ${p.label}">📌</button>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+// Curseur bougé : mise à jour sur place (sans redessiner l'écran)
+if (typeof document !== 'undefined') {
+  document.addEventListener('input', (e) => {
+    const k = e.target.dataset?.testK;
+    if (!k || !tester) return;
+    tester[k] = Number(e.target.value);
+    const d = load();
+    const x = TEST_SLIDERS.find((y) => y.k === k);
+    const val = document.querySelector(`[data-tester-val="${k}"]`);
+    if (val) val.textContent = x.fmt(tester[k]);
+    const head = document.querySelector('[data-tester-head]');
+    if (head) head.innerHTML = testerHead(d);
+    const tiles = document.querySelector('[data-tester-tiles]');
+    if (tiles) tiles.innerHTML = testerTiles(d);
+  });
+}
+
 export function view() {
   const d = load();
   const m = model(d);
   if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(updateSticky); // après un re-rendu
 
   return `
-    <header class="page-head"><h1>Clinique Singulier</h1><p>Modèle financier</p></header>
+    <header class="page-head"><h1>Clinique Singulier</h1><p>Modèle financier <button class="chip tester-open" data-action="clinic-test-open">🎚️ Tester</button></p></header>
+    ${tester ? testerView(d) : ''}
     ${cashCard(d.cash, 'clinicCash')}
     ${cashCard(d.capex, 'clinicCapex', { title: '🏗️ Capex restant', placeholder: 'Montant restant (€)', colored: false, sign: false })}
     ${(() => {
@@ -355,7 +451,11 @@ export function view() {
     <section class="card">
       <p class="hint">Activités qui tournent sans médecin dans la salle. Leurs coûts : ceux affectés à « Lignes business » dans Coûts.</p>
       <form data-form="clinicLines">
-        <label class="field lines-total"><span>CA total des lignes business (€ / an)</span><input name="total" inputmode="decimal" value="${d.linesTotal ?? ''}" placeholder="ex : 750 000" autocomplete="off"></label>
+        <div class="lines-head">
+          <label class="field"><span>CA total des lignes business (€ / an)</span><input name="total" inputmode="decimal" value="${d.linesTotal ?? ''}" placeholder="ex : 750 000" autocomplete="off"></label>
+          <label class="field"><span>Marge Caractère (%)</span><input name="margin" inputmode="decimal" value="${d.linesMargin ?? 100}" placeholder="100" autocomplete="off"></label>
+        </div>
+        <p class="hint">Marge = ce qui reste après consommables, labo et produits. Entre dans le résultat : CA × marge.</p>
         <div class="bline-row head"><span>Ligne</span><span>%</span><span>CA / an</span><span></span></div>
         ${[...d.lines].sort((a, b) => (b.pct || 0) - (a.pct || 0)).map((x) => `
           <div class="bline-row">
@@ -454,7 +554,7 @@ function docFin(d, extraCm28 = 0, lines = d.docLines.now) {
   // Lignes business : indépendantes des médecins, comptées à leur estimation annuelle
   const others = lines ?? 0;
   const caYear = offices.reduce((s, o) => s + o.year, 0) + others;
-  const costYear = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0); // scénario de coûts choisi
+  const costYear = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0) + linesVar(d, others); // + coûts variables Caractère
   return { etpDays, offices, officeTo, others, caYear, costYear, res: caYear - costYear };
 }
 
@@ -843,6 +943,7 @@ export const forms = {
   clinicLines(f) {
     const d = load();
     d.linesTotal = num(f.total);
+    d.linesMargin = num(f.margin) ?? 100;
     d.lines.forEach((x) => {
       x.name = (f[`name_${x.id}`] || '').trim() || x.name;
       x.pct = num(f[`pct_${x.id}`]);
@@ -902,9 +1003,9 @@ export const actions = {
     const allCosts = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
     const base = d.targetBase || snapRev(d);
     const officesFill = REVENUES.reduce((s, r) => s + (base[r.key].count || 0) * (TO_FILL / 100) * (base[r.key].ca || 0) * (d.days || 0), 0);
-    const gap = target + allCosts - linesCa(d) - officesFill;
+    const gap = target + allCosts - linesCa(d) * lineMargin(d) - officesFill;
     if (gap > 0 && d.lines.length) {
-      const L = Math.min(LINES_MAX, linesCa(d) + LINES_SHARE * gap);
+      const L = Math.min(LINES_MAX, linesCa(d) + (LINES_SHARE * gap) / lineMargin(d));
       if (L > linesCa(d)) linesBreakeven(d, 0, Math.round(L / 1000) * 1000);
     }
     const sol = solveTarget(d, target);
@@ -934,7 +1035,7 @@ export const actions = {
     const snap = {
       id: same?.id || uid(), name,
       days: d.days, etpDays: d.etpDays, cost: d.scn.cost, res: model(d).res,
-      rev: snapRev(d), lines: d.lines.map((x) => ({ ...x })), linesTotal: d.linesTotal,
+      rev: snapRev(d), lines: d.lines.map((x) => ({ ...x })), linesTotal: d.linesTotal, linesMargin: d.linesMargin,
       costs: d.costs.map((c) => ({ ...c })),
     };
     d.presets = same ? d.presets.map((p) => (p === same ? snap : p)) : [...d.presets, snap];
@@ -950,6 +1051,7 @@ export const actions = {
     d.lines = p.lines.map((x) => ({ ...x }));
     d.linesTotal = p.linesTotal ?? p.lines.reduce((s, x) => s + (x.ca || 0), 0);
     if (p.costs) d.costs = p.costs.map((c) => ({ ...c }));
+    if (p.linesMargin != null) d.linesMargin = p.linesMargin;
     d.targetBase = null;
     save(d);
     return `↺ Scénario « ${p.name} » rétabli`;
@@ -960,6 +1062,31 @@ export const actions = {
     if (!p || !confirm(`Supprimer le scénario « ${p.name} » ?`)) return false;
     d.presets = d.presets.filter((x) => x !== p);
     save(d);
+  },
+  'clinic-test-open'() { tester = testFromScenario(load()); },
+  'clinic-test-close'() { tester = null; },
+  'clinic-test-reset'() { tester = testFromScenario(load()); return 'Curseurs remis sur ton scénario'; },
+  // Valeur exacte : toucher le chiffre à droite du curseur
+  'clinic-test-edit'(el) {
+    const x = TEST_SLIDERS.find((y) => y.k === el.dataset.k);
+    const big = x.k === 'car' || x.k === 'chg';
+    const cur = big ? tester[x.k] / 1000 : tester[x.k];
+    const v = num(prompt(`${x.label}${big ? ' (en k€)' : ''}`, String(cur).replace('.', ',')));
+    if (v == null) return false;
+    tester[x.k] = big ? v * 1000 : v;
+  },
+  'clinic-test-preset'(el) {
+    const p = (load().testPresets || {})[el.dataset.k];
+    if (!p) return 'Règle les curseurs puis touche 📌 pour enregistrer ce jeu de valeurs';
+    tester = { ...p };
+  },
+  'clinic-test-save'(el) {
+    const label = TEST_PRESETS.find((p) => p.k === el.dataset.k).label;
+    if (!confirm(`Enregistrer les curseurs actuels dans « ${label} » ?`)) return false;
+    const d = load();
+    d.testPresets = { ...(d.testPresets || {}), [el.dataset.k]: { ...tester } };
+    save(d);
+    return `📌 « ${label} » enregistré`;
   },
   'clinic-scn'(el) {
     const d = load();
