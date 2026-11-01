@@ -771,3 +771,28 @@ small.warn { color: var(--warn); }
 .tester-kpi small { color: var(--muted); font-size: 11px; }
 .tester-targets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .tester-targets .seg { font-size: 12px; padding: 9px 2px; }
+/* Tester : occupe toute la hauteur de l'écran, éléments agrandis */
+.tester { justify-content: space-between; gap: clamp(4px, 0.8vh, 12px); }
+.tester-head { padding-bottom: clamp(8px, 1.5vh, 16px); }
+.tester-head span, .tester-head small { font-size: clamp(12px, min(1.7vh, 3.4vw), 15px); white-space: nowrap; }
+.tester-big { font-size: clamp(34px, min(6vh, 9.5vw), 58px); white-space: nowrap; }
+.tester-chg b { font-size: clamp(16px, min(2.5vh, 4.6vw), 22px); white-space: nowrap; }
+.tester-row > span, .tester-val { font-size: clamp(15px, min(2.3vh, 4.4vw), 20px); white-space: nowrap; }
+.tester-row input[type=range] {
+  -webkit-appearance: none; appearance: none; height: clamp(26px, 3.6vh, 36px); margin: 0; background: transparent;
+}
+.tester-row input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 4px; background: linear-gradient(to right, var(--accent) var(--fill, 50%), var(--line) var(--fill, 50%)); }
+.tester-row input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: clamp(26px, 3.4vh, 32px); height: clamp(26px, 3.4vh, 32px); border-radius: 50%;
+  background: #fff; border: 3px solid var(--accent); margin-top: calc((8px - clamp(26px, 3.4vh, 32px)) / 2); box-shadow: 0 2px 6px rgba(0,0,0,.35);
+}
+.tester-row input[type=range]::-moz-range-track { height: 8px; border-radius: 4px; background: var(--line); }
+.tester-row input[type=range]::-moz-range-progress { height: 8px; border-radius: 4px; background: var(--accent); }
+.tester-row input[type=range]::-moz-range-thumb { width: 30px; height: 30px; border-radius: 50%; background: #fff; border: 3px solid var(--accent); }
+.tester-kpi { padding-top: clamp(8px, 1.5vh, 16px); }
+.tester-kpi span { font-size: clamp(12px, min(1.7vh, 3.3vw), 15px); white-space: nowrap; }
+.tester-kpi b { font-size: clamp(22px, 3.6vh, 32px); }
+.tester-kpi small { font-size: clamp(11px, 1.5vh, 13px); }
+.tester-targets { gap: 8px; }
+.tester-targets .seg { font-size: clamp(13px, 1.9vh, 16px); padding: clamp(9px, 1.5vh, 14px) 2px; }
+.tester-row { row-gap: 0; } .tester-row > span, .tester-val { line-height: 1.2; } .tester-bar { min-height: 0; } .tester-bar .icon-btn { padding: 2px 6px; }

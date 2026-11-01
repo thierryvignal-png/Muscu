@@ -320,6 +320,8 @@ const TEST_SLIDERS = [
 ];
 // Objectifs d'EBITDA : les charges restent celles du scénario ; occupation, contributions et marge Caractère
 // montent ensemble entre un bas et un haut réalistes (même effort t pour tous), t trouvé par dichotomie.
+// Partie remplie du curseur (couleur d'accent jusqu'à la valeur)
+const fillStyle = (min, max, v) => `--fill:${(((v - min) / (max - min || 1)) * 100).toFixed(1)}%`;
 const TEST_TARGETS = [-600000, -300000, 0, 300000, 500000, 700000, 1000000];
 const T_LOW = { occ: 25, cm: 280, sg: 380, car: 100000 };
 const T_HIGH = { occ: 90, cm: 600, sg: 700, car: 1200000 };
@@ -387,7 +389,7 @@ function testerView(d) {
         <div class="tester-row">
           <span>${x.label}</span>
           <button class="tester-val" data-action="clinic-test-edit" data-k="${x.k}" data-tester-val="${x.k}">${x.fmt(v)}</button>
-          <input type="range" data-test-k="${x.k}" min="${Math.min(x.min, v)}" max="${Math.max(x.max, v)}" step="${x.step}" value="${v}">
+          <input type="range" data-test-k="${x.k}" min="${Math.min(x.min, v)}" max="${Math.max(x.max, v)}" step="${x.step}" value="${v}" style="${fillStyle(Math.min(x.min, v), Math.max(x.max, v), v)}">
         </div>`;
       }).join('')}
       <div class="tester-kpi" data-tester-kpi>${testerKpi(d)}</div>
@@ -400,6 +402,7 @@ if (typeof document !== 'undefined') {
     const k = e.target.dataset?.testK;
     if (!k || !tester) return;
     tester[k] = Number(e.target.value);
+    e.target.style.setProperty('--fill', `${(((e.target.value - e.target.min) / (e.target.max - e.target.min || 1)) * 100).toFixed(1)}%`);
     const d = load();
     const x = TEST_SLIDERS.find((y) => y.k === k);
     const val = document.querySelector(`[data-tester-val="${k}"]`);
