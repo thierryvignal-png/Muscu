@@ -121,8 +121,8 @@ const TARGETS = [
 // 2. Au-delà, un même effort f fait monter ensemble le taux d'occupation (100 − 30 / f², sans atteindre 100 %),
 //    le CA / jour (× f) et le nombre de bureaux (× f, arrondi).
 const TO_FILL = 70;
-const LINES_SHARE = 0.7; // part de l'effort portée par les lignes business au-delà du point de départ
-const LINES_MAX = 1000000; // CA total maximum des lignes business
+const LINES_SHARE = 0.4; // part de l'effort portée par les lignes business au-delà du point de départ
+const LINES_MAX = 700000; // CA total maximum des lignes business
 const snapRev = (d) => Object.fromEntries(REVENUES.map((r) => [r.key, { count: d.rev[r.key].count, to: d.rev[r.key].to, ca: d.rev[r.key].ca }]));
 function solveTarget(d, target) {
   const costYear = d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
@@ -323,8 +323,8 @@ const TEST_SLIDERS = [
 // Partie remplie du curseur (couleur d'accent jusqu'à la valeur)
 const fillStyle = (min, max, v) => `--fill:${(((v - min) / (max - min || 1)) * 100).toFixed(1)}%`;
 const TEST_TARGETS = [-600000, -300000, 0, 300000, 500000, 700000, 1000000];
-const T_LOW = { occ: 25, cm: 280, sg: 380, car: 100000 };
-const T_HIGH = { occ: 90, cm: 600, sg: 700, car: 1200000 };
+const T_LOW = { occ: 25, cm: 280, sg: 380, car: 75000 };
+const T_HIGH = { occ: 90, cm: 600, sg: 700, car: 700000 }; // Caractère volontairement prudent
 let tester = null; // valeurs des curseurs (null = écran fermé)
 
 // Valeurs de départ : celles du scénario en cours
@@ -422,7 +422,8 @@ export function view() {
   if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(updateSticky); // après un re-rendu
 
   return `
-    <header class="page-head"><h1>Clinique Singulier</h1><p>Modèle financier <button class="chip tester-open" data-action="clinic-test-open">🎚️ Tester</button></p></header>
+    <header class="page-head"><h1>Clinique Singulier</h1><p>Modèle financier</p></header>
+    <button class="tester-cta" data-action="clinic-test-open"><span class="tester-cta-icon">📊</span><span><b>Tester des scénarios</b><small>Curseurs, EBITDA et marges en direct</small></span><span class="tester-cta-go">›</span></button>
     ${tester ? testerView(d) : ''}
     ${cashCard(d.cash, 'clinicCash')}
     ${cashCard(d.capex, 'clinicCapex', { title: '🏗️ Capex restant', placeholder: 'Montant restant (€)', colored: false, sign: false })}
