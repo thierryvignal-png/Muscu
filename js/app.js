@@ -165,6 +165,53 @@ const state = {
 };
 
 // Dépense et bilan d'un jour. deficit > 0 = déficit, < 0 = excédent.
+// Contrôle par la balance (14 derniers jours) : déficit réel d'après la perte de poids vs déficit noté.
+// Moins exigeant que la calibration complète : 4 pesées sur au moins 7 jours et 3 jours notés suffisent.
+function realityCheck() {
+  const { raw } = weightSeries();
+  const start = addDays(today(), -14);
+  const pts = raw.filter((p) => p.date >= start);
+  if (pts.length < 4 || daysBetween(pts[0].date, pts[pts.length - 1].date) < 7) {
+    return { ready: false, need: `${Math.max(0, 4 - pts.length)} pesée(s) de plus, sur au moins 7 jours` };
+  }
+  const slope = weightSlope(14); // kg / semaine
+  if (slope == null) return { ready: false, need: 'des pesées plus étalées' };
+  const real = (-slope / 7) * 7700; // kcal / jour
+  const logged = [];
+  for (let dt = pts[0].date; dt <= today(); dt = addDays(dt, 1)) {
+    const b = dayBalance(dt);
+    if (b.deficit != null && b.kcal > 0) logged.push(b.deficit);
+  }
+  if (logged.length < 3) return { ready: false, need: `${3 - logged.length} jour(s) de plus avec repas + dépense notés` };
+  const noted = logged.reduce((a, v) => a + v, 0) / logged.length;
+  return { ready: true, real, noted, gap: real - noted, slope, days: daysBetween(pts[0].date, today()), n: logged.length };
+}
+const burnAdj = () => store.settings().burnAdj || 0; // correction de dépense acceptée (kcal / jour)
+
+function realityCard() {
+  const r = realityCheck();
+  const adj = burnAdj();
+  if (!r.ready) {
+    return card('⚖️ Contrôle par la balance', `<p class="hint">Compare ta perte de poids réelle à ton déficit noté. Il manque ${r.need}.</p>`);
+  }
+  const prop = Math.round(r.gap / 10) * 10;
+  // Correction applicable plafonnée à ±500 kcal/j : au début d'une sèche, l'eau et le glycogène gonflent l'écart
+  const MAX_ADJ = 500;
+  const applied = Math.max(-MAX_ADJ, Math.min(MAX_ADJ, prop));
+  return card('⚖️ Contrôle par la balance', `
+    <div class="macros">
+      <div><b class="good">${fr(r.real)}</b><span>déficit réel / j<br>(${fr(-r.slope, 2)} kg/sem)</span></div>
+      <div><b>${fr(r.noted)}</b><span>déficit noté / j<br>(${r.n} j notés)</span></div>
+      <div><b class="${prop >= 0 ? 'good' : 'warn'}">${prop >= 0 ? '+' : ''}${fr(prop)}</b><span>écart / j</span></div>
+    </div>
+    <p class="hint">Sur ${r.days} jours, ta balance indique un déficit ${Math.abs(prop) < 100 ? 'proche de ce que tu notes 👌' : prop > 0 ? `plus fort que noté : ta dépense réelle est sans doute ≈ <b>${fr(prop)} kcal/j</b> au-dessus de ce que tu saisis` : `plus faible que noté : ta dépense réelle est sans doute ≈ <b>${fr(-prop)} kcal/j</b> en dessous`}. Les premières semaines, l'eau et le glycogène exagèrent la perte : à confirmer sur 3-4 semaines.${applied !== prop ? ` Par prudence, la correction proposée est plafonnée à ${fr(MAX_ADJ)} kcal/j.` : ''}</p>
+    ${adj ? `<p>Correction appliquée au budget « Reste à manger » : <b>${adj > 0 ? '+' : ''}${fr(adj)} kcal/j</b></p>` : ''}
+    <div class="lines-btns">
+      ${Math.abs(applied) >= 50 && applied !== adj ? `<button class="chip" data-action="burn-adj" data-v="${applied}">Appliquer ${applied > 0 ? '+' : ''}${fr(applied)} kcal/j au budget${applied !== prop ? ' (prudent)' : ''}</button>` : ''}
+      ${adj ? '<button class="chip" data-action="burn-adj" data-v="0">Retirer la correction</button>' : ''}
+    </div>`);
+}
+
 function dayBalance(date) {
   const t = dayTotals(date);
   const burn = store.get().burn.find((x) => x.date === date)?.kcal ?? null;
@@ -419,7 +466,7 @@ views.home = () => {
   const required = gp.required;
   const cal = gp.cal || calibration();
   // Reste à manger : dépense saisie (sinon 2 300 par défaut) − mangé
-  const budget = b.burn ?? DEFAULT_BURN;
+  const budget = (b.burn ?? DEFAULT_BURN) + burnAdj();
   const left = budget - (b.kcal || 0);
   const alc = alcoholDay(d);
   const streak = completeStreak();
@@ -445,7 +492,7 @@ views.home = () => {
         <strong class="${left >= 0 ? 'good' : 'warn'}">${left >= 0 ? `${fr(left)} kcal` : `dépassé de ${fr(-left)} kcal`}</strong>
       </div>
       <div class="hero-row">
-        <div><span>Budget${b.burn == null ? ' (défaut)' : ''}</span><b>${fr(budget)}</b></div>
+        <div><span>Budget${b.burn == null ? ' (défaut)' : ''}${burnAdj() ? ' corrigé' : ''}</span><b>${fr(budget)}</b></div>
         <div class="op">−</div>
         <div><span>Mangé</span><b>${fr(b.kcal || 0)}</b></div>
       </div>
@@ -511,6 +558,8 @@ views.home = () => {
            <ul class="mini">${lastWorkout.exercises.map((e) => `<li>${esc(e.name)} <span>${setsText(e.sets)}</span></li>`).join('')}</ul>`
         : '<p class="hint">Aucune séance enregistrée.</p>'
     )}
+
+    ${realityCard()}
   `;
 };
 
@@ -1003,6 +1052,11 @@ const actions = {
     const field = tab === 'food' ? 'form[data-form="meal"] input[name="name"]' : tab === 'body' ? 'form[data-form="body"] input[name="weight"]' : null;
     if (field) document.querySelector(field)?.focus();
   },
+  'burn-adj'(el) {
+    const v = Number(el.dataset.v) || 0;
+    store.setSettings({ burnAdj: v });
+    toast(v ? `Budget corrigé de ${v > 0 ? '+' : ''}${fr(v)} kcal/j` : 'Correction retirée');
+  },
   'weight-goal-edit'() { state.goalEdit = true; render(); },
   'weight-goal-cancel'() { state.goalEdit = false; render(); },
   'open-muscu'(el) {
@@ -1185,7 +1239,7 @@ function journeeView() {
   const protRatio = Math.min(1, (b.protein || 0) / s.proteinGoal);
   const alc = alcoholDay(t);
   // Reste à manger : dépense saisie (sinon 2 300 par défaut) − mangé
-  const budget = b.burn ?? DEFAULT_BURN;
+  const budget = (b.burn ?? DEFAULT_BURN) + burnAdj();
   const left = budget - (b.kcal || 0);
 
   let goalLine;
@@ -1210,7 +1264,7 @@ function journeeView() {
       <div class="j-head"><h2>🍽️ Reste à manger</h2><button class="chip" data-action="open-muscu" data-mtab="home">Muscu ›</button></div>
       <div class="j-deficit">
         <strong class="${left >= 0 ? 'good' : 'warn'}">${left >= 0 ? `${fr(left)} kcal` : `dépassé de ${fr(-left)} kcal`}</strong>
-        <span class="hint">budget ${fr(budget)}${b.burn == null ? ' (par défaut)' : ''} − mangé ${fr(b.kcal || 0)}</span>
+        <span class="hint">budget ${fr(budget)}${b.burn == null ? ' (par défaut)' : ''}${burnAdj() ? ` dont ${burnAdj() > 0 ? '+' : ''}${fr(burnAdj())} de correction balance` : ''} − mangé ${fr(b.kcal || 0)}</span>
       </div>
       <form data-form="burn" class="burn-form">
         <input type="hidden" name="date" value="${t}">
