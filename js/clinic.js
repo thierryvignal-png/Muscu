@@ -204,11 +204,12 @@ function model(d) {
     const line = d.rev[r.key];
     return { r, line, year: revenueYear(r, line, d.days) };
   });
-  const caYear = lines.reduce((s, x) => s + (x.year || 0), 0) + linesCa(d);
-  const costYear = d.costs.reduce((s, c) => s + costMonth(c, cost) * 12, 0) + linesVar(d);
+  // Caractère compté après marge (consommables déduits) : « Coûts » = charges fixes seulement, comme dans « Tester »
+  const caYear = lines.reduce((s, x) => s + (x.year || 0), 0) + linesCa(d) * lineMargin(d);
+  const costYear = d.costs.reduce((s, c) => s + costMonth(c, cost) * 12, 0);
   const byBu = BUS.map((b) => {
-    const ca = lines.filter((x) => (x.line.bu || x.r.bu) === b.key).reduce((s, x) => s + (x.year || 0), 0) + (b.key === 'devices' ? linesCa(d) : 0);
-    const cst = d.costs.filter((c) => c.bu === b.key).reduce((s, c) => s + costMonth(c, cost) * 12, 0) + (b.key === 'devices' ? linesVar(d) : 0);
+    const ca = lines.filter((x) => (x.line.bu || x.r.bu) === b.key).reduce((s, x) => s + (x.year || 0), 0) + (b.key === 'devices' ? linesCa(d) * lineMargin(d) : 0);
+    const cst = d.costs.filter((c) => c.bu === b.key).reduce((s, c) => s + costMonth(c, cost) * 12, 0);
     return { b, ca, cost: cst, res: ca - cst };
   });
   const totMin = d.costs.reduce((s, c) => s + costMonth(c, 'min'), 0);
@@ -308,48 +309,59 @@ function revImpl(d, r, line) {
   return impl;
 }
 
-// ---------- Écran « Tester » : 5 curseurs, rien n'est enregistré dans le scénario ----------
-// EBITDA = CM28 + Singulier + marge Caractère − charges
-// CM28 = bureaux médicaux × occupation × jours × contribution CM28 ; Singulier = bureaux esthétiques × occupation × jours × contribution Singulier
+// ---------- Écran « Tester » : 4 curseurs, rien n'est enregistré dans le scénario ----------
+// Un bureau est un bureau : bureaux = médicaux + esthétiques, contribution = moyenne pondérée des deux.
+// EBITDA = bureaux × occupation × jours × contribution moyenne + marge Caractère − charges
 const TEST_SLIDERS = [
-  { k: 'occ', label: 'Occupation (CM28 + Singulier)', min: 40, max: 90, step: 0.1, fmt: (v) => `${fr(v, 1)} %` },
-  { k: 'cm', label: 'Contribution CM28 / jour', min: 300, max: 600, step: 1, fmt: (v) => `${fr(v)} €` },
-  { k: 'sg', label: 'Contribution Singulier / jour', min: 400, max: 700, step: 1, fmt: (v) => `${fr(v)} €` },
+  { k: 'occ', label: 'Occupation des bureaux', min: 40, max: 90, step: 0.1, fmt: (v) => `${fr(v, 1)} %` },
+  { k: 'co', label: 'Contribution / bureau / jour', min: 300, max: 700, step: 1, fmt: (v) => `${fr(v)} €` },
   { k: 'car', label: 'Marge Caractère / an', min: 100000, max: 2000000, step: 1000, fmt: (v) => `${fr(Math.round(v / 1000))} k€` },
   { k: 'chg', label: 'Charges / an', min: 700000, max: 1500000, step: 1000, fmt: (v) => `${fr(Math.round(v / 1000))} k€` },
 ];
-// Objectifs d'EBITDA : les charges restent celles du scénario ; occupation, contributions et marge Caractère
+// Objectifs d'EBITDA : les charges restent celles du scénario ; occupation, contribution et marge Caractère
 // montent ensemble entre un bas et un haut réalistes (même effort t pour tous), t trouvé par dichotomie.
 // Partie remplie du curseur (couleur d'accent jusqu'à la valeur)
 const fillStyle = (min, max, v) => `--fill:${(((v - min) / (max - min || 1)) * 100).toFixed(1)}%`;
 const TEST_TARGETS = [-600000, -300000, 0, 300000, 500000, 700000, 1000000];
-const T_LOW = { occ: 25, cm: 280, sg: 380, car: 75000 };
-const T_HIGH = { occ: 90, cm: 600, sg: 700, car: 700000 }; // Caractère volontairement prudent
+const T_LOW = { occ: 25, co: 300, car: 75000 };
+const T_HIGH = { occ: 90, co: 620, car: 700000 }; // Caractère volontairement prudent
 let tester = null; // valeurs des curseurs (null = écran fermé)
 
-// Valeurs de départ : celles du scénario en cours
+const officeCount = (d) => (d.rev.med.count || 0) + (d.rev.esth.count || 0);
+// Contribution moyenne pondérée par les bureaux occupés (le CA des bureaux reste celui du modèle)
+function avgContribution(d) {
+  const occ = (k) => (d.rev[k].count || 0) * ((d.rev[k].to || 0) / 100);
+  const tot = occ('med') + occ('esth');
+  if (!tot) return Math.round(((d.rev.med.ca || 0) + (d.rev.esth.ca || 0)) / 2) || 450;
+  return (occ('med') * (d.rev.med.ca || 0) + occ('esth') * (d.rev.esth.ca || 0)) / tot; // non arrondi : même CA que le modèle
+}
+// Occupation moyenne pondérée par le nombre de bureaux
+function avgOccupation(d) {
+  const n = officeCount(d);
+  if (!n) return 70;
+  return ((d.rev.med.count || 0) * (d.rev.med.to || 0) + (d.rev.esth.count || 0) * (d.rev.esth.to || 0)) / n;
+}
+// Valeurs de départ : celles du scénario en cours ; charges = « Coûts / an » de la page (scénario de coûts actif)
 const fixedCosts = (d) => d.costs.reduce((s, c) => s + costMonth(c, d.scn.cost) * 12, 0);
 const testFromScenario = (d) => ({
-  occ: d.rev.med.to ?? 70, cm: d.rev.med.ca ?? 400, sg: d.rev.esth.ca ?? 500,
+  occ: avgOccupation(d), co: avgContribution(d),
   car: Math.round(linesCa(d) * lineMargin(d)), chg: fixedCosts(d),
 });
 export function testCalc(d, t) {
-  const days = d.days || 0;
-  const cm = (d.rev.med.count || 0) * (t.occ / 100) * days * t.cm;
-  const sg = (d.rev.esth.count || 0) * (t.occ / 100) * days * t.sg;
+  const offices = officeCount(d) * (t.occ / 100) * (d.days || 0) * t.co;
   const car = t.car;
-  const income = cm + sg + car;
-  return { cm, sg, car, chg: t.chg, income, ebitda: income - t.chg };
+  const income = offices + car;
+  return { offices, car, chg: t.chg, income, ebitda: income - t.chg };
 }
 function testTarget(d, target) {
   const at = (t) => {
     const v = (k) => T_LOW[k] + (T_HIGH[k] - T_LOW[k]) * t;
-    return { occ: Math.min(95, v('occ')), cm: v('cm'), sg: v('sg'), car: v('car'), chg: tester.chg };
+    return { occ: Math.min(95, v('occ')), co: v('co'), car: v('car'), chg: tester.chg };
   };
   let lo = 0, hi = 1.5;
   for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (testCalc(d, at(m)).ebitda < target) lo = m; else hi = m; }
   const x = at(hi);
-  return { occ: Math.round(x.occ * 10) / 10, cm: Math.round(x.cm), sg: Math.round(x.sg), car: Math.round(x.car / 1000) * 1000, chg: x.chg };
+  return { occ: Math.round(x.occ * 10) / 10, co: Math.round(x.co), car: Math.round(x.car / 1000) * 1000, chg: x.chg };
 }
 const tLabel = (v) => (v === 0 ? 'Breakeven' : `${v > 0 ? '+' : '−'}${Math.abs(v) >= 1000000 ? `${fr(Math.abs(v) / 1000000)} M€` : `${fr(Math.abs(v) / 1000)} k€`}`);
 function testerHead(d) {
@@ -361,17 +373,31 @@ function testerHead(d) {
     <div class="tester-chg"><span class="hint">Charges</span><b>${euros(r.chg)}</b></div>`;
 }
 // Deux marges nettes :
-// - sur notre CA : contributions CM28 + Singulier + CA Caractère (avant marge, d'après la marge du scénario)
+// - sur notre CA : contributions des bureaux + CA Caractère (avant consommables, d'après la marge du scénario)
 // - sur le volume d'affaires : honoraires des médecins (CM28 : redevance = 25 % ; Singulier : notre part = 30 %) + CA Caractère
-const SHARE = { cm: 0.25, sg: 0.3 };
+const SHARE = { med: 0.25, esth: 0.3 };
+function volFactor(d) {
+  const w = (k) => (d.rev[k].count || 0) * (d.rev[k].ca || 0);
+  const tot = w('med') + w('esth');
+  return tot ? (w('med') / SHARE.med + w('esth') / SHARE.esth) / tot : 1 / SHARE.med;
+}
 function testerKpi(d) {
   const r = testCalc(d, tester);
   const carCa = r.car / (lineMargin(d) || 1);
-  const ca = r.cm + r.sg + carCa;
-  const vol = r.cm / SHARE.cm + r.sg / SHARE.sg + carCa;
+  const ca = r.offices + carCa;
+  const vol = r.offices * volFactor(d) + carCa;
   const pct = (x) => (x ? (r.ebitda / x) * 100 : 0);
   const cell = (label, base) => `<div><span>${label}</span><b class="${pct(base) < 0 ? 'warn' : 'good'}">${fr(pct(base), 1)} %</b><small>EBITDA ÷ ${kEuros(base)}</small></div>`;
   return cell('Marge nette / notre CA', ca) + cell('Marge nette / vol. d\'affaires', vol);
+}
+// Bureaux occupés un jour d'ouverture moyen et jours d'ouverture par semaine, avec ces curseurs
+function testerOffices(d) {
+  const n = officeCount(d);
+  const busy = n * (tester.occ / 100);
+  return `
+    <div><b>${fr(busy, 1)}</b><span>bureaux occupés sur ${fr(n)} un jour moyen</span></div>
+    <div><b>${fr((d.days || 0) / 52, 1)}</b><span>jours d'ouverture par semaine</span></div>
+    <small>${fr(n)} bureaux = ${fr(d.rev.med.count || 0)} médicaux (CM28) + ${fr(d.rev.esth.count || 0)} esthétiques (Singulier), comptés pareil · ${fr(d.days || 0)} j / an</small>`;
 }
 const kEuros = (v) => `${fr(Math.round(v / 1000))} k€`;
 const testerTargets = (d) => TEST_TARGETS.map((v) => `<button class="seg ${Math.abs(testCalc(d, tester).ebitda - v) < 5000 ? 'on good' : ''}" data-action="clinic-test-target" data-v="${v}">${tLabel(v)}</button>`).join('');
@@ -392,6 +418,7 @@ function testerView(d) {
           <input type="range" data-test-k="${x.k}" min="${Math.min(x.min, v)}" max="${Math.max(x.max, v)}" step="${x.step}" value="${v}" style="${fillStyle(Math.min(x.min, v), Math.max(x.max, v), v)}">
         </div>`;
       }).join('')}
+      <div class="tester-offices" data-tester-offices>${testerOffices(d)}</div>
       <div class="tester-kpi" data-tester-kpi>${testerKpi(d)}</div>
       <div class="tester-targets" data-tester-targets>${testerTargets(d)}</div>
     </div>`;
@@ -411,6 +438,8 @@ if (typeof document !== 'undefined') {
     if (head) head.innerHTML = testerHead(d);
     const kpi = document.querySelector('[data-tester-kpi]');
     if (kpi) kpi.innerHTML = testerKpi(d);
+    const off = document.querySelector('[data-tester-offices]');
+    if (off) off.innerHTML = testerOffices(d);
     const tg = document.querySelector('[data-tester-targets]');
     if (tg) tg.innerHTML = testerTargets(d);
   });
