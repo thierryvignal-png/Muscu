@@ -2,6 +2,7 @@ import { store } from './store.js';
 import { setSpace, spaceSwitch, spaceMenu, spaceViews, SPACE_KEYS } from './spaces.js';
 import * as clinic from './clinic.js';
 import * as ideas from './ideas.js';
+import * as fundraising from './fundraising.js';
 import { formatNumberInputs } from './util.js';
 import * as goodnews from './goodnews.js';
 import * as goals from './goals.js';
@@ -1338,6 +1339,7 @@ spaceViews.goodnews = goodnews.view;
 spaceViews.clinique = clinic.view;
 spaceViews.ideas = () => ideas.view('ai');
 spaceViews.ideasSing = () => ideas.view('sing');
+spaceViews.fundraising = fundraising.view;
 // Objectifs de vie + suivi financier en bas
 spaceViews.goals = () => goals.view() + finance.view();
 function wrapSpace(handlers) {
@@ -1348,8 +1350,8 @@ function wrapSpace(handlers) {
     render();
   }]));
 }
-Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions), wrapSpace(todo.actions), wrapSpace(esthetique.actions), wrapSpace(atom.actions), wrapSpace(finance.actions), wrapSpace(clinic.actions), wrapSpace(ideas.actions));
-Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms), wrapSpace(todo.forms), wrapSpace(esthetique.forms), wrapSpace(atom.forms), wrapSpace(finance.forms), wrapSpace(clinic.forms), wrapSpace(ideas.forms));
+Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions), wrapSpace(todo.actions), wrapSpace(esthetique.actions), wrapSpace(atom.actions), wrapSpace(finance.actions), wrapSpace(clinic.actions), wrapSpace(ideas.actions), wrapSpace(fundraising.actions));
+Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms), wrapSpace(todo.forms), wrapSpace(esthetique.forms), wrapSpace(atom.forms), wrapSpace(finance.forms), wrapSpace(clinic.forms), wrapSpace(ideas.forms), wrapSpace(fundraising.forms));
 
 // ---------- Retour sur aujourd'hui ----------
 // L'app reste ouverte en arrière-plan sur l'iPhone : au changement de jour, et à chaque changement
