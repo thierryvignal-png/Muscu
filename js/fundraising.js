@@ -1,48 +1,36 @@
-// Espace « Fundraising Singulier » : investisseurs (montant chacun, total) et courtiers / leveurs de fonds.
+// Espace « Fundraising Singulier » : investisseurs et courtiers / leveurs de fonds, un montant par ligne, totaux.
 // Tout se saisit dans l'app ; chaque ligne est modifiable directement (enregistrement à la frappe).
 import { esc, fr, num, uid, read, write } from './util.js';
 
 export const KEY = 'fundraising.data.v1';
-const load = () => read(KEY, { investors: [], brokers: [] }); // investors {id,name,amount} · brokers {id,name,note}
+const load = () => read(KEY, { investors: [], brokers: [] }); // investors {id,name,amount} · brokers {id,name,amount}
 const save = (d) => write(KEY, d);
 
 const euros = (v) => `${fr(v)} €`;
-const total = (d) => d.investors.reduce((s, x) => s + (x.amount || 0), 0);
+const sum = (list) => list.reduce((s, x) => s + (x.amount || 0), 0);
+const KINDS = {
+  investors: { title: '💶 Investisseurs', one: 'investisseur', ph: 'Investisseur' },
+  brokers: { title: '🤝 Courtiers / leveurs de fonds', one: 'courtier', ph: 'Courtier / leveur de fonds' },
+};
 
-function investorsCard(d) {
-  const list = [...d.investors].sort((a, b) => (b.amount || 0) - (a.amount || 0));
+// Une liste : nom + montant par ligne, total, classée du plus gros au plus petit montant
+function listCard(d, kind) {
+  const k = KINDS[kind];
+  const list = [...d[kind]].sort((a, b) => (b.amount || 0) - (a.amount || 0));
   return `
     <section class="card">
-      <h2>💶 Investisseurs</h2>
+      <h2>${k.title}</h2>
       ${list.map((x) => `
         <div class="fin-row pl">
-          <input data-fund-line="name" data-kind="investors" data-id="${x.id}" value="${esc(x.name)}" autocomplete="off">
-          <input data-fund-line="amount" data-kind="investors" data-id="${x.id}" inputmode="decimal" value="${x.amount ?? ''}" placeholder="€" autocomplete="off">
-          <button type="button" class="icon-btn" data-action="fund-delete" data-kind="investors" data-id="${x.id}" aria-label="Supprimer">✕</button>
+          <input data-fund-line="name" data-kind="${kind}" data-id="${x.id}" value="${esc(x.name)}" autocomplete="off">
+          <input data-fund-line="amount" data-kind="${kind}" data-id="${x.id}" inputmode="decimal" value="${x.amount ?? ''}" placeholder="€" autocomplete="off">
+          <button type="button" class="icon-btn" data-action="fund-delete" data-kind="${kind}" data-id="${x.id}" aria-label="Supprimer">✕</button>
         </div>`).join('')}
-      ${list.length ? `<div class="deal-total"><span>Total (${list.length} investisseur${list.length > 1 ? 's' : ''})</span><b data-fund-total>${euros(total(d))}</b></div>` : ''}
+      ${list.length ? `<div class="deal-total"><span>Total (${list.length} ${k.one}${list.length > 1 ? 's' : ''})</span><b data-fund-total="${kind}">${euros(sum(list))}</b></div>` : ''}
       <form data-form="fundAdd" class="deal-add with-amount">
-        <input type="hidden" name="kind" value="investors">
-        <input name="name" required placeholder="Investisseur" autocomplete="off">
+        <input type="hidden" name="kind" value="${kind}">
+        <input name="name" required placeholder="${k.ph}" autocomplete="off">
         <input name="amount" inputmode="decimal" placeholder="€" autocomplete="off">
-        <button class="primary" aria-label="Ajouter">＋</button>
-      </form>
-    </section>`;
-}
-
-function brokersCard(d) {
-  return `
-    <section class="card">
-      <h2>🤝 Courtiers / leveurs de fonds</h2>
-      ${d.brokers.map((x) => `
-        <div class="fin-row fund-broker">
-          <input data-fund-line="name" data-kind="brokers" data-id="${x.id}" value="${esc(x.name)}" autocomplete="off">
-          <input data-fund-line="note" data-kind="brokers" data-id="${x.id}" value="${esc(x.note || '')}" placeholder="Contact, commission…" autocomplete="off">
-          <button type="button" class="icon-btn" data-action="fund-delete" data-kind="brokers" data-id="${x.id}" aria-label="Supprimer">✕</button>
-        </div>`).join('')}
-      <form data-form="fundAdd" class="deal-add">
-        <input type="hidden" name="kind" value="brokers">
-        <input name="name" required placeholder="Courtier / leveur de fonds" autocomplete="off">
         <button class="primary" aria-label="Ajouter">＋</button>
       </form>
     </section>`;
@@ -57,11 +45,12 @@ if (typeof document !== 'undefined') {
     const line = (d[e.target.dataset.kind] || []).find((x) => x.id === e.target.dataset.id);
     if (!line) return;
     if (field === 'name') { if (e.target.value.trim()) line.name = e.target.value.trim(); }
-    else if (field === 'amount') line.amount = num(e.target.value);
-    else line.note = e.target.value;
+    else line.amount = num(e.target.value);
     save(d);
-    const t = document.querySelector('[data-fund-total]');
-    if (t) t.textContent = euros(total(d));
+    for (const kind of Object.keys(KINDS)) {
+      const t = document.querySelector(`[data-fund-total="${kind}"]`);
+      if (t) t.textContent = euros(sum(d[kind]));
+    }
   });
 }
 
@@ -69,8 +58,8 @@ export function view() {
   const d = load();
   return `
     <header class="page-head"><h1>Fundraising Singulier</h1></header>
-    ${investorsCard(d)}
-    ${brokersCard(d)}
+    ${listCard(d, 'investors')}
+    ${listCard(d, 'brokers')}
   `;
 }
 
@@ -79,8 +68,7 @@ export const forms = {
     const name = (f.name || '').trim();
     if (!name || !['investors', 'brokers'].includes(f.kind)) return false;
     const d = load();
-    if (f.kind === 'investors') d.investors.push({ id: uid(), name, amount: num(f.amount) });
-    else d.brokers.push({ id: uid(), name, note: '' });
+    d[f.kind].push({ id: uid(), name, amount: num(f.amount) });
     save(d);
     return 'Ajouté';
   },
