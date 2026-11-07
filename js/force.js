@@ -6,10 +6,10 @@ export const EXS = ['squat', 'dev', 'rdl', 'tr'];
 // th : seuils débutant / novice / intermédiaire / avancé / élite à 76 kg
 // (squat et roumain : 1RM en kg ; développé : 1RM par haltère ; tractions : reps d'affilée)
 export const EX = {
-  squat: { name: 'Squat', short: 'Squat', color: '#3b82f6', w: 0.3, kind: 'bar', th: [70, 95, 126, 161, 198], step: 2.5, reps: [10, 12], section: 'squat', app: 'Squat' },
-  dev: { name: 'Développé incliné', short: 'Développé', color: '#f97316', w: 0.3, kind: 'db', th: [20, 27, 37, 48, 60], step: 2, reps: [11, 9], section: 'developpe_incline', app: 'Bench' },
-  rdl: { name: 'Soulevé roumain', short: 'Roumain', color: '#10b981', w: 0.2, kind: 'bar', th: [61, 86, 119, 156, 196], step: 2.5, reps: [16, 12], section: 'souleve_roumain', app: 'RDL' },
-  tr: { name: 'Tractions', short: 'Tractions', color: '#d4a017', w: 0.2, kind: 'bw', th: [1, 8, 14, 21, 30], section: 'tractions', app: 'Tractions' },
+  squat: { name: 'Squat', short: 'Squat', color: '#4f8a63', w: 0.3, kind: 'bar', th: [70, 95, 126, 161, 198], step: 2.5, reps: [10, 12], section: 'squat', app: 'Squat' },
+  dev: { name: 'Développé incliné', short: 'Développé', color: '#4f7aa6', w: 0.3, kind: 'db', th: [20, 27, 37, 48, 60], step: 2, reps: [11, 9], section: 'developpe_incline', app: 'Bench' },
+  rdl: { name: 'Soulevé roumain', short: 'Roumain', color: '#b06b3f', w: 0.2, kind: 'bar', th: [61, 86, 119, 156, 196], step: 2.5, reps: [16, 12], section: 'souleve_roumain', app: 'RDL' },
+  tr: { name: 'Tractions', short: 'Tractions', color: '#86659e', w: 0.2, kind: 'bw', th: [1, 8, 14, 21, 30], section: 'tractions', app: 'Tractions' },
 };
 export const ZONES = [
   { label: 'Débutant', min: 5 },
@@ -19,6 +19,38 @@ export const ZONES = [
   { label: 'Élite', min: 95 },
 ];
 const PCT = ZONES.map((z) => z.min);
+
+// Barèmes Strength Level hommes par poids de corps (strengthlevel.com, relevés le 07/11/2026) :
+// [poids, débutant, novice, intermédiaire, avancé, élite]. Développé : par haltère. Tractions : reps, poids en livres.
+const SL = {
+  squat: [[50, 36, 55, 78, 106, 137], [55, 43, 63, 88, 118, 150], [60, 49, 71, 98, 129, 162], [65, 56, 79, 107, 139, 174], [70, 62, 86, 116, 149, 185], [75, 69, 94, 124, 159, 196], [80, 75, 101, 132, 168, 206], [85, 81, 108, 140, 177, 216], [90, 87, 115, 148, 186, 226], [95, 93, 121, 156, 194, 235], [100, 98, 128, 163, 203, 244], [110, 109, 140, 177, 218, 261], [120, 120, 152, 191, 233, 278], [140, 140, 175, 215, 261, 307]],
+  dev: [[50, 10, 16, 24, 32, 42], [55, 12, 19, 26, 36, 46], [60, 14, 21, 29, 39, 49], [65, 16, 23, 32, 42, 53], [70, 18, 25, 34, 45, 56], [75, 20, 27, 37, 48, 59], [80, 22, 29, 39, 50, 62], [85, 23, 32, 42, 53, 65], [90, 25, 33, 44, 55, 68], [95, 27, 35, 46, 58, 71], [100, 28, 37, 48, 60, 73], [110, 31, 41, 52, 65, 78], [120, 34, 44, 56, 69, 83], [140, 40, 51, 63, 77, 91]],
+  rdl: [[50, 32, 51, 76, 106, 140], [55, 37, 58, 85, 117, 152], [60, 43, 65, 93, 127, 163], [65, 49, 72, 102, 136, 174], [70, 54, 79, 110, 145, 184], [75, 60, 85, 117, 154, 194], [80, 65, 92, 125, 163, 203], [85, 70, 98, 132, 171, 213], [90, 75, 104, 139, 179, 221], [95, 80, 110, 145, 186, 230], [100, 85, 115, 152, 194, 238], [110, 95, 126, 164, 208, 254], [120, 104, 137, 176, 221, 268], [140, 121, 156, 198, 245, 295]],
+  tr: [[110, 0.5, 7, 14, 24, 34], [120, 0.5, 7, 14, 24, 33], [130, 0.5, 7, 14, 23, 33], [140, 1, 8, 14, 23, 32], [150, 1, 8, 14, 22, 31], [160, 1, 8, 14, 22, 30], [170, 1, 7, 14, 21, 29], [180, 1, 7, 13, 21, 28], [190, 1, 7, 13, 20, 27], [200, 1, 7, 12, 19, 27], [210, 1, 7, 12, 19, 26], [220, 1, 7, 12, 18, 25], [240, 1, 6, 11, 17, 23], [260, 0.5, 6, 10, 16, 22], [310, 0.5, 4, 9, 13, 19]],
+};
+export const REF_BW = 76;
+function slAt(ex, bw) {
+  const rows = SL[ex];
+  const w = ex === 'tr' ? bw * 2.20462 : bw;
+  const c = Math.min(Math.max(w, rows[0][0]), rows[rows.length - 1][0]);
+  let i = 0;
+  while (i < rows.length - 2 && rows[i + 1][0] < c) i++;
+  const [a, b] = [rows[i], rows[i + 1]];
+  const t = (c - a[0]) / (b[0] - a[0]);
+  return a.slice(1).map((v, j) => v + t * (b[j + 1] - v));
+}
+// Seuils au poids donné : seuils à 76 kg × évolution du barème Strength Level entre 76 kg et ce poids
+const thCache = {};
+export function thAt(ex, bw = REF_BW) {
+  if (!bw || Math.abs(bw - REF_BW) < 1e-9) return EX[ex].th;
+  const key = `${ex}|${Math.round(bw * 100)}`;
+  if (!thCache[key]) {
+    const ref = slAt(ex, REF_BW);
+    const cur = slAt(ex, bw);
+    thCache[key] = EX[ex].th.map((t, j) => (t * cur[j]) / ref[j]);
+  }
+  return thCache[key];
+}
 
 export const START = '2026-02-07'; // premier jour où les 4 exercices ont un niveau
 export const ANCHOR = '2026-07-19'; // départ des blocs de 14 jours
@@ -76,16 +108,16 @@ export const bestLabel = (s) => (s.ex === 'tr' ? `${s.best.reps} reps` : s.ex ==
 export const fmtKg = (v) => String(Math.round(v * 10) / 10).replace('.', ',');
 
 // ---------- Barème ----------
-export function scoreOf(ex, v) {
-  const th = EX[ex].th;
+export function scoreOf(ex, v, bw = REF_BW) {
+  const th = thAt(ex, bw);
   if (!(v > 0)) return 0;
   if (v <= th[0]) return (PCT[0] * v) / th[0];
   for (let i = 0; i < 4; i++) if (v < th[i + 1]) return PCT[i] + ((PCT[i + 1] - PCT[i]) * (v - th[i])) / (th[i + 1] - th[i]);
   return Math.min(100, PCT[4] + ((PCT[4] - PCT[3]) * (v - th[4])) / (th[4] - th[3]));
 }
 // Valeur (1RM, 1RM par haltère ou reps) qui donne ce score
-export function valueForScore(ex, s) {
-  const th = EX[ex].th;
+export function valueForScore(ex, s, bw = REF_BW) {
+  const th = thAt(ex, bw);
   if (s <= PCT[0]) return (th[0] * s) / PCT[0];
   for (let i = 0; i < 4; i++) if (s < PCT[i + 1]) return th[i] + ((th[i + 1] - th[i]) * (s - PCT[i])) / (PCT[i + 1] - PCT[i]);
   return th[4] + ((th[4] - th[3]) * (s - PCT[4])) / (PCT[4] - PCT[3]);
@@ -143,7 +175,7 @@ export function enrich(sessions) {
     s.light = s.ex !== 'tr' && prevTop > 0 && s.best.kg < 0.5 * prevTop;
     if (s.light) s.reliab = 'legere';
     top[s.ex] = Math.max(prevTop, s.oneRm);
-    if (s.score == null) s.score = r1(scoreOf(s.ex, metricOf(s)));
+    if (s.score == null) s.score = r1(scoreOf(s.ex, metricOf(s), s.bw));
     s.assumed = s.assumed ?? s.date < ASSUMED_BEFORE;
   }
   return list;
@@ -228,13 +260,17 @@ export function analyze(rawSessions, { today, weights = [], pauses = [] } = {}) 
   }
   const bestScore = Object.fromEntries(EXS.map((k) => [k, counted[k].reduce((m, s) => Math.max(m, s.score), 0)]));
 
-  // Potentiel immédiat : chaque record depuis la reprise refait au poids d'aujourd'hui (barèmes à 76 kg)
-  const potLv = {};
-  for (const k of EXS) {
-    const since = counted[k].filter((s) => s.date >= REPRISE);
-    potLv[k] = since.length ? Math.max(...since.map((s) => scoreOf(k, metricOf(s)))) : nowLv[k];
-  }
-  const potential = indexOf(potLv);
+  // Potentiel immédiat : chaque record depuis la reprise refait à un poids donné (poids actuel, ou 76 kg)
+  const potentialAt = (bw) => {
+    const lv = {};
+    for (const k of EXS) {
+      const since = counted[k].filter((s) => s.date >= REPRISE);
+      // tractions : la charge est le poids du corps, les reps restent les mêmes
+      lv[k] = since.length ? Math.max(...since.map((s) => scoreOf(k, metricOf(s), bw))) : nowLv[k];
+    }
+    return indexOf(lv);
+  };
+  const potential = potentialAt(REF_BW);
 
   // Objectifs du bloc en cours
   const goals = prevBlock ? goalsFor(prevBlock.values, nowLv, bestScore, counted, cur) : null;
@@ -264,7 +300,7 @@ export function analyze(rawSessions, { today, weights = [], pauses = [] } = {}) 
 
   return {
     today: end, sessions, per, counted, daily, levels: nowLv, index, at, blocks, cur, prevBlock, wonCount: done.filter((b) => b.won).length, doneCount: done.length,
-    records, bestScore, potential, goals, projected, gaps, pauses: declared, activePause, rel, weight, firstAdvanced, monthEnds,
+    records, bestScore, potential, potentialAt, goals, projected, gaps, pauses: declared, activePause, rel, weight, firstAdvanced, monthEnds,
     last: Object.fromEntries(EXS.map((k) => [k, lastAt(k, end)])),
     yearMax: Math.max(...daily.filter((x) => x.date.slice(0, 4) === end.slice(0, 4) && x.index != null).map((x) => x.index)),
   };

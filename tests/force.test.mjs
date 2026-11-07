@@ -35,6 +35,11 @@ test('barème à 76 kg', () => {
   near(F.scoreOf('squat', 35), 2.5);
   near(F.scoreOf('squat', 235), 100);
   near(F.valueForScore('rdl', 89.4), 181.07, 0.01);
+  // barèmes selon le poids : 12 × 120 kg au squat (1RM 168)
+  near(F.scoreOf('squat', 168, 77.4), 81.9, 0.15);
+  near(F.scoreOf('squat', 168, 75.5), 83.3, 0.15);
+  near(F.scoreOf('dev', 56, 78.6), 88.4, 0.3);
+  near(F.scoreOf('rdl', 184, 77.8), 89.4, 0.3);
 });
 
 test('indice : 82,3 le 7 nov., 43,8 le 7 févr.', () => {

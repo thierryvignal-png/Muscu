@@ -63,7 +63,7 @@ export function analysis() {
 }
 
 // ---------- État de l'écran ----------
-const ui = { detail: null, relMode: 'base', block: null, heat: null, paste: false, pauseForm: false };
+const ui = { page: 'overview', detail: null, relMode: 'base', block: null, heat: null, paste: false, pauseForm: false, wb: null, wlist: false, wRange: 'all', jf: 'all', jn: 40, backup: false, month: null };
 let animated = false;
 
 // ---------- Petits outils SVG ----------
@@ -72,12 +72,12 @@ const xOf = (d0, d1, x0, x1) => { const n = F.diffDays(d0, d1) || 1; return (d) 
 const yOf = (v0, v1, y0, y1) => (v) => y0 + ((y1 - y0) * (v - v0)) / (v1 - v0 || 1);
 const pathOf = (pts) => pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join('');
 // Segments pleins, pointillés si plus de 30 jours entre deux points
-function gapPaths(pts, dates, color, width = 2.2) {
+function gapPaths(pts, dates, color, width = 2.2, maxGap = 30) {
   let solid = '';
   let dash = '';
   for (let i = 1; i < pts.length; i++) {
     const seg = `M${pts[i - 1][0].toFixed(1)},${pts[i - 1][1].toFixed(1)}L${pts[i][0].toFixed(1)},${pts[i][1].toFixed(1)}`;
-    if (F.diffDays(dates[i - 1], dates[i]) > 30) dash += seg; else solid += seg;
+    if (F.diffDays(dates[i - 1], dates[i]) > maxGap) dash += seg; else solid += seg;
   }
   return `<path d="${solid}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linejoin="round" stroke-linecap="round"/>
     ${dash ? `<path d="${dash}" fill="none" stroke="${color}" stroke-width="${width * 0.7}" stroke-dasharray="3 4"/>` : ''}`;
@@ -235,11 +235,11 @@ function blocksCard(an) {
       <div class="fx-mini4">${EXS.map((k) => `<div><span><i style="background:${EX[k].color}"></i>${EX[k].short}</span><b>${n1(b.values[k])}</b>
         <small class="${!p ? '' : b.values[k] > p.values[k] + 0.05 ? 'good' : b.values[k] < p.values[k] - 0.05 ? 'warn' : ''}">${!b.fresh[k] ? '= sans séance' : p ? sgn(b.values[k] - p.values[k]) : ''}</small></div>`).join('')}</div>
     </div>`;
-  })() : '<p class="hint">Touche un bloc pour voir ses 4 exercices.</p>';
+  })() : `<p class="fx-blockfoot"><span>⚑ Bloc ${an.cur.n} · ${dShort(an.cur.start)} – ${dShort(an.cur.stop)}</span><b>À jouer</b></p><p class="hint">Touche un bloc pour voir ses 4 exercices.</p>`;
   return `
     <section class="card">
-      <h2>📈 ${an.wonCount} bloc${an.wonCount > 1 ? 's' : ''} sur ${an.doneCount} en hausse</h2>
-      <p class="fx-sub">Blocs de 2 semaines depuis le ${dShort(F.ANCHOR)} · indice moyen de chaque bloc</p>
+      <div class="fx-card-head">${kicker('◈ Régularité')}<span class="fx-badge">14 jours</span></div>
+      <h2 class="fx-title">${an.wonCount} bloc${an.wonCount > 1 ? 's' : ''} sur ${an.doneCount} en hausse</h2>
       <svg class="fx-svg" viewBox="0 0 ${W} ${H}">${bars}</svg>
       ${detail}
     </section>`;
@@ -280,28 +280,29 @@ function indexCard(an) {
   // Mois : repère + indice de fin de mois sous l'axe
   const months = an.monthEnds.map((m) => {
     const mx = x(m.date.slice(0, 8) + '15');
-    return `<text x="${mx}" y="${B + 14}" text-anchor="middle" class="fx-t-muted">${MONTHS[+m.date.slice(5, 7) - 1]}</text>
-      <text x="${mx}" y="${B + 27}" text-anchor="middle" class="fx-t-val">${n1(m.index)}</text>
+    return `<text x="${mx}" y="${B + 14}" text-anchor="middle" class="fx-t-muted">${+m.date.slice(5, 7) % 2 ? MONTHS[+m.date.slice(5, 7) - 1] : ''}</text>
       <circle cx="${x(m.date)}" cy="${y(m.index)}" r="1.8" class="fx-dot-sm"/>`;
   }).join('');
   const tips = pts.filter((_, i) => i % 2 === 0 || i === pts.length - 1).map((p) => [x(p.date), y(p.index), `${dShort(p.date)} : ${n1(p.index)} / 100`]);
   return `
     <section class="card">
-      <h2>🚀 Ton indice : ${n1(first.index)} → ${n1(an.index)} depuis ${MONTHS[+F.START.slice(5, 7) - 1]}</h2>
-      <p class="fx-sub">Il ne baisse jamais sans séance. Hachures : pauses. Sous l'axe : indice en fin de mois.</p>
+      <div class="fx-card-head">${kicker('📈 Depuis février')}<span class="fx-badge">/ 100</span></div>
+      <h2 class="fx-title">Ton indice dans le temps</h2>
       <svg class="fx-svg fx-chart" viewBox="0 0 ${W} ${H}" ${tipAttr(tips)}>
         ${hatchDef('fxHatchD')}${bands}${hatch}
         <path d="${line}" fill="none" class="fx-line-main"/>
         ${months}${ann.join('')}${nowLbl}${cursor(T, B)}
       </svg>
       ${tipLine()}
+      <div class="fx-months">${an.monthEnds.map((m) => `<div><span>${MONTHS[+m.date.slice(5, 7) - 1]}</span><b>${n1(m.index)}</b></div>`).join('')}</div>
+      <p class="hint">Hachures · pauses (plus de 3 semaines sans séance) et pauses déclarées.${an.firstAdvanced ? ` Premier passage en zone avancée le ${dShort(an.firstAdvanced)}.` : ''}</p>
     </section>`;
 }
 
 // ---------- E. Force relative depuis la reprise ----------
 function relCard(an) {
   const H = 210;
-  const L = 30, R = 296, T = 10, B = 186;
+  const L = 30, R = 232, T = 10, B = 186;
   const mode = ui.relMode;
   const series = EXS.map((k) => {
     const r = an.rel[k];
@@ -325,10 +326,12 @@ function relCard(an) {
   }).join('');
   const wLine = wPts.length ? `<path d="${pathOf(wPts.map((q) => [x(q.date), y(q.v)]))}" fill="none" class="fx-line-weight"/>` : '';
   const ends = spread([
-    ...series.map((s) => ({ y: y(s.pts.at(-1).v), x: x(s.pts.at(-1).date), color: EX[s.k].color, t: mode === 'base' ? pct(s.pts.at(-1).v - 100) : `${n1(s.pts.at(-1).v, 2)}×` })),
-    ...(wPts.length ? [{ y: y(wPts.at(-1).v), x: x(wPts.at(-1).date), color: 'var(--muted)', t: pct(wPts.at(-1).v - 100) }] : []),
-  ], 12, T + 6, B - 2);
-  const endLbl = ends.map((e) => `<text x="${R + 6}" y="${e.y + 4}" class="fx-t-end" style="fill:${e.color}">${e.t}</text>`).join('');
+    ...series.map((s) => ({ y: y(s.pts.at(-1).v), y0: y(s.pts.at(-1).v), x: x(s.pts.at(-1).date), color: EX[s.k].color, t: `${EX[s.k].short} ${mode === 'base' ? pct(s.pts.at(-1).v - 100) : `${n1(s.pts.at(-1).v, 2)}×`}` })),
+    ...(wPts.length ? [{ y: y(wPts.at(-1).v), y0: y(wPts.at(-1).v), x: x(wPts.at(-1).date), color: 'var(--fx-brass)', t: `Poids ${pct(wPts.at(-1).v - 100)}` }] : []),
+  ], 13, T + 6, B - 2);
+  // Étiquettes en bout de courbe, reliées par un pointillé
+  const endLbl = ends.map((e) => `<path d="M${e.x + 3},${e.y0}L${R + 4},${e.y0}L${R + 8},${e.y}" fill="none" stroke="${e.color}" stroke-width="1" stroke-dasharray="2 2"/>
+    <text x="${R + 11}" y="${e.y + 4}" class="fx-t-end" style="fill:${e.color}">${e.t}</text>`).join('');
   const dots = series.map((s) => `<circle cx="${x(s.pts.at(-1).date)}" cy="${y(s.pts.at(-1).v)}" r="3.5" fill="${EX[s.k].color}"/>`).join('');
   const ticks = [];
   for (let m = new Date(F.REPRISE.slice(0, 7) + '-01T12:00:00Z'); ; m.setUTCMonth(m.getUTCMonth() + 1)) {
@@ -342,21 +345,22 @@ function relCard(an) {
   const tips = dates.map((d) => [x(d), null, `${dShort(d)} · ${series.map((s) => { const v = valAt(s.pts, d); return v == null ? '' : `${EX[s.k].short} ${mode === 'base' ? pct(v - 100) : `${n1(v, 2)}×`}`; }).filter(Boolean).join(' · ')}${wPts.length ? ` · Poids ${pct(valAt(wPts, d) - 100)}` : ''}`]);
   const tiles = [
     ...series.map((s) => ({ c: EX[s.k].color, name: EX[s.k].short, big: pct((s.lastRel / s.baseRel - 1) * 100), small: `${n1(s.baseRel, 2)} → ${n1(s.lastRel, 2)}×` })),
-    ...(wt.base ? [{ c: 'var(--muted)', name: 'Poids', big: pct((wt.now / wt.base - 1) * 100), small: `${n1(wt.base)} → ${n1(wt.now)} kg` }] : []),
+    ...(wt.base ? [{ c: 'var(--fx-brass)', name: 'Poids', big: pct((wt.now / wt.base - 1) * 100), small: `${n1(wt.base)} → ${n1(wt.now)} kg` }] : []),
   ];
   return `
     <section class="card">
-      <h2>💪 Plus fort, plus léger</h2>
-      <p class="fx-sub">Force relative (1RM ÷ poids) en moyenne sur 15 jours, depuis ta reprise du ${dShort(F.REPRISE)}</p>
-      <div class="fx-tiles">${tiles.map((t) => `<div><span><i style="background:${t.c}"></i>${t.name}</span><b>${t.big}</b><small>${t.small}</small></div>`).join('')}</div>
+      ${kicker(`↗ Depuis le ${dShort(F.REPRISE)}`)}
+      <h2 class="fx-title">Ta force relative</h2>
       <div class="fx-toggle">
-        <button class="${mode === 'base' ? 'on' : ''}" data-action="force-rel" data-mode="base">base 100</button>
+        <button class="${mode === 'base' ? 'on' : ''}" data-action="force-rel" data-mode="base">Base 100</button>
         <button class="${mode === 'bw' ? 'on' : ''}" data-action="force-rel" data-mode="bw">× poids du corps</button>
       </div>
       <svg class="fx-svg fx-chart" viewBox="0 0 ${W} ${H}" ${tipAttr(tips)}>
         ${grid.join('')}${wLine}${lines}${dots}${endLbl}${ticks.join('')}${cursor(T, B)}
       </svg>
-      ${tipLine(mode === 'base' ? 'Chaque courbe vaut 100 le jour de la reprise. Pointillés gris : ton poids.' : undefined)}
+      ${tipLine()}
+      <p class="fx-legend">${tiles.map((t) => `<span><b style="color:${t.c}">${t.name}</b> ${t.big} · ${t.small.split(' → ')[1]}</span>`).join('')}</p>
+      <p class="hint">Force relative (1RM ÷ poids) en moyenne sur 15 jours. Chaque courbe vaut 100 le jour de la reprise.</p>
     </section>`;
 }
 
@@ -375,13 +379,6 @@ function tierScale(k, value, big = false) {
     <circle cx="${xx(Math.min(s, 100))}" cy="11" r="4.5" fill="${EX[k].color}" class="fx-ring"/>
   </svg>`;
 }
-const nextTier = (k, value) => {
-  const th = EX[k].th;
-  const i = th.findIndex((t) => t > value);
-  if (i < 0) return 'au-delà d\'élite';
-  const d = th[i] - value;
-  return `${ZONES[i].label.toLowerCase()} à +${k === 'tr' ? Math.ceil(d) : kg(Math.ceil(d * 10) / 10)} ${k === 'tr' ? `rep${Math.ceil(d) > 1 ? 's' : ''}` : k === 'dev' ? 'kg / haltère' : 'kg'}`;
-};
 function spark(an, k) {
   const list = an.counted[k].filter((s) => s.date >= `${an.today.slice(0, 4)}-01-01`);
   if (list.length < 2) return '';
@@ -390,24 +387,6 @@ function spark(an, k) {
   return `<svg class="fx-spark" viewBox="0 0 150 40"><path d="${pathOf(list.map((s) => [x(s.date), y(s.level)]))}" fill="none" stroke="${EX[k].color}" stroke-width="2"/>
     <circle cx="${x(list.at(-1).date)}" cy="${y(list.at(-1).level)}" r="2.8" fill="${EX[k].color}"/></svg>`;
 }
-function exCards(an) {
-  return `<div class="fx-grid2">${EXS.map((k) => {
-    const lvl = an.levels[k];
-    const rec = an.records[k].s;
-    const val = rec ? F.metricOf(rec) : 0;
-    return `<button class="card fx-ex" data-action="force-ex" data-ex="${k}">
-      <span class="fx-ex-name"><i style="background:${EX[k].color}"></i>${EX[k].short}</span>
-      <span class="fx-ex-score"><b>${n1(lvl)}</b><small>/100</small></span>
-      <span class="fx-ex-zone">${F.zoneLabel(lvl)}</span>
-      ${tierScale(k, val)}
-      <small class="fx-ex-next">${nextTier(k, val)}</small>
-      ${spark(an, k)}
-      ${rec ? `<small class="fx-ex-rec">🏆 ${F.bestLabel(rec)} · ${dShort(rec.date)}</small>` : ''}
-      ${agoPill(an, k)}
-    </button>`;
-  }).join('')}</div>`;
-}
-
 // Détail d'un exercice
 function scoreChart(an, k) {
   const list = an.per[k];
@@ -525,80 +504,331 @@ function heatCard(an) {
   }).join('');
   const sel = ui.heat ? `<p class="fx-tipline">${dShort(ui.heat)} : ${by[ui.heat]?.length ? by[ui.heat].map((k) => EX[k].short).join(', ') : inPause(ui.heat) ? 'pause' : 'repos'}</p>` : '<p class="fx-tipline">Touche un jour pour voir ses exercices.</p>';
   const total = Object.keys(by).filter((d) => d <= an.today).length;
+  // Explorer un mois : grand calendrier lundi → dimanche
+  const month = ui.month || an.today.slice(0, 7);
+  const months = [];
+  for (let m = 1; m <= lastM; m++) months.push(`${yr}-${String(m).padStart(2, '0')}`);
+  const first = `${month}-01`;
+  const offset = (new Date(first + 'T12:00:00').getDay() + 6) % 7;
+  const nDays = new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7), 0)).getUTCDate();
+  const grid = [...Array(offset).fill('<span></span>'), ...Array.from({ length: nDays }, (_, i) => {
+    const iso = `${month}-${String(i + 1).padStart(2, '0')}`;
+    const n = by[iso]?.length || 0;
+    const cls = [n ? `l${Math.min(n, 3)}` : '', inPause(iso) ? 'pause' : '', iso === an.today ? 'today' : '', ui.heat === iso ? 'sel' : ''].join(' ');
+    return `<button class="${cls}" data-action="force-heat" data-d="${iso}">${i + 1}</button>`;
+  })].join('');
+  const nextMs = EXS.map((k) => {
+    const c = an.per[k].length;
+    const next = [10, 25, 50, 100, 150, 200, 250, 300, 400, 500].find((m) => m > c);
+    return { k, c, next, left: next - c };
+  }).sort((a, b) => a.left - b.left || b.c - a.c)[0];
   return `
     <section class="card">
-      <h2>🗓️ ${total} jours d'entraînement en ${yr}</h2>
-      <p class="fx-sub">Plus c'est foncé, plus il y a d'exercices suivis ce jour-là. Hachures : pauses.</p>
+      ${kicker('📅 Régularité')}
+      <h2 class="fx-title">Ton calendrier</h2>
+      <p class="fx-sub">${total} jours d'entraînement en ${yr} · plus c'est foncé, plus il y a d'exercices ce jour-là.</p>
       <svg class="fx-svg" viewBox="0 0 ${W} ${H}">${hatchDef('fxHatchG')}${head}${labels}${cells}</svg>
+      <div class="fx-explore"><span>Explorer un mois</span><select data-force-month>${months.map((m) => `<option value="${m}" ${m === month ? 'selected' : ''}>${MONTHS[+m.slice(5, 7) - 1].replace('.', '')} ${yr}</option>`).join('')}</select></div>
+      <div class="fx-cal"><b>L</b><b>M</b><b>M</b><b>J</b><b>V</b><b>S</b><b>D</b>${grid}</div>
       ${sel}
+      ${nextMs ? `<p class="fx-flag">⚑ ${nextMs.c} séances de ${EX[nextMs.k].short.toLowerCase()} · encore ${nextMs.left} pour la ${nextMs.next}e.</p>` : ''}
       <ul class="fx-counts">${counts}</ul>
-    </section>`;
-}
-
-// ---------- H. Records et jalons ----------
-function recordsCard(an) {
-  const ms = F.milestones(an);
-  const unit = (m) => (m.unit === 'pt' ? `+${n1(Math.max(0.1, m.dist))} pt` : m.unit === 'rep' ? `+${m.dist} rep${m.dist > 1 ? 's' : ''}` : `+${kg(Math.ceil(m.dist))} kg${m.unit === 'kg/haltère' ? ' par haltère' : ''}`);
-  const nextIdx = Math.floor(an.index / 5) * 5 + 5;
-  return `
-    <section class="card">
-      <h2>🏆 Records</h2>
-      <ul class="fx-recs">${EXS.map((k) => {
-        const r = an.records[k];
-        if (!r.s) return '';
-        return `<li><span><i style="background:${EX[k].color}"></i>${EX[k].short}</span><b>${F.bestLabel(r.s)}</b><small>${r.sessions.map((s) => dShort(s.date)).join(' et ')} · ${k === 'tr' ? '' : `1RM ${n0(r.s.oneRm)} kg · `}${n1(r.rel, 2)}×</small></li>`;
-      }).join('')}</ul>
-      <h2 class="fx-h2b">🎯 Prochains jalons</h2>
-      <ul class="fx-miles">${ms.map((m) => `<li><span><i style="background:${EX[m.ex].color}"></i>${EX[m.ex].short} ${m.zone.toLowerCase()}</span><b>${unit(m)}</b></li>`).join('')}
-        <li><span>⭐ Indice ${nextIdx}</span><b>${an.potential >= nextIdx ? '4 records refaits' : `+${n1(nextIdx - an.index)} pts`}</b></li>
-      </ul>
-    </section>`;
-}
-
-// ---------- I. Pauses et reprises ----------
-function pauseCard(an) {
-  const list = pauses();
-  const reprises = [];
-  const r0 = an.at(F.REPRISE);
-  if (r0 != null) reprises.push({ date: F.REPRISE, v: r0 });
-  for (const p of an.pauses) {
-    if (p.open || p.to >= an.today) continue;
-    const d = F.addDays(p.to, 1);
-    const v = an.at(d);
-    if (v != null && !reprises.some((x) => x.date === d)) reprises.push({ date: d, v, motif: p.motif });
-  }
-  const months = (d) => Math.max(1, Math.round(F.diffDays(d, an.today) / 30.4));
-  return `
-    <section class="card">
-      <h2>🔁 Tes reprises</h2>
-      <ul class="fx-miles">${reprises.map((r) => `<li><span>Reprise du ${dShort(r.date)}${r.motif ? ` (${esc(r.motif)})` : ''}</span><b class="good">${sgn(an.index - r.v)} pts en ${months(r.date)} mois</b></li>`).join('')}</ul>
-      <p class="hint">Ton schéma : après 2 à 3 semaines de pause, tu reviens plus fort.</p>
-      <h2 class="fx-h2b">⏸ Pauses déclarées</h2>
-      ${list.length ? `<ul class="fx-miles">${list.map((p, i) => `<li><span>${esc(p.motif || 'Pause')} · ${dShort(p.from)} → ${p.to ? dShort(p.to) : 'fin à préciser'}</span>
-        <button class="icon-btn" data-action="force-pause-del" data-i="${i}" aria-label="Supprimer">✕</button></li>`).join('')}</ul>` : '<p class="hint">Aucune pause déclarée.</p>'}
-      ${ui.pauseForm ? `
-        <form data-form="forcePause" class="form fx-pause-form">
-          <label class="field"><span>Du</span><input type="date" name="from" required value="${list.find((p) => !p.to)?.from || an.today}"></label>
-          <label class="field"><span>Au (reprise la veille)</span><input type="date" name="to"></label>
-          <label class="field full"><span>Motif</span><input name="motif" placeholder="ex : greffe" autocomplete="off"></label>
-          <button class="primary full">Déclarer la pause</button>
-        </form>` : '<button class="chip" data-action="force-pause-form">＋ Déclarer une pause</button>'}
-      ${list.some((p) => !p.to) ? '<p class="hint">Touche « ＋ Déclarer une pause » avec la même date de début pour ajouter la date de fin donnée par ton chirurgien.</p>' : ''}
     </section>`;
 }
 
 // ---------- K. Composition ----------
 function compoCard(an) {
-  const dx = settings().dexa;
+  const dx = [...(settings().dexaList || [])].sort((a, b) => (a.date < b.date ? -1 : 1)).at(-1);
   if (!dx) return '';
   const rels = EXS.map((k) => an.rel[k]).filter((r) => r.base && r.pts.length).map((r) => (r.pts.at(-1).value / r.base - 1) * 100);
   const w = an.weight.base ? (an.weight.now / an.weight.base - 1) * 100 : null;
   return `
-    <section class="card fx-compo">
-      <h2>🧬 Composition · DEXA du ${dShort(dx.date)}</h2>
-      <div class="fx-mini4 three"><div><span>Masse grasse</span><b>${n1(dx.bf)} %</b></div><div><span>Masse maigre</span><b>${n1(dx.lean)} kg</b></div><div><span>Poids moyen</span><b>${n1(an.weight.now)} kg</b></div></div>
-      ${rels.length && w != null ? `<p class="hint">Force relative ${pct(Math.min(...rels))} à ${pct(Math.max(...rels))} pendant que ton poids baissait de ${n0(Math.abs(w))} %.</p>` : ''}
+    <section class="card">
+      ${kicker(`🧬 DEXA · ${dShort(dx.date)}`)}
+      <h2 class="fx-title">Ta composition</h2>
+      <div class="fx-stats2"><div><span>Masse grasse</span><b>${n1(dx.bf)} %</b></div><div><span>Masse maigre</span><b>${n1(dx.lean)} kg</b></div></div>
+      ${rels.length && w != null ? `<p>Du ${dShort(F.REPRISE)} au ${dShort(an.today)} · force relative en hausse de ${n0(Math.min(...rels))} à ${n0(Math.max(...rels))} % pour un poids en baisse de ${n0(Math.abs(w))} %.</p>` : ''}
     </section>`;
+}
+
+// ---------- Pictogrammes des exercices ----------
+const ICONS = {
+  squat: '<path d="M3 9v6M6 7v10M18 7v10M21 9v6M6 12h12"/>',
+  dev: '<path d="M4 17l8-6M3 20h18M14 6l4 4M12 8l2-2 4 4-2 2z"/>',
+  rdl: '<path d="M4 6v12M8 6v12M16 6v12M20 6v12M8 12h8"/>',
+  tr: '<path d="M4 4h16M8 4v3a4 4 0 0 0 8 0V4M12 11v4M9 21l3-6 3 6"/>',
+};
+const icon = (k) => `<span class="fx-ico" style="--c:${EX[k].color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg></span>`;
+const kicker = (t) => `<p class="fx-kick">${t}</p>`;
+const longDate = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+// ---------- En-tête et navigation du carnet ----------
+const PAGES = [['overview', "Vue d'ensemble"], ['progress', 'Progression'], ['weight', 'Poids'], ['journal', 'Journal']];
+const TITLES = { overview: 'Ta force', progress: 'Ta progression', weight: 'Ton poids', journal: 'Journal de séances', method: 'Méthode' };
+function head(an, page) {
+  const btn = page === 'weight'
+    ? '<button class="fx-head-btn" data-action="quick" data-mtab="body">＋ Pesée</button>'
+    : '<button class="fx-head-btn" data-action="new-workout">＋ Séance</button>';
+  return `
+    <nav class="fx-nav">${PAGES.map(([k, t]) => `<button class="${page === k ? 'on' : ''}" data-action="force-page" data-p="${k}">${t}</button>`).join('')}</nav>
+    <header class="fx-head"><div><p class="fx-date">${longDate(an.today)}</p><h1>${TITLES[page]}</h1></div>${btn}</header>`;
+}
+const foot = () => `
+  <footer class="fx-foot"><span>Muscu · Carnet de Thierry</span>
+    <button data-action="force-page" data-p="journal" data-backup="1">💾 Mes données</button>
+    <button data-action="force-page" data-p="method">Méthode</button></footer>`;
+
+// ---------- Vue d'ensemble : cartes exercice ----------
+function exCards(an) {
+  return `<div class="fx-grid2">${EXS.map((k) => {
+    const lvl = an.levels[k];
+    const rec = an.records[k].s;
+    const val = rec ? F.metricOf(rec) : 0;
+    const th = EX[k].th;
+    const s = F.scoreOf(k, val);
+    const ago = an.last[k] ? F.diffDays(an.last[k], an.today) : null;
+    const cls = an.activePause || ago == null ? '' : ago < 14 ? 'ok' : ago < 28 ? 'mid' : 'bad';
+    return `<button class="card fx-ex" data-action="force-ex" data-ex="${k}">
+      <span class="fx-ex-top">${icon(k)}<span class="fx-chev">›</span></span>
+      <span class="fx-ex-name">${EX[k].name}</span>
+      <span class="fx-ex-score"><b>${n1(lvl)}</b><small>/100</small></span>
+      <span class="fx-ex-zone" style="color:${EX[k].color}">${F.zoneLabel(lvl)}</span>
+      ${spark(an, k)}
+      ${rec ? `<span class="fx-ex-rec"><b>${F.bestLabel(rec)}</b><small>${dShort(rec.date)}${k === 'tr' ? '' : ` · 1RM ${n0(rec.oneRm)} kg`}</small></span>` : ''}
+      <svg class="fx-tier" viewBox="0 0 150 14"><rect x="2" y="5" width="146" height="3" rx="1.5" class="fx-track"/>
+        ${[5, 20, 50, 80, 95].map((p) => `<line x1="${2 + 1.46 * p}" x2="${2 + 1.46 * p}" y1="2" y2="11" class="fx-tick2"/>`).join('')}
+        <circle cx="${2 + 1.46 * Math.min(s, 100)}" cy="6.5" r="4.5" fill="${EX[k].color}"/></svg>
+      <span class="fx-tier-ends"><small>${kg(th[0])} ${k === 'tr' ? 'reps' : 'kg'}</small><small>${kg(th[4])} ${k === 'tr' ? 'reps' : 'kg'}</small></span>
+      <small class="fx-ex-next">${nextTier(k, val)}</small>
+      <span class="fx-pill ${cls}">● ${ago == null ? 'jamais' : ago === 0 ? "Aujourd'hui" : ago === 1 ? 'Hier' : `Il y a ${ago} j`}</span>
+    </button>`;
+  }).join('')}</div>`;
+}
+const nextTier = (k, value) => {
+  const th = EX[k].th;
+  const i = th.findIndex((t) => t > value);
+  if (i < 0) return 'Au-delà d\'élite';
+  const d = th[i] - value;
+  return `${ZONES[i].label} · +${k === 'tr' ? `${Math.ceil(d)} rep${Math.ceil(d) > 1 ? 's' : ''}` : `${kg(Math.ceil(d * 10) / 10)} kg${k === 'dev' ? ' / haltère' : ''}`}`;
+};
+
+// Paliers : records, distance au palier suivant, potentiel
+function paliersCard(an) {
+  const bw = an.weight.now || F.DEFAULT_BW;
+  const potNow = an.potentialAt(bw);
+  const ms = F.milestones(an).filter((m) => m.unit === 'pt');
+  return `
+    <section class="card">
+      ${kicker('🏆 Records et jalons')}
+      <h2 class="fx-title">Tes prochains paliers</h2>
+      <ul class="fx-rows">${EXS.map((k) => {
+        const r = an.records[k];
+        if (!r.s) return '';
+        return `<li data-action="force-ex" data-ex="${k}">${icon(k)}<div><b>${EX[k].name} · ${F.bestLabel(r.s)}</b>
+          <small>${r.sessions.map((s) => dShort(s.date)).join(' et ')} · ${nextTier(k, F.metricOf(r.s)).replace(' · +', ' à +')}</small></div><span class="fx-chev">›</span></li>`;
+      }).join('')}</ul>
+      <div class="fx-box"><b>Indice potentiel · ≈ ${n0(potNow)}/100</b>
+        <p>Tes quatre records depuis la reprise refaits à ${n1(bw)} kg. À 76 kg, projection ${n1(an.potential)}/100.</p></div>
+      ${ms.map((m) => `<p class="hint">Au ${EX[m.ex].short.toLowerCase()}, ton niveau moyen est à ${n1(an.levels[m.ex])}. Encore ${n1(Math.max(0.1, m.dist))} pt pour passer ${m.zone.toLowerCase()}.</p>`).join('')}
+    </section>`;
+}
+
+// Reprises : la grosse progression depuis la reprise + effet du poids + pauses
+function reprisesCard(an) {
+  const r0 = an.at(F.REPRISE);
+  const bw = an.weight.now || F.DEFAULT_BW;
+  const rec = an.records.squat.s;
+  const list = pauses();
+  return `
+    <section class="card">
+      ${kicker('↗ Tes reprises')}
+      <h2 class="fx-title">Depuis le ${dShort(F.REPRISE)}</h2>
+      ${r0 != null ? `<p class="fx-huge good">${sgn(an.index - r0)} <small>points</small></p>
+        <p>Ton indice est passé de <b>${n1(r0)}</b> à <b>${n1(an.index)}</b> depuis la reprise du squat.</p>` : ''}
+      ${rec ? `<div class="fx-box"><b>Effet du poids · squat</b>
+        <p>${F.bestLabel(rec)} valait ${n1(rec.score)}/100 à ${n1(rec.bw)} kg le ${dShort(rec.date)}. À ${n1(bw)} kg, la même série vaut ${n1(F.scoreOf('squat', F.metricOf(rec), bw))}/100.</p></div>` : ''}
+      <button class="fx-outline" data-action="force-page" data-p="progress">Explorer mes courbes →</button>
+      <h3 class="fx-h3">⏸ Pauses</h3>
+      ${list.length ? `<ul class="fx-miles">${list.map((p, i) => `<li><span>${esc(p.motif || 'Pause')} · ${dShort(p.from)} → ${p.to ? dShort(p.to) : 'fin à préciser'}</span>
+        <button class="icon-btn" data-action="force-pause-del" data-i="${i}" aria-label="Supprimer">✕</button></li>`).join('')}</ul>` : '<p class="hint">Aucune pause déclarée.</p>'}
+      ${ui.pauseForm ? `
+        <form data-form="forcePause" class="form fx-pause-form">
+          <label class="field"><span>Du</span><input type="date" name="from" required value="${list.find((p) => !p.to)?.from || an.today}"></label>
+          <label class="field"><span>Au</span><input type="date" name="to"></label>
+          <label class="field full"><span>Motif</span><input name="motif" placeholder="ex : greffe" autocomplete="off"></label>
+          <button class="primary full">Enregistrer la pause</button>
+        </form>` : `<button class="chip" data-action="force-pause-form">${list.some((p) => !p.to) ? '✎ Ajouter la date de fin' : '＋ Déclarer une pause'}</button>`}
+    </section>`;
+}
+
+// ---------- Poids : blocs de 15 jours, repères, courbe, DEXA ----------
+const W_ANCHOR = '2026-06-26';
+const W_BLOCK = 15;
+const kg2 = (v) => n1(v, 2);
+function weightPage(an) {
+  const raw = store.get().body.filter((b) => b.weight > 0);
+  const med = medians();
+  if (!med.length) {
+    return `<section class="card"><p>Aucune pesée enregistrée dans l'app.</p>
+      <button class="primary block" data-action="quick" data-mtab="body">＋ Ajouter une pesée</button></section>${dexaCard()}`;
+  }
+  const n = Math.floor(F.diffDays(W_ANCHOR, an.today) / W_BLOCK);
+  const blocks = [];
+  for (let b = 0; b <= n; b++) {
+    const start = F.addDays(W_ANCHOR, b * W_BLOCK);
+    const stop = F.addDays(start, W_BLOCK - 1);
+    const days = med.filter((m) => m.date >= start && m.date <= stop);
+    if (days.length && stop <= an.today) blocks.push({ n: b + 1, start, stop, days, avg: days.reduce((s, m) => s + m.weight, 0) / days.length });
+  }
+  const last = blocks.at(-1);
+  let streak = 0;
+  for (let i = blocks.length - 1; i > 0 && blocks[i].avg < blocks[i - 1].avg; i--) streak++;
+  const downs = blocks.filter((b, i) => i && b.avg < blocks[i - 1].avg).length;
+  const pick = blocks[ui.wb ?? blocks.length - 1] ? (ui.wb ?? blocks.length - 1) : blocks.length - 1;
+  const sel = blocks[pick];
+  const prevSel = blocks[pick - 1];
+  // Mini-courbe des moyennes de blocs
+  const sx = xOf(blocks[0]?.start || an.today, last?.start || an.today, 8, 112);
+  const ys = blocks.length ? yOf(Math.min(...blocks.map((b) => b.avg)), Math.max(...blocks.map((b) => b.avg)), 52, 12) : () => 0;
+  const heroCard = last ? `
+    <section class="card fx-wk-hero">
+      ${kicker('Moyenne du dernier bloc clos')}
+      <div class="fx-wk-top"><div><p class="fx-huge">${kg2(last.avg)} <small>kg</small></p><p>Bloc ${last.n} · ${dShort(last.start)} – ${dShort(last.stop)}</p></div>
+        ${blocks.length > 1 ? `<svg viewBox="0 0 120 64" class="fx-wk-spark"><path d="${pathOf(blocks.map((b) => [sx(b.start), ys(b.avg)]))}" fill="none" stroke="currentColor" stroke-width="1.6"/>
+          ${blocks.map((b) => `<circle cx="${sx(b.start)}" cy="${ys(b.avg)}" r="1.8" fill="currentColor"/>`).join('')}
+          <text x="4" y="8" class="fx-t-inv">${kg2(blocks[0].avg)}</text><text x="116" y="62" text-anchor="end" class="fx-t-inv">${kg2(last.avg)}</text></svg>` : ''}</div>
+      <div class="fx-wk-foot"><div><b>${blocks.length > 1 ? `${last.avg - blocks[0].avg < 0 ? '−' : '+'}${kg2(Math.abs(last.avg - blocks[0].avg))} kg` : '–'}</b><span>depuis le premier bloc</span></div>
+        <div><b>${streak} baisse${streak > 1 ? 's' : ''} de suite</b><span>sur les blocs clos</span></div></div>
+    </section>` : '';
+  // Barres des blocs
+  const H = 150;
+  const bwid = Math.min(30, (W - 16) / blocks.length - 6);
+  const gap = blocks.length > 1 ? (W - 16 - blocks.length * bwid) / (blocks.length - 1) : 0;
+  const lo = Math.min(...blocks.map((b) => b.avg)) - 3;
+  const hi = Math.max(...blocks.map((b) => b.avg)) + 0.5;
+  const y = yOf(lo, hi, 116, 22);
+  const bars = blocks.map((b, i) => {
+    const x = 8 + i * (bwid + gap);
+    return `<g data-action="force-wb" data-i="${i}" class="fx-hit"><rect x="${x - 3}" y="4" width="${bwid + 6}" height="${H - 8}" rx="6" class="fx-wk-sel ${i === pick ? 'on' : ''}"/>
+      <rect x="${x}" y="${y(b.avg)}" width="${bwid}" height="${116 - y(b.avg)}" rx="3" class="fx-wk-bar ${i === pick ? 'on' : i % 2 ? 'alt' : ''}"/>
+      <text x="${x + bwid / 2}" y="${y(b.avg) - 5}" text-anchor="middle" class="fx-t-small">${kg2(b.avg)}</text>
+      <text x="${x + bwid / 2}" y="134" text-anchor="middle" class="fx-t-strong">B${b.n}</text></g>`;
+  }).join('');
+  const blocksCard = blocks.length ? `
+    <section class="card">
+      <div class="fx-card-head">${kicker(`Blocs de ${W_BLOCK} jours`)}<span class="fx-badge">${blocks.length} bloc${blocks.length > 1 ? 's' : ''} clos</span></div>
+      <h2 class="fx-title">${downs} baisse${downs > 1 ? 's' : ''} sur ${blocks.length - 1} comparaison${blocks.length > 2 ? 's' : ''}</h2>
+      <svg class="fx-svg" viewBox="0 0 ${W} ${H}">${bars}</svg>
+      <div class="fx-wk-nav"><button data-action="force-wb" data-i="${pick - 1}" ${pick ? '' : 'disabled'}>‹</button>
+        <div><b>Bloc ${sel.n}</b><small>${dShort(sel.start)} – ${dShort(sel.stop)}</small></div>
+        <button data-action="force-wb" data-i="${pick + 1}" ${pick < blocks.length - 1 ? '' : 'disabled'}>›</button></div>
+      <div class="fx-stats3"><div><span>Moyenne</span><b>${kg2(sel.avg)} <small>kg</small></b></div>
+        <div><span>Bloc précédent</span><b>${prevSel ? `${sel.avg - prevSel.avg < 0 ? '−' : '+'}${kg2(Math.abs(sel.avg - prevSel.avg))}` : '–'} <small>kg</small></b></div>
+        <div><span>Jours pesés</span><b>${sel.days.length}<small>/${W_BLOCK}</small></b></div></div>
+      ${(() => {
+        const list = raw.filter((r) => r.date >= sel.start && r.date <= sel.stop).sort((a, b) => (a.date < b.date ? 1 : -1));
+        return `<button class="fx-more" data-action="force-wlist">📋 ${ui.wlist ? 'Masquer' : 'Voir'} les ${list.length} pesées du bloc ${ui.wlist ? '⌃' : '⌄'}</button>
+          ${ui.wlist ? `<ul class="fx-miles">${list.map((r) => `<li><span>${dShort(r.date)}</span><b>${kg2(r.weight)} kg</b></li>`).join('')}</ul>` : ''}`;
+      })()}
+      <p class="hint">Chaque jour pesé compte une fois, par sa médiane. Les jours sans pesée restent vides.</p>
+    </section>` : '';
+  // Où tu en es
+  const lastRaw = [...raw].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)).at(-1);
+  const week = Array.from({ length: 7 }, (_, i) => F.addDays(an.today, i - 6));
+  const wk = med.filter((m) => m.date >= week[0] && m.date <= an.today);
+  const wkAvg = wk.length ? wk.reduce((s, m) => s + m.weight, 0) / wk.length : null;
+  const letters = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+  const whereCard = `
+    <section class="card">
+      ${kicker('📅 Tes repères')}
+      <h2 class="fx-title">Où tu en es</h2>
+      <div class="fx-where"><div><span>Dernière pesée</span><b>${kg2(lastRaw.weight)} <small>kg</small></b></div><small>${dShort(lastRaw.date)}</small></div>
+      <div class="fx-where"><div><span>Moyenne sur 7 jours</span><b>${wkAvg ? kg2(wkAvg) : '–'} <small>kg</small></b></div><small>${wk.length}/7 jours pesés</small></div>
+      <div class="fx-week">${week.map((d) => `<div class="${med.some((m) => m.date === d) ? 'on' : ''}"><i></i><small>${letters[new Date(d + 'T12:00:00').getDay()]}</small></div>`).join('')}</div>
+    </section>`;
+  return heroCard + blocksCard + whereCard + weightCurve(an, med) + dexaCard();
+}
+function weightCurve(an, med) {
+  const from = ui.wRange === '30' ? F.addDays(an.today, -29) : med[0].date;
+  const ma = med.map((m) => {
+    const w = med.filter((x) => x.date <= m.date && x.date >= F.addDays(m.date, -6));
+    return { date: m.date, v: w.reduce((s, x) => s + x.weight, 0) / w.length };
+  }).filter((p) => p.date >= from);
+  if (!ma.length) return '';
+  const H = 200, L = 32, R = 334, T = 10, B = 172;
+  const lo = Math.floor(Math.min(...ma.map((p) => p.v)) / 5) * 5;
+  const hi = Math.ceil(Math.max(...ma.map((p) => p.v)) / 5) * 5 || lo + 5;
+  const x = xOf(ma[0].date, an.today, L, R);
+  const y = yOf(lo, hi === lo ? lo + 5 : hi, B, T);
+  const grid = [];
+  for (let v = lo; v <= hi; v += ui.wRange === '30' ? 1 : 5) grid.push(`<line x1="${L}" x2="${R}" y1="${y(v)}" y2="${y(v)}" class="fx-grid"/><text x="${L - 5}" y="${y(v) + 3}" text-anchor="end" class="fx-t-muted">${v}</text>`);
+  const lastP = ma.at(-1);
+  const tips = ma.map((p) => [x(p.date), y(p.v), `${dShort(p.date)} · moyenne 7 j : ${kg2(p.v)} kg`]);
+  return `
+    <section class="card">
+      ${kicker('📈 Moyenne mobile · 7 jours')}
+      <h2 class="fx-title">Ta courbe de poids</h2>
+      <div class="fx-toggle"><button class="${ui.wRange !== '30' ? 'on' : ''}" data-action="force-wrange" data-r="all">Tout l'historique</button><button class="${ui.wRange === '30' ? 'on' : ''}" data-action="force-wrange" data-r="30">30 derniers jours</button></div>
+      <div class="fx-where"><div><b>${kg2(lastP.v)} <small>kg</small></b></div><small><b>${dShort(lastP.date)}</b><br>Moyenne mobile</small></div>
+      <svg class="fx-svg fx-chart" viewBox="0 0 ${W} ${H}" ${tipAttr(tips)}>${grid.join('')}
+        ${gapPaths(ma.map((p) => [x(p.date), y(p.v)]), ma.map((p) => p.date), 'var(--fx-index)', 2.4, 7)}
+        <circle cx="${x(lastP.date)}" cy="${y(lastP.v)}" r="4" class="fx-now"/>
+        ${monthTicks(ma[0].date, an.today, x, B + 18)}${cursor(T, B)}</svg>
+      ${tipLine('Pointillés · tendance estimée (plus de 7 jours sans pesée)')}
+    </section>`;
+}
+function dexaCard() {
+  const list = [...(settings().dexaList || [])].sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (!list.length) return '';
+  return `
+    <section class="card">
+      ${kicker('🧬 Composition corporelle')}
+      <h2 class="fx-title">Tes ${list.length > 1 ? `${list.length === 2 ? 'deux' : list.length} repères` : 'repère'} DEXA</h2>
+      <div class="fx-dexa">${list.map((d, i) => `<div class="${i === list.length - 1 ? 'last' : ''}"><b>${longDate(d.date).replace(/^\S+ /, '')}</b>
+        <p class="fx-mid">${kg2(d.weight)} <small>kg</small></p><small>${n1(d.bf, 2)} % de masse grasse · ${kg2(d.lean)} kg de masse maigre</small></div>`).join('')}</div>
+      <p class="hint">Ces examens sont présentés séparément des moyennes de pesée.</p>
+    </section>`;
+}
+
+// ---------- Journal ----------
+function journalPage(an, extra) {
+  const f = ui.jf || 'all';
+  const all = [...an.sessions].reverse();
+  const list = f === 'all' ? all : all.filter((s) => s.ex === f);
+  const shown = list.slice(0, ui.jn || 40);
+  const reps = (s) => s.sets.reduce((t, x) => t + x.reps, 0);
+  return `
+    <section class="card">
+      <div class="fx-card-head">${kicker('📖 Historique')}<button class="fx-save" data-action="force-backup" aria-label="Mes données">💾</button></div>
+      <h2 class="fx-title">${list.length} séances</h2>
+      ${ui.backup ? backupCard() : ''}
+      <div class="fx-filters">${[['all', 'Tout'], ...EXS.map((k) => [k, EX[k].short])].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-action="force-jf" data-f="${k}">${t}</button>`).join('')}</div>
+      <ul class="fx-rows fx-jrows">${shown.map((s) => `
+        <li data-action="force-ex" data-ex="${s.ex}" class="${s.light ? 'light' : ''}">${icon(s.ex)}
+          <div><b>${EX[s.ex].short === 'Développé' ? 'Développé incliné' : EX[s.ex].name}</b><small>${dShort(s.date)}${s.date.slice(0, 4) !== an.today.slice(0, 4) ? ` ${s.date.slice(0, 4)}` : ''} · ${s.sets.length} série${s.sets.length > 1 ? 's' : ''} · ${reps(s)} reps${s.src === 'app' ? ' · app' : ''}</small></div>
+          <div class="r"><b>${s.ex === 'tr' ? `${s.best.reps} reps` : F.bestLabel(s)}</b><small>${n1(s.score)}/100 · ${s.reliab === 'legere' ? 'légère' : s.reliab}</small></div></li>`).join('')}</ul>
+      ${list.length > shown.length ? `<button class="fx-outline" data-action="force-jmore">Voir ${Math.min(40, list.length - shown.length)} séances de plus</button>` : ''}
+    </section>
+    ${extra}`;
+}
+
+// ---------- Méthode ----------
+function methodPage() {
+  const li = (b, t) => `<li><b>${b}</b> : ${t}</li>`;
+  return `
+    <section class="card fx-method"><ul>
+      ${li('Indice de force (sur 100)', 'chaque exercice reçoit un score qui dit quelle part des pratiquants de ton âge et de ton poids tu dépasses, puis l\'indice en fait la moyenne pondérée : squat 30 %, développé incliné 30 %, soulevé roumain 20 %, tractions 20 %.')}
+      ${li('Score d\'une séance', 'barèmes hommes Strength Level selon le poids de corps (débutant 5 %, novice 20 %, intermédiaire 50 %, avancé 80 %, élite 95 %), interpolés selon ton poids du jour. Développé : 1RM par haltère. Tractions : ta meilleure série en reps. Mêmes barèmes de 25 à 40 ans.')}
+      ${li('1RM estimé', 'formule d\'Epley sur la meilleure série : charge × (1 + reps ÷ 30). Au-delà de 12 reps, estimation moins sûre.')}
+      ${li('Fiabilité', '« solide » de 2 à 12 reps ; « indicative » au-delà de 12 reps ou sur une seule rep ; « légère » sous 50 % de ton meilleur 1RM à date, exclue des moyennes et de l\'indice.')}
+      ${li('Niveau du moment', 'moyenne des scores des 15 derniers jours, prise à ta dernière séance. Sans séance, il garde sa valeur : l\'indice ne baisse jamais sans mesure.')}
+      ${li('Blocs de 2 semaines', `depuis le ${dShort(F.ANCHOR)}. Valeur d'un exercice = moyenne de ses scores du bloc ; sans séance, celle du bloc d'avant. Un bloc est gagné quand l'indice dépasse celui du bloc précédent.`)}
+      ${li('Objectifs du bloc', 'le score à battre (au squat : 80 minimum pour passer avancé), converti en séries par Epley inversé, charge arrondie au-dessus (2,5 kg à la barre, 2 kg par haltère).')}
+      ${li('Poids du moment', 'moyenne des médianes de pesée à ± 3 jours de la séance, sinon interpolation entre deux pesées ; avant le 23 juin, 85 kg par hypothèse.')}
+      ${li('Force relative', '1RM ÷ poids du moment, en moyenne sur 15 jours ; base 100 à la reprise du 6 août.')}
+      ${li('Désentraînement', 'la force maximale tient environ 4 semaines sans entraînement puis baisse plus vite (Bosquet et al., 2013) : vert sous 14 jours, orange jusqu\'à 27, rouge à partir de 28.')}
+      ${li('Poids', 'blocs de 15 jours ; chaque jour pesé compte une fois, par sa médiane.')}
+    </ul><p class="hint">Sources : strengthlevel.com (barèmes hommes en kg : squat, incline dumbbell bench press, romanian deadlift, chin ups) ; stronger by science (désentraînement).</p></section>`;
 }
 
 // ---------- Sauvegarde texte ----------
@@ -639,27 +869,21 @@ function importData(text) {
 }
 
 // ---------- Vue ----------
-export function view(extra = '') {
+export function view(extra = {}) {
   if (!journalText) {
     return `<header class="page-head"><h1>Salle</h1></header>
-      <section class="card"><p class="hint">${journalError ? '⚠️ Journal introuvable : vérifie ta connexion puis rouvre l\'app.' : 'Chargement du journal…'}</p></section>${extra}`;
+      <section class="card"><p class="hint">${journalError ? '⚠️ Journal introuvable : vérifie ta connexion puis rouvre l\'app.' : 'Chargement du journal…'}</p></section>`;
   }
   const an = analysis();
   if (ui.detail && EX[ui.detail]) return detailView(an, ui.detail);
-  return `
-    ${hero(an)}
-    ${mission(an)}
-    ${blocksCard(an)}
-    ${indexCard(an)}
-    ${relCard(an)}
-    <h2 class="fx-section">Tes 4 exercices</h2>
-    ${exCards(an)}
-    ${recordsCard(an)}
-    ${heatCard(an)}
-    ${pauseCard(an)}
-    ${compoCard(an)}
-    ${extra}
-    ${backupCard()}`;
+  const page = ui.page;
+  let body = '';
+  if (page === 'progress') body = indexCard(an) + relCard(an) + blocksCard(an) + heatCard(an) + (extra.sets || '') + compoCard(an);
+  else if (page === 'weight') body = weightPage(an);
+  else if (page === 'journal') body = journalPage(an, extra.history || '');
+  else if (page === 'method') body = methodPage();
+  else body = hero(an) + mission(an) + `<h2 class="fx-section">Tes 4 exercices</h2>` + exCards(an) + paliersCard(an) + reprisesCard(an);
+  return head(an, page) + body + foot();
 }
 
 // Aperçu en direct dans la saisie d'une séance : 1RM → score → objectif
@@ -670,10 +894,10 @@ export function preview(name, sets, bw) {
   const clean = sets.map((s) => ({ reps: Number(String(s.reps).replace(',', '.')) || 0, kg: k === 'tr' ? 0 : Number(String(s.weight).replace(',', '.')) || 0 })).filter((s) => s.reps > 0);
   if (!clean.length) return '';
   const [s] = F.enrich([{ date: today(), ex: k, sets: clean, bw: bw || F.DEFAULT_BW }]);
-  const sc = F.scoreOf(k, F.metricOf(s));
+  const sc = s.score; // barème au poids du jour
   const g = an.goals?.[k];
   const ok = g && sc > g.target + 1e-9;
-  const warn = bw && (bw < F.BW_REF[0] || bw > F.BW_REF[1]) ? ' · barèmes à 76 kg' : '';
+  const warn = '';
   return `${k === 'tr' ? `${s.best.reps} reps` : `1RM ${n0(s.oneRm)} kg`} → <b>${n1(sc)}/100</b>${g ? ok ? ' → <b class="good">objectif atteint ✓</b>' : ` · objectif > ${n1(g.target)}` : ''}${warn}`;
 }
 // Valeurs proposées pour une nouvelle série : l'objectif du bloc
@@ -752,6 +976,12 @@ function onTouch(e) {
   if (tip?.classList.contains('fx-tipline')) tip.textContent = best[2];
 }
 if (typeof document !== 'undefined') {
+  document.addEventListener('change', (e) => {
+    if (!e.target.matches?.('[data-force-month]')) return;
+    ui.month = e.target.value;
+    ui.heat = null;
+    document.dispatchEvent(new CustomEvent('space-changed'));
+  });
   document.addEventListener('pointerdown', onTouch);
   document.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType === 'touch') onTouch(e); });
 }
@@ -759,6 +989,13 @@ if (typeof document !== 'undefined') {
 // ---------- Actions et formulaires ----------
 export const actions = {
   'force-ex'(el) { ui.detail = el.dataset.ex; window.scrollTo(0, 0); },
+  'force-page'(el) { ui.page = el.dataset.p; ui.detail = null; if (el.dataset.backup) ui.backup = true; window.scrollTo(0, 0); },
+  'force-wb'(el) { ui.wb = +el.dataset.i; ui.wlist = false; },
+  'force-wlist'() { ui.wlist = !ui.wlist; },
+  'force-wrange'(el) { ui.wRange = el.dataset.r; },
+  'force-jf'(el) { ui.jf = el.dataset.f; ui.jn = 40; },
+  'force-jmore'() { ui.jn += 40; },
+  'force-backup'() { ui.backup = !ui.backup; },
   'force-back'() { ui.detail = null; window.scrollTo(0, 0); },
   'force-rel'(el) { ui.relMode = el.dataset.mode; },
   'force-block'(el) { ui.block = ui.block === +el.dataset.i ? null : +el.dataset.i; },

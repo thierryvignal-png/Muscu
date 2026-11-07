@@ -694,7 +694,7 @@ views.gym = () => {
         ${workouts.length > 8 && !state.allWorkouts ? `<button class="chip" data-action="all-workouts">Voir les ${workouts.length} séances</button>` : ''}`
       : '<p class="hint">Aucune séance notée dans l\'app pour l\'instant.</p>'
   );
-  return banner + force.view(weekSetsCard() + history);
+  return banner + force.view({ sets: weekSetsCard(), history });
 };
 
 // Noms affichés des exercices du programme
@@ -885,6 +885,7 @@ function render() {
   main.innerHTML = spaceSwitch(space) + page;
   formatNumberInputs(main); // espaces entre les milliers dans les champs
   document.body.classList.toggle('no-tabbar', space !== 'muscu');
+  document.body.classList.toggle('carnet', space === 'muscu' && current === 'gym' && !(state.draft && state.editorOpen));
   document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.tab === current));
   window.scrollTo(0, y);
   if (space === 'muscu' && current === 'gym') force.afterRender();
@@ -1475,7 +1476,17 @@ document.addEventListener('toast', (e) => toast(e.detail)); // message envoyé p
 
 // Pause greffe (fin à préciser) et DEXA du 02/11/2026 : données de départ du tableau de force (une seule fois)
 if (!store.settings().forceSeeded) {
-  store.setSettings({ pauses: store.settings().pauses || [{ from: '2026-11-20', to: null, motif: 'greffe' }], dexa: { date: '2026-11-02', bf: 6.2, lean: 66.6 }, forceSeeded: true });
+  store.setSettings({ pauses: store.settings().pauses || [{ from: '2026-11-20', to: null, motif: 'greffe' }], forceSeeded: true });
+}
+// Repères DEXA (25 août et 2 nov. 2026)
+if (!store.settings().dexaSeeded) {
+  store.setSettings({
+    dexaList: store.settings().dexaList || [
+      { date: '2026-08-25', weight: 79.89, bf: 9.01, lean: 69.81 },
+      { date: '2026-11-02', weight: 74.08, bf: 6.16, lean: 66.65 },
+    ],
+    dexaSeeded: true,
+  });
 }
 
 const initial = location.hash.slice(1);
