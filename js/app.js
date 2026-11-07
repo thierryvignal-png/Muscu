@@ -2,6 +2,7 @@ import { store } from './store.js';
 import { setSpace, spaceSwitch, spaceMenu, spaceViews, SPACE_KEYS } from './spaces.js';
 import * as clinic from './clinic.js';
 import * as ideas from './ideas.js';
+import * as force from './force-ui.js';
 import * as fundraising from './fundraising.js';
 import { formatNumberInputs } from './util.js';
 import * as goodnews from './goodnews.js';
@@ -630,44 +631,6 @@ function saveDraft() {
   } catch {}
 }
 
-// Big five : dernière séance où chaque mouvement a été fait (reconnu dans le nom de l'exercice)
-const BIG_THREE = [
-  { label: 'Squat', re: /^(?!.*(split|bulgar|goblet)).*squat/i },
-  { label: 'RDL', re: /\brdl\b|roumain|romanian/i },
-  { label: 'Bench', re: /bench|d[ée]velopp/i }, // développé incliné haltères
-  { label: 'Élév. latérales', re: /lat[ée]ral|lateral raise/i },
-  { label: 'Tractions', re: /traction|chin.?up/i },
-];
-function bigThreeCard() {
-  const ws = store.get().workouts;
-  const manual = store.settings().big3 || {}; // dates saisies à la main : {Squat: '2026-10-20', …}
-  const rows = BIG_THREE.map((b) => {
-    const dates = ws.filter((w) => w.exercises.some((e) => b.re.test(e.name))).map((w) => w.date);
-    if (manual[b.label]) dates.push(manual[b.label]);
-    const last = dates.sort().pop();
-    return { ...b, last, ago: last ? daysBetween(last, today()) : null };
-  });
-  const latest = rows.map((r) => r.last).filter(Boolean).sort().pop();
-  const agoTxt = (n) => (n === 0 ? "aujourd'hui" : n === 1 ? 'hier' : `il y a ${n} j`);
-  return `
-    <section class="card big3">
-      <div class="big3-head"><span>🏋️ Dernier big five</span><b>${latest ? `${fmtDate(latest)} · ${agoTxt(daysBetween(latest, today()))}` : 'jamais'}</b></div>
-      ${rows.map((r) => `
-        <label class="big3-row">
-          <span>${r.label}</span>
-          <span class="big3-ago ${r.ago == null || r.ago > 7 ? 'warn' : ''}">${r.last ? agoTxt(r.ago) : 'touche la date →'}</span>
-          <input type="date" data-big3="${r.label}" value="${r.last || ''}" max="${today()}">
-        </label>`).join('')}
-      <p class="hint">Touche une date pour la changer. Les séances enregistrées la mettent à jour toutes seules.</p>
-    </section>`;
-}
-// Date d'un big three saisie à la main
-document.addEventListener('change', (e) => {
-  const k = e.target.dataset?.big3;
-  if (!k) return;
-  store.setSettings({ big3: { ...(store.settings().big3 || {}), [k]: e.target.value || null } });
-});
-
 // Sets par semaine (lundi → dimanche), au total et par muscle
 const MUSCLES = [
   { label: '🦵 Jambes', re: /squat|\brdl\b|roumain|romanian/i },
@@ -705,57 +668,45 @@ function weekSetsCard() {
 views.gym = () => {
   if (state.draft && state.editorOpen) return gymEditor();
   const workouts = [...store.get().workouts].sort(byDate).reverse();
-  const names = exerciseNames();
-  const ex = state.exercise && names.includes(state.exercise) ? state.exercise : names[0];
-  const hist = ex ? exerciseHistory(ex) : [];
-  const pr = hist.reduce((b, h) => (h.e1rm > (b?.e1rm || 0) ? h : b), null);
-  const prTop = hist.reduce((b, h) => (h.top > (b?.top || 0) ? h : b), null);
-  const lastH = hist[hist.length - 1];
-
-  return `
-    <header class="page-head"><h1>Salle</h1></header>
-    ${bigThreeCard()}
-    ${weekSetsCard()}
-    ${state.draft ? `
+  const banner = state.draft ? `
       <section class="card draft-banner">
         <div><b>⚠️ Séance du ${fmtDate(state.draft.date)} non enregistrée</b><small>${esc(sessionTitle(state.draft))} · touche « Compléter » puis « Enregistrer »</small></div>
         <button class="primary" data-action="resume-workout">Compléter</button>
         <button class="icon-btn" data-action="cancel-workout" aria-label="Abandonner">✕</button>
-      </section>`
-      : '<button class="primary block" data-action="new-workout">＋ Nouvelle séance</button>'}
-    ${names.length ? card(
-      'Progression',
-      `<select id="exSelect">${names.map((n) => `<option ${n === ex ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
-       ${lineChart(hist.map((h) => ({ date: h.date, value: h.e1rm })), { unit: ' kg' })}
-       <p class="hint">Courbe : 1RM estimé (Epley) par séance.</p>
-       <div class="macros">
-         <div><b>${pr ? fr(pr.e1rm, 1) : '–'} kg</b><span>record 1RM est.</span></div>
-         <div><b>${prTop ? fr(prTop.top, 1) : '–'} kg</b><span>charge max</span></div>
-         <div><b>${hist.length}</b><span>séances</span></div>
-       </div>
-       ${lastH ? `<p class="hint">Dernière fois (${fmtDate(lastH.date)}) : ${setsText(lastH.sets)}</p>` : ''}`
-    ) : ''}
-    ${card(
-      'Historique',
-      workouts.length
-        ? `<ul class="list workouts">${workouts.map((w) => `
-          <li>
-            <div>
-              <b>${fmtDate(w.date)} · ${esc(sessionTitle(w))}</b>
-              <small>${w.exercises.length} exo · ${fr(workoutVolume(w))} kg de volume</small>
-              <ul class="mini">${w.exercises.map((e) => `<li>${esc(e.name)} <span>${setsText(e.sets)}</span></li>`).join('')}</ul>
-              ${w.notes ? `<small>${esc(w.notes)}</small>` : ''}
-              <div class="row-actions">
-                <button class="chip" data-action="repeat-workout" data-id="${w.id}">↻ Refaire</button>
-                <button class="chip" data-action="edit-workout" data-id="${w.id}">✎ Modifier</button>
-              </div>
+      </section>` : '';
+  // Bas de page : sets par semaine et séances notées dans l'app (modifier, refaire, supprimer)
+  const history = card(
+    '📝 Séances notées dans l\'app',
+    workouts.length
+      ? `<ul class="list workouts">${workouts.slice(0, state.allWorkouts ? undefined : 8).map((w) => `
+        <li>
+          <div>
+            <b>${fmtDate(w.date)} · ${esc(sessionTitle(w))}</b>
+            <ul class="mini">${w.exercises.map((e) => `<li>${esc(e.name)} <span>${setsText(e.sets)}</span></li>`).join('')}</ul>
+            ${w.notes ? `<small>${esc(w.notes)}</small>` : ''}
+            <div class="row-actions">
+              <button class="chip" data-action="repeat-workout" data-id="${w.id}">↻ Refaire</button>
+              <button class="chip" data-action="edit-workout" data-id="${w.id}">✎ Modifier</button>
             </div>
-            ${delBtn('workouts', w.id)}
-          </li>`).join('')}</ul>`
-        : '<p class="hint">Aucune séance. Commence par « Nouvelle séance ».</p>'
-    )}
-  `;
+          </div>
+          ${delBtn('workouts', w.id)}
+        </li>`).join('')}</ul>
+        ${workouts.length > 8 && !state.allWorkouts ? `<button class="chip" data-action="all-workouts">Voir les ${workouts.length} séances</button>` : ''}`
+      : '<p class="hint">Aucune séance notée dans l\'app pour l\'instant.</p>'
+  );
+  return banner + force.view(weekSetsCard() + history);
 };
+
+// Noms affichés des exercices du programme
+const EX_LABEL = { Squat: 'Squat', Bench: 'Développé incliné', RDL: 'Soulevé roumain', Tractions: 'Tractions', 'Élévations latérales': 'Élévations latérales' };
+// Pas des boutons − / + : reps 1 ; kg 2,5 à la barre, 4 au développé (2 kg par haltère), 1 sinon
+const stepOf = (name, f) => (f === 'reps' ? 1 : name === 'Bench' ? 4 : /Squat|RDL/.test(name) ? 2.5 : 1);
+const stepper = (i, j, f, v, ph, mode) => `
+  <span class="stepper">
+    <button type="button" data-action="set-step" data-ex="${i}" data-set="${j}" data-f="${f}" data-d="-1" aria-label="Moins">−</button>
+    <input data-field="${f}" data-ex="${i}" data-set="${j}" inputmode="${mode}" value="${esc(v)}" placeholder="${ph ?? '0'}">
+    <button type="button" data-action="set-step" data-ex="${i}" data-set="${j}" data-f="${f}" data-d="1" aria-label="Plus">+</button>
+  </span>`;
 
 // Titre d'une séance : ses exercices (plus de champ « Nom » à remplir)
 const sessionTitle = (w) => w.exercises.map((e) => e.name.trim()).filter(Boolean).join(', ') || w.name || 'Séance';
@@ -770,12 +721,11 @@ function gymEditor() {
     </select>`;
   return `
     <header class="page-head"><h1>${d.id ? 'Modifier la séance' : d.date === today() ? 'Séance du jour' : `Séance du ${fmtDay(d.date)}`}</h1><p>${d.id ? '' : 'Pas encore enregistrée : termine par « Enregistrer la séance »'}</p></header>
-    ${bigThreeCard()}
     <form data-form="workout" class="form" id="workoutForm">
-      ${input('date', 'Date', { type: 'date', value: d.date, cls: 'full' })}
+      ${input('date', 'Date', { type: 'date', value: d.date })}
+      ${input('bw', 'Poids du jour (kg)', { value: d.bw ?? force.bwFor(d.date).bw, decimal: true })}
       <div class="full ex-pick">
-        <span class="hint">Ajouter un exercice</span>
-        <div class="chips">${EXERCISES.map((n) => `<button type="button" class="chip ${used.has(n) ? 'done' : ''}" data-action="add-ex" data-name="${esc(n)}">${used.has(n) ? '✓' : '＋'} ${esc(n)}</button>`).join('')}</div>
+        <div class="fx-exbtns">${EXERCISES.map((n) => `<button type="button" class="${used.has(n) ? 'done' : ''}" data-action="add-ex" data-name="${esc(n)}">${used.has(n) ? '✓' : '＋'} ${esc(EX_LABEL[n] || n)}</button>`).join('')}</div>
       </div>
       <div class="full exercises">
         ${d.exercises.map((e, i) => {
@@ -788,15 +738,16 @@ function gymEditor() {
             </div>
             <p class="hint last-time" ${prev ? '' : 'hidden'}>${prev ? `Dernière fois : ${setsText(prev.sets)} · en gris = repris si tu laisses vide` : ''}</p>
             <div class="sets">
-              <div class="set-row head"><span>#</span><span>Reps</span><span>Kg</span><span></span></div>
+              <div class="set-row step head ${e.name === 'Tractions' ? 'bw' : ''}"><span>#</span><span>Reps</span><span>${e.name === 'Tractions' ? '' : e.name === 'Bench' ? 'Kg (2 haltères)' : 'Kg'}</span><span></span></div>
               ${e.sets.map((s, j) => `
-                <div class="set-row">
+                <div class="set-row step ${e.name === 'Tractions' ? 'bw' : ''}">
                   <span>${j + 1}</span>
-                  <input data-field="reps" data-ex="${i}" data-set="${j}" inputmode="numeric" value="${esc(s.reps)}" placeholder="${prev?.sets[j]?.reps ?? ''}">
-                  <input data-field="weight" data-ex="${i}" data-set="${j}" inputmode="decimal" value="${esc(s.weight)}" placeholder="${prev?.sets[j]?.weight ?? ''}">
-                  <button type="button" class="icon-btn" data-action="del-set" data-ex="${i}" data-set="${j}" aria-label="Supprimer la série">−</button>
+                  ${stepper(i, j, 'reps', s.reps, prev?.sets[j]?.reps, 'numeric')}
+                  ${e.name === 'Tractions' ? '<span class="hint">reps</span>' : stepper(i, j, 'weight', s.weight, prev?.sets[j]?.weight, 'decimal')}
+                  <button type="button" class="icon-btn" data-action="del-set" data-ex="${i}" data-set="${j}" aria-label="Supprimer la série">✕</button>
                 </div>`).join('')}
             </div>
+            <p class="fx-preview" data-preview="${i}">${force.preview(e.name, e.sets, num(d.bw) ?? force.bwFor(d.date).bw)}</p>
             <button type="button" class="chip" data-action="add-set" data-ex="${i}">＋ Série</button>
           </div>`;
         }).join('')}
@@ -936,6 +887,7 @@ function render() {
   document.body.classList.toggle('no-tabbar', space !== 'muscu');
   document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.tab === current));
   window.scrollTo(0, y);
+  if (space === 'muscu' && current === 'gym') force.afterRender();
 }
 
 function go(tab) {
@@ -1011,7 +963,9 @@ const forms = {
       })
       .filter((e) => e.name && e.sets.length);
     if (!exercises.length) return toast('Ajoute au moins un exercice avec ses reps');
-    const w = { date: d.date, name: d.name, exercises, notes: d.notes.trim() };
+    const bw = num(form.elements.bw?.value);
+    const w = { date: d.date, name: d.name, exercises, notes: d.notes.trim(), ...(bw ? { bw } : {}) };
+    const before = force.snapshot();
     // Brouillon vidé AVANT l'enregistrement : le rendu qui suit affiche la page Salle (historique, 1RM)
     state.draft = null;
     state.editorOpen = false;
@@ -1019,7 +973,9 @@ const forms = {
     if (d.id) store.update('workouts', d.id, w);
     else store.add('workouts', w);
     window.scrollTo(0, 0);
-    toast('Séance enregistrée 💪');
+    const wins = force.events(before, force.snapshot());
+    if (wins.length) force.celebrate(wins);
+    else toast('Séance enregistrée 💪');
   },
 };
 
@@ -1162,8 +1118,9 @@ const actions = {
     const ex = state.draft.exercises;
     // Une carte encore vide (sans nom ni série remplie) est réutilisée
     const empty = ex.find((e) => !e.name && !e.sets.some((x) => x.reps || x.weight));
-    if (empty) empty.name = name;
-    else ex.push({ name, sets: [{ reps: '', weight: '' }] });
+    const first = force.suggestSet(name) || { reps: '', weight: '' };
+    if (empty) { empty.name = name; if (!empty.sets.some((x) => x.reps || x.weight)) empty.sets = [first]; }
+    else ex.push({ name, sets: [first] });
     saveDraft();
     render();
   },
@@ -1181,6 +1138,16 @@ const actions = {
     saveDraft();
     render();
   },
+  'set-step'(el) {
+    const e = state.draft.exercises[+el.dataset.ex];
+    const s = e.sets[+el.dataset.set];
+    const f = el.dataset.f;
+    const v = (num(s[f]) || 0) + Number(el.dataset.d) * stepOf(e.name, f);
+    s[f] = String(Math.max(0, Math.round(v * 10) / 10));
+    saveDraft();
+    render();
+  },
+  'all-workouts'() { state.allWorkouts = true; render(); },
   'del-set'(el) {
     const sets = state.draft.exercises[+el.dataset.ex].sets;
     sets.splice(+el.dataset.set, 1);
@@ -1350,8 +1317,8 @@ function wrapSpace(handlers) {
     render();
   }]));
 }
-Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions), wrapSpace(todo.actions), wrapSpace(esthetique.actions), wrapSpace(atom.actions), wrapSpace(finance.actions), wrapSpace(clinic.actions), wrapSpace(ideas.actions), wrapSpace(fundraising.actions));
-Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms), wrapSpace(todo.forms), wrapSpace(esthetique.forms), wrapSpace(atom.forms), wrapSpace(finance.forms), wrapSpace(clinic.forms), wrapSpace(ideas.forms), wrapSpace(fundraising.forms));
+Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions), wrapSpace(todo.actions), wrapSpace(esthetique.actions), wrapSpace(atom.actions), wrapSpace(finance.actions), wrapSpace(clinic.actions), wrapSpace(ideas.actions), wrapSpace(fundraising.actions), wrapSpace(force.actions));
+Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms), wrapSpace(todo.forms), wrapSpace(esthetique.forms), wrapSpace(atom.forms), wrapSpace(finance.forms), wrapSpace(clinic.forms), wrapSpace(ideas.forms), wrapSpace(fundraising.forms), wrapSpace(force.forms));
 
 // ---------- Retour sur aujourd'hui ----------
 // L'app reste ouverte en arrière-plan sur l'iPhone : au changement de jour, et à chaque changement
@@ -1403,6 +1370,40 @@ document.addEventListener('input', (e) => {
   else if (field === 'reps' || field === 'weight') ex.sets[+el.dataset.set][field] = el.value;
   else if (field === 'notes') state.draft.notes = el.value;
   saveDraft();
+  refreshPreview(+el.dataset.ex);
+});
+
+// Aperçu « 1RM → score → objectif » d'un exercice de l'éditeur
+function refreshPreview(i) {
+  const d = state.draft;
+  if (!d) return;
+  const bw = num(d.bw) ?? force.bwFor(d.date).bw;
+  d.exercises.forEach((e, j) => {
+    if (i != null && i !== j) return;
+    const p = document.querySelector(`[data-preview="${j}"]`);
+    if (p) p.innerHTML = force.preview(e.name, e.sets, bw);
+  });
+}
+// Poids du jour : enregistré dans le brouillon, aperçus recalculés
+document.addEventListener('input', (e) => {
+  if (!state.draft || e.target.form?.id !== 'workoutForm' || e.target.name !== 'bw') return;
+  state.draft.bw = e.target.value;
+  saveDraft();
+  refreshPreview(null);
+});
+// Reps / kg : le champ se vide quand on le touche ; laissé vide, il reprend sa valeur
+document.addEventListener('focusin', (e) => {
+  const el = e.target;
+  if (!/^(reps|weight)$/.test(el.dataset?.field || '')) return;
+  el.dataset.was = el.value;
+  el.value = '';
+});
+document.addEventListener('focusout', (e) => {
+  const el = e.target;
+  if (!/^(reps|weight)$/.test(el.dataset?.field || '') || el.value.trim() !== '') return;
+  el.value = el.dataset.was || '0';
+  const ex = state.draft?.exercises[+el.dataset.ex];
+  if (ex) { ex.sets[+el.dataset.set][el.dataset.field] = el.value; saveDraft(); refreshPreview(+el.dataset.ex); }
 });
 
 document.addEventListener('change', (e) => {
@@ -1472,9 +1473,15 @@ store.onChange(render);
 document.addEventListener('space-changed', render); // un espace a modifié ses données hors action (ex : liste déroulante)
 document.addEventListener('toast', (e) => toast(e.detail)); // message envoyé par un espace (ex : copie terminée)
 
+// Pause greffe (fin à préciser) et DEXA du 02/11/2026 : données de départ du tableau de force (une seule fois)
+if (!store.settings().forceSeeded) {
+  store.setSettings({ pauses: store.settings().pauses || [{ from: '2026-11-20', to: null, motif: 'greffe' }], dexa: { date: '2026-11-02', bf: 6.2, lean: 66.6 }, forceSeeded: true });
+}
+
 const initial = location.hash.slice(1);
 if (views[initial]) current = initial;
 render();
+force.loadJournal().then(() => { if (space === 'muscu' && current === 'gym') render(); });
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
