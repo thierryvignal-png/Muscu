@@ -4,6 +4,8 @@
 // on est encore « hier »). On peut ajouter d'autres idées dans l'espace dédié : datées du jour, elles
 // n'avancent pas les jours suivants. Chaque idée a une note de 1 à 5 étoiles. Chaque semaine et chaque mois
 // terminés, il faut choisir la meilleure idée (🏆 semaine, 👑 mois) : le blocage de 21 h le demande aussi.
+// Jour oublié : dès l'ouverture, et à toute heure, l'app reste bloquée tant que chaque jour manqué
+// (depuis la date de départ « since » du flux) n'a pas son idée, saisie à la date de ce jour.
 import { esc, uid, read, write, isoOf, addDays, fmtDate } from './util.js';
 
 export const STREAMS = {
@@ -32,6 +34,24 @@ const save = (s, d) => write(STREAMS[s].key, d);
 // Jour de l'idée : avant 4 h du matin, c'est encore la veille
 export const ideaDay = () => isoOf(new Date(Date.now() - DAY_END_HOUR * 3600000));
 const doneToday = (d) => d.items.some((x) => x.date === ideaDay());
+
+// Date de départ du suivi des jours manqués : fixée une fois, au dernier jour noté avant aujourd'hui
+// (ou aujourd'hui si rien n'a encore été noté) ; les trous plus anciens ne sont pas réclamés.
+function since(s, d) {
+  if (!d.since) {
+    const past = d.items.map((x) => x.date).filter((x) => x < ideaDay()).sort();
+    d.since = past.length ? past[past.length - 1] : ideaDay();
+    save(s, d);
+  }
+  return d.since;
+}
+// Jours passés sans idée (du plus ancien au plus récent), hors aujourd'hui
+function missing(s, d) {
+  const days = new Set(d.items.map((x) => x.date));
+  const out = [];
+  for (let day = since(s, d); day < ideaDay() && out.length < 366; day = addDays(day, 1)) if (!days.has(day)) out.push(day);
+  return out;
+}
 const mondayOf = (iso) => addDays(iso, -((new Date(iso + 'T12:00:00').getDay() + 6) % 7));
 const monthOf = (iso) => iso.slice(0, 7);
 const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
@@ -55,18 +75,21 @@ function pending(d) {
   return [...weeks.map((key) => ({ kind: 'weeks', key })), ...months.map((key) => ({ kind: 'months', key }))];
 }
 const inPeriod = (x, p) => (p.kind === 'weeks' ? mondayOf(x.date) === p.key : monthOf(x.date) === p.key);
-const needs = (s) => { const d = load(s); return !doneToday(d) || pending(d).length > 0; };
+const lateHour = () => { const h = new Date().getHours(); return h >= LOCK_HOUR || h < DAY_END_HOUR; };
+// Ce flux bloque-t-il l'app ? Un jour manqué : toujours. Après 21 h : idée du jour ou meilleure idée à choisir.
+const needs = (s) => {
+  const d = load(s);
+  return missing(s, d).length > 0 || (lateHour() && (!doneToday(d) || pending(d).length > 0));
+};
 
-// Bloquer l'app ? (après 21 h ou avant 4 h : une idée du jour manquante, ou une meilleure idée à choisir)
 export function mustLock() {
-  const h = new Date().getHours();
-  if (!(h >= LOCK_HOUR || h < DAY_END_HOUR)) return false;
   return Object.keys(STREAMS).some(needs);
 }
 
-const ideaForm = (s, big, label = "Enregistrer l'idée du jour") => `
+const ideaForm = (s, big, label = "Enregistrer l'idée du jour", date = '') => `
   <form data-form="idea" class="idea-form">
-    <input type="hidden" name="stream" value="${s}">
+    <input type="hidden" name="stream" value="${s}">${date ? `
+    <input type="hidden" name="date" value="${date}">` : ''}
     <textarea name="text" rows="${big ? 5 : 3}" required placeholder="${STREAMS[s].placeholder}"></textarea>
     <button class="primary block">${label}</button>
   </form>`;
@@ -90,6 +113,17 @@ export function lockView() {
   const blocks = Object.keys(STREAMS).filter(needs).map((s) => {
     const d = load(s);
     const st = streak(d);
+    const late = missing(s, d);
+    // Jours manqués d'abord, un par un, du plus ancien au plus récent
+    if (late.length) {
+      return `
+        <section class="card idea-lock-card">
+          <h2>${STREAMS[s].icon} ${STREAMS[s].short} · ${fmtDate(late[0])}</h2>
+          <p class="hint warn">⏰ Jour oublié${late.length > 1 ? ` (${late.length} jours de retard)` : ''} : rattrape-le pour débloquer l'app.</p>
+          ${ideaForm(s, true, `Enregistrer l'idée du ${fmtDate(late[0], false)}`, late[0])}
+        </section>`;
+    }
+    if (!lateHour()) return '';
     return `
       ${doneToday(d) ? '' : `
         <section class="card idea-lock-card">
@@ -234,9 +268,11 @@ export const forms = {
     if (text.length < 10) return 'Développe un peu ton idée (10 caractères minimum)';
     const s = streamOf(f.stream);
     const d = load(s);
-    d.items.push({ id: uid(), date: ideaDay(), text });
+    // Rattrapage : la date d'un jour manqué est acceptée, sinon c'est l'idée du jour
+    const date = f.date && missing(s, d).includes(f.date) ? f.date : ideaDay();
+    d.items.push({ id: uid(), date, text });
     save(s, d);
-    return `${STREAMS[s].icon} Idée enregistrée`;
+    return `${STREAMS[s].icon} Idée enregistrée${date !== ideaDay() ? ` pour le ${fmtDate(date, false)}` : ''}`;
   },
 };
 
