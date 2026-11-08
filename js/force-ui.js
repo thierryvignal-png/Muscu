@@ -102,34 +102,39 @@ function hero(an) {
   const idx = an.index;
   const feb = an.at(F.START);
   const rep = an.at(F.REPRISE);
-  const zone = F.zoneLabel(idx);
   const top = Math.abs(idx - an.yearMax) < 0.05;
-  const x = (v) => 8 + (324 * v) / 100;
-  const marks = [
-    { v: feb, t: `${n1(feb)} ${dShort(F.START)}` },
-    { v: rep, t: `${n1(rep)} reprise` },
-  ].filter((m) => m.v != null);
-  const zoneTicks = ZONES.slice(1).map((z) => z.min);
+  const x = (v) => 6 + (328 * v) / 100;
+  const zones = [[0, 20, 'Débutant'], [20, 50, 'Novice'], [50, 80, 'Intermédiaire'], [80, 95, 'Avancé'], [95, 100, 'Élite']];
+  const marks = [feb, rep].filter((v) => v != null);
   const pause = an.activePause;
   return `
-    <section class="card fx-hero">
-      <div class="fx-kicker">Indice de force relative · ${dShort(an.today)}</div>
-      <div class="fx-big"><b data-count="${idx.toFixed(1)}">${n1(idx)}</b><span>/100</span><span class="fx-zone z${F.zoneOf(idx)}">${zone}</span></div>
-      <div class="fx-chips">
-        ${feb != null ? `<span class="fx-chip good">${sgn(idx - feb)} depuis février</span>` : ''}
-        ${rep != null ? `<span class="fx-chip good">${sgn(idx - rep)} depuis la reprise</span>` : ''}
-        ${top ? '<span class="fx-chip">🏔️ plus haut niveau de l\'année</span>' : ''}
+    <section class="card fx-hero2">
+      <div class="fx-hero2-top">
+        <div>
+          <p class="fx-kick">∿ Indice de force</p>
+          <div class="fx-big"><b data-count="${idx.toFixed(1)}">${n1(idx)}</b><span>/100</span></div>
+          <div class="fx-hero2-tags"><span class="fx-zone2">● ${F.zoneLabel(idx)}</span>${top ? '<span>🏆 Record annuel</span>' : ''}</div>
+        </div>
+        <svg class="fx-dumbbell" viewBox="0 0 120 80" aria-hidden="true">
+          <g transform="rotate(-28 60 40)">
+            <rect x="34" y="36" width="52" height="8" rx="3" class="db-bar"/>
+            <rect x="16" y="20" width="10" height="40" rx="4" class="db-plate"/><rect x="26" y="24" width="9" height="32" rx="4" class="db-plate2"/>
+            <rect x="94" y="20" width="10" height="40" rx="4" class="db-plate"/><rect x="85" y="24" width="9" height="32" rx="4" class="db-plate2"/>
+            <rect x="10" y="34" width="6" height="12" rx="2" class="db-bar"/><rect x="104" y="34" width="6" height="12" rx="2" class="db-bar"/>
+          </g>
+        </svg>
       </div>
-      <svg class="fx-gauge" viewBox="0 0 ${W} 58" role="img" aria-label="Jauge de l'indice">
-        ${marks.map((m, i) => `<text x="${x(m.v) + (i ? 2 : -2)}" y="11" text-anchor="${i ? 'start' : 'end'}" class="fx-t-muted">${m.t}</text>`).join('')}
-        <rect x="8" y="22" width="324" height="8" rx="4" class="fx-track"/>
-        <rect x="8" y="22" width="${(324 * Math.min(idx, 100)) / 100}" height="8" rx="4" class="fx-fill"/>
-        ${zoneTicks.map((v) => `<line x1="${x(v)}" x2="${x(v)}" y1="18" y2="34" class="fx-tick"/>`).join('')}
-        ${marks.map((m) => `<circle cx="${x(m.v)}" cy="26" r="4.5" class="fx-mark"/>`).join('')}
-        <circle cx="${x(idx)}" cy="26" r="6" class="fx-now"/>
-        <text x="${x(idx)}" y="10" text-anchor="middle" class="fx-t-strong">${n1(idx)}</text>
-        ${[[0, 20, 'débutant'], [20, 50, 'novice'], [50, 80, 'intermédiaire'], [80, 95, 'avancé'], [95, 100, 'élite']].map(([a, b, t]) => `<text x="${x((a + b) / 2)}" y="50" text-anchor="middle" class="fx-t-muted ${idx >= a && idx < b ? 'on' : ''}">${t}</text>`).join('')}
+      <svg class="fx-gauge2" viewBox="0 0 ${W} 54" role="img" aria-label="Jauge de l'indice">
+        ${marks.map((v) => `<text x="${x(v)}" y="12" text-anchor="middle" class="g-lbl">${n1(v)}</text><line x1="${x(v)}" x2="${x(v)}" y1="17" y2="33" class="g-mark"/>`).join('')}
+        <text x="${x(idx)}" y="12" text-anchor="middle" class="g-now-lbl">${n1(idx)}</text>
+        ${zones.map(([a, b], i) => `<rect x="${x(a) + 1}" y="22" width="${x(b) - x(a) - 2}" height="6" rx="2" class="g-seg ${idx >= b ? 'past' : idx >= a ? 'cur' : ''}"/>`).join('')}
+        <circle cx="${x(idx)}" cy="25" r="6" class="g-now"/><circle cx="${x(idx)}" cy="25" r="2.4" class="g-now-in"/>
+        ${zones.map(([a, b, t], i) => `<text x="${i === 0 ? x(a) : i === 4 ? x(b) + 1 : i === 3 ? x(b) - 7 : x((a + b) / 2)}" y="48" text-anchor="${i === 0 ? 'start' : i >= 3 ? 'end' : 'middle'}" class="g-zone ${idx >= a && idx < b ? 'on' : ''}">${t}</text>`).join('')}
       </svg>
+      <div class="fx-hero2-foot">
+        ${feb != null ? `<span>↗ <b>${sgn(idx - feb)}</b> depuis février</span>` : ''}
+        ${rep != null ? `<span>↗ <b>${sgn(idx - rep)}</b> depuis la reprise</span>` : ''}
+      </div>
       ${pause ? `<p class="fx-pause-note">⏸ En pause${pause.motif ? ` (${esc(pause.motif)})` : ''} : l'indice ne baisse pas sans mesure · reprise dans ${F.diffDays(an.today, F.addDays(pause.to, 1))} j</p>` : ''}
     </section>`;
 }
@@ -139,12 +144,21 @@ const agoPill = (an, k) => {
   const last = an.last[k];
   if (!last) return '<span class="fx-pill">jamais</span>';
   const n = F.diffDays(last, an.today);
-  if (an.activePause) return `<span class="fx-pill">${n === 0 ? "aujourd'hui" : `${n} j`}</span>`;
-  const cls = n < 14 ? 'ok' : n < 28 ? 'mid' : 'bad';
-  return `<span class="fx-pill ${cls}">${cls === 'ok' ? '✓' : '⚠'} ${n === 0 ? "aujourd'hui" : n === 1 ? 'hier' : `${n} j${cls === 'ok' ? '' : ' sans'}`}</span>`;
+  const cls = an.activePause ? '' : n < 14 ? 'ok' : n < 28 ? 'mid' : 'bad';
+  return `<span class="fx-pill ${cls}">● ${n === 0 ? "Aujourd'hui" : n === 1 ? 'Hier' : `Il y a ${n} j`}</span>`;
 };
 // Semaine de reprise après une pause déclarée : charges prudentes (−10 %)
 const prudent = (an) => an.pauses.find((p) => !p.open && p.to < an.today && F.diffDays(p.to, an.today) <= 7);
+// Séries proposées pour un exercice (charges à −10 % la semaine de reprise)
+function optionsOf(an, k) {
+  const soft = prudent(an);
+  return an.goals[k].options.map((o) => {
+    if (!soft || k === 'tr') return o;
+    const step = EX[k].step;
+    const per = Math.floor(((k === 'dev' ? o.kg / 2 : o.kg) * 0.9) / step) * step;
+    return { ...o, kg: k === 'dev' ? per * 2 : per, label: k === 'dev' ? `${o.reps} × 2 × ${kg(per)} kg` : `${o.reps} × ${kg(per)} kg` };
+  });
+}
 function mission(an) {
   const g = an.goals;
   const cur = an.cur;
@@ -152,50 +166,45 @@ function mission(an) {
   if (an.activePause) {
     const p = an.activePause;
     return `<section class="card fx-mission">
-      <h2>⏸ Pause${p.motif ? ` ${esc(p.motif)}` : ''}</h2>
-      <p class="fx-mission-sub">${dShort(p.from)} → ${dShort(p.to)}${p.open ? ' (fin à préciser)' : ''}</p>
-      <div class="fx-count"><b>J-${F.diffDays(an.today, F.addDays(p.to, 1))}</b><span>avant la reprise</span></div>
+      <div class="fx-card-head">${kicker('⏸ Pause')}<span class="fx-badge">${esc(p.motif || 'pause')}</span></div>
+      <h2 class="fx-title">Reprise dans ${F.diffDays(an.today, F.addDays(p.to, 1))} jours</h2>
+      <p class="fx-mission-sub">📅 ${dShort(p.from)} → ${dShort(p.to)}${p.open ? ' (fin à préciser)' : ''}</p>
       <p class="hint">Aucune alerte pendant la pause. À la reprise : une semaine de charges prudentes, puis tes records en ligne de mire.</p>
     </section>`;
   }
   const left = F.diffDays(an.today, cur.stop) + 1;
   const soft = prudent(an);
   const upcoming = an.pauses.find((p) => p.from > an.today && F.diffDays(an.today, p.from) <= 30);
+  const doneN = EXS.filter((k) => g[k].done).length;
   const row = (k) => {
     const goal = g[k];
-    const o = goal.options;
-    const lead = soft && k !== 'tr' ? softLabel(k, o[0]) : o[0].label;
+    const opts = optionsOf(an, k);
     const unlock = k === 'tr'
-      ? goal.next ? `${goal.next.reps} reps = ${goal.next.zone}` : ''
-      : o.find((x) => x.unlock)?.unlock;
-    const unlockTxt = k === 'tr' ? unlock : unlock === 'record' ? '→ ton meilleur score' : unlock ? `→ ${EX[k].short.toLowerCase()} ${unlock}` : '';
+      ? goal.next ? `${goal.next.reps} reps pour la zone ${goal.next.zone}e à 76 kg` : ''
+      : (() => { const u = opts.find((o) => o.unlock)?.unlock; return u === 'record' ? '↗ Battre ton meilleur score' : u ? `↗ Passer en zone ${u}e` : ''; })();
     return `
-      <div class="fx-goal ${goal.done ? 'done' : ''}">
-        <div class="fx-goal-l"><b><i style="background:${EX[k].color}"></i>${EX[k].name}</b>${goal.done ? `<span class="fx-pill ok">✓ fait · ${n1(goal.best)}</span>` : agoPill(an, k)}</div>
-        <div class="fx-goal-r"><b>${lead}</b>
-          <small>${k === 'tr' ? 'd\'affilée' : `ou ${o[1].label}`}${unlockTxt && k !== 'tr' ? ` ${unlockTxt}` : ''}</small>
-          ${k === 'tr' && unlockTxt ? `<small>${unlockTxt}</small>` : ''}</div>
+      <div class="fx-goal2 ${goal.done ? 'done' : ''}">
+        ${icon(k)}
+        <div class="fx-goal2-main">
+          <div class="fx-goal2-head"><b>${EX[k].name}</b>${goal.done ? `<span class="fx-pill ok">✓ Validé · ${n1(goal.best)}</span>` : agoPill(an, k)}</div>
+          <div class="fx-opts">${opts.map((o, i) => `<button data-action="force-start" data-ex="${k}" data-o="${i}">${o.label} ›</button>`).join('')}</div>
+          ${unlock ? `<small class="fx-unlock">${unlock}</small>` : ''}
+        </div>
       </div>`;
   };
   return `
     <section class="card fx-mission">
-      <h2>🎯 Ta mission · bloc ${cur.n}</h2>
-      <p class="fx-mission-sub">${dShort(cur.start)} → ${dShort(cur.stop)} · ${left} jour${left > 1 ? 's' : ''} restant${left > 1 ? 's' : ''} · une séance par exercice suffit</p>
+      <div class="fx-card-head">${kicker('◎ Objectif du bloc')}<span class="fx-badge brass">Bloc ${cur.n}</span></div>
+      <h2 class="fx-title">Ta mission</h2>
+      <p class="fx-mission-sub">📅 ${dShort(cur.start)} – ${dShort(cur.stop)} · <span class="brass">${left === 1 ? 'dernier jour' : `${left} jours restants`}</span></p>
       ${soft ? '<p class="fx-soft">🌱 Semaine de reprise : charges à −10 %, records la semaine prochaine.</p>' : ''}
       ${EXS.map(row).join('')}
-      <div class="fx-mission-foot">
-        <div><span>Si tout est fait</span><b>≈ ${n1(an.projected)}</b><small>bloc ${cur.n - 1} : ${n1(an.prevBlock.index)}</small></div>
-        ${upcoming ? `<div><span>${esc(upcoming.motif || 'Pause')} le ${dShort(upcoming.from)}</span><b>J-${F.diffDays(an.today, upcoming.from)}</b><small>${upcoming.from <= cur.stop ? 'le bloc se gagne avant' : 'avant la pause'}</small></div>`
-          : `<div><span>Potentiel immédiat</span><b>≈ ${n1(an.potential)}</b><small>tes 4 records refaits au poids actuel</small></div>`}
-      </div>
-      <button class="primary block fx-add" data-action="new-workout">＋ Séance</button>
+      <button class="fx-launch" data-action="force-start">≡ Lancer ma séance</button>
+      <div class="fx-prog"><span><b>${doneN}/4 exercices validés</b></span><span>Bloc projeté <b>${n1(an.projected)}</b></span></div>
+      <div class="fx-prog-bar">${EXS.map((k) => `<i class="${g[k].done ? 'on' : ''}"></i>`).join('')}</div>
+      <p class="hint">Cibles à 76 kg · bloc précédent ${n1(an.prevBlock.index)}. Une séance par exercice suffit.</p>
+      ${upcoming ? `<button class="fx-pauseline" data-action="force-pause-form"><span>‖ ${esc(upcoming.motif ? upcoming.motif[0].toUpperCase() + upcoming.motif.slice(1) : 'Pause')} le ${dShort(upcoming.from)}</span><b>J−${F.diffDays(an.today, upcoming.from)} ›</b></button>` : ''}
     </section>`;
-}
-function softLabel(k, o) {
-  const step = EX[k].step;
-  const per = k === 'dev' ? o.kg / 2 : o.kg;
-  const v = Math.floor((per * 0.9) / step) * step;
-  return k === 'dev' ? `${o.reps} × 2 × ${kg(v)} kg` : `${o.reps} × ${kg(v)} kg`;
 }
 
 // ---------- C. Série de blocs ----------
@@ -564,14 +573,15 @@ const longDate = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR'
 
 // ---------- En-tête et navigation du carnet ----------
 const PAGES = [['overview', "Vue d'ensemble"], ['progress', 'Progression'], ['weight', 'Poids'], ['journal', 'Journal']];
-const TITLES = { overview: 'Ta force', progress: 'Ta progression', weight: 'Ton poids', journal: 'Journal de séances', method: 'Méthode' };
+const TITLES = { overview: 'Tableau de bord', progress: 'Ta progression', weight: 'Ton poids', journal: 'Journal de séances', method: 'Méthode' };
 function head(an, page) {
   const btn = page === 'weight'
     ? '<button class="fx-head-btn" data-action="quick" data-mtab="body">＋ Pesée</button>'
     : '<button class="fx-head-btn" data-action="new-workout">＋ Séance</button>';
   return `
     <nav class="fx-nav">${PAGES.map(([k, t]) => `<button class="${page === k ? 'on' : ''}" data-action="force-page" data-p="${k}">${t}</button>`).join('')}</nav>
-    <header class="fx-head"><div><p class="fx-date">${longDate(an.today)}</p><h1>${TITLES[page]}</h1></div>${btn}</header>`;
+    <p class="fx-date">${longDate(an.today)}</p>
+    <header class="fx-head"><h1>${TITLES[page]}</h1>${btn}</header>`;
 }
 const foot = () => `
   <footer class="fx-foot"><span>Muscu · Carnet de Thierry</span>
@@ -882,7 +892,7 @@ export function view(extra = {}) {
   else if (page === 'weight') body = weightPage(an);
   else if (page === 'journal') body = journalPage(an, extra.history || '');
   else if (page === 'method') body = methodPage();
-  else body = hero(an) + mission(an) + `<h2 class="fx-section">Tes 4 exercices</h2>` + exCards(an) + paliersCard(an) + reprisesCard(an);
+  else body = hero(an) + mission(an) + blocksCard(an) + `<div class="fx-sec">${kicker('〣 Niveaux du moment')}<h2 class="fx-title">Tes quatre exercices</h2></div>` + exCards(an) + paliersCard(an) + reprisesCard(an);
   return head(an, page) + body + foot();
 }
 
@@ -989,6 +999,19 @@ if (typeof document !== 'undefined') {
 // ---------- Actions et formulaires ----------
 export const actions = {
   'force-ex'(el) { ui.detail = el.dataset.ex; window.scrollTo(0, 0); },
+  // Toucher une cible (ou « Lancer ma séance ») : la séance s'ouvre avec ces séries déjà remplies
+  'force-start'(el) {
+    const an = analysis();
+    if (!an?.goals) return false;
+    const list = el.dataset.ex ? [el.dataset.ex] : EXS.filter((k) => !an.goals[k].done);
+    const items = (list.length ? list : EXS).map((k) => {
+      const o = optionsOf(an, k)[+(el.dataset.o || 0)] || optionsOf(an, k)[0];
+      return { name: EX[k].app, reps: String(o.reps), weight: k === 'tr' ? '' : String(o.kg) };
+    });
+    document.dispatchEvent(new CustomEvent('force-start', { detail: items }));
+    return false;
+  },
+  'force-pause-form'() { ui.pauseForm = true; setTimeout(() => document.querySelector('.fx-pause-form')?.scrollIntoView({ block: 'center' }), 50); },
   'force-page'(el) { ui.page = el.dataset.p; ui.detail = null; if (el.dataset.backup) ui.backup = true; window.scrollTo(0, 0); },
   'force-wb'(el) { ui.wb = +el.dataset.i; ui.wlist = false; },
   'force-wlist'() { ui.wlist = !ui.wlist; },
@@ -1000,7 +1023,6 @@ export const actions = {
   'force-rel'(el) { ui.relMode = el.dataset.mode; },
   'force-block'(el) { ui.block = ui.block === +el.dataset.i ? null : +el.dataset.i; },
   'force-heat'(el) { ui.heat = ui.heat === el.dataset.d ? null : el.dataset.d; },
-  'force-pause-form'() { ui.pauseForm = true; },
   'force-pause-del'(el) {
     if (!confirm('Supprimer cette pause ?')) return false;
     const list = [...pauses()];

@@ -1374,6 +1374,22 @@ document.addEventListener('input', (e) => {
   refreshPreview(+el.dataset.ex);
 });
 
+// Mission du bloc : une cible touchée ouvre la séance avec ces séries déjà remplies
+document.addEventListener('force-start', (e) => {
+  if (!state.draft) state.draft = emptyDraft();
+  for (const it of e.detail) {
+    const set = { reps: it.reps, weight: it.weight };
+    const ex = state.draft.exercises.find((x) => x.name === it.name);
+    if (!ex) state.draft.exercises.push({ name: it.name, sets: [set] });
+    else if (!ex.sets.some((x) => x.reps || x.weight)) ex.sets = [set];
+  }
+  state.draft.exercises = state.draft.exercises.filter((x) => x.name || x.sets.some((y) => y.reps || y.weight));
+  state.editorOpen = true;
+  saveDraft();
+  render();
+  window.scrollTo(0, 0);
+});
+
 // Aperçu « 1RM → score → objectif » d'un exercice de l'éditeur
 function refreshPreview(i) {
   const d = state.draft;
