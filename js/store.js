@@ -64,6 +64,10 @@ export const store = {
     data[collection].push({ id: uid(), ...item });
     save();
   },
+  addMany(collection, items) {
+    for (const item of items) data[collection].push({ id: uid(), ...item });
+    save();
+  },
   update(collection, id, patch) {
     const it = data[collection].find((x) => x.id === id);
     if (it) Object.assign(it, patch);

@@ -793,6 +793,12 @@ views.body = () => {
       </form>
     </section>
     ${force.weightView()}
+    ${card('📥 Importer des pesées', state.pastePesees ? `
+      <form data-form="pesees" class="fx-paste">
+        <p class="hint">Une pesée par ligne : date puis poids. Formats acceptés : « 2026-07-06 85,2 », « 06/07/2026 85.2 », « 6/7 85,2 ». Les doublons (même date, même poids) sont ignorés.</p>
+        <textarea name="text" rows="8" placeholder="2026-07-06 85,2"></textarea>
+        <button class="primary block">Importer</button>
+      </form>` : '<button class="chip" data-action="paste-pesees">Coller une liste de pesées</button>')}
     ${weights.length ? card('📋 Tes pesées', `<ul class="list">${weights.slice(0, state.allWeights ? undefined : 10).map((e) => `<li><div><b>${fmtDate(e.date)}</b><small>${fr(e.weight, 2)} kg</small></div>${delBtn('body', e.id)}</li>`).join('')}</ul>
       ${weights.length > 10 && !state.allWeights ? `<button class="chip" data-action="all-weights">Voir les ${weights.length} pesées</button>` : ''}`) : ''}
 
@@ -938,6 +944,39 @@ const forms = {
       heightCm: num(f.heightCm),
     });
     toast('Objectifs enregistrés');
+  },
+  // Liste de pesées collée : « date poids » par ligne, sans doublon (même date et même poids)
+  pesees(f) {
+    const year = today().slice(0, 4);
+    const seen = new Set(store.get().body.map((b) => `${b.date}|${b.weight}`));
+    const add = [];
+    let bad = 0;
+    for (const line of String(f.text || '').split('\n')) {
+      const t = line.trim();
+      if (!t) continue;
+      let m = t.match(/(\d{4})-(\d{1,2})-(\d{1,2})\D+(\d{2,3}(?:[.,]\d+)?)/);
+      let date = m && `${m[1]}-${pad2(+m[2])}-${pad2(+m[3])}`;
+      if (!m) {
+        m = t.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\D+(\d{2,3}(?:[.,]\d+)?)/);
+        if (m) date = `${m[3] ? (m[3].length === 2 ? '20' + m[3] : m[3]) : year}-${pad2(+m[2])}-${pad2(+m[1])}`;
+      }
+      if (!m) {
+        // « 7 juillet 2026 : 85,0 » ou « 7 juil. 85 »
+        const MO = ['janv', 'févr', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'];
+        const mm = t.toLowerCase().replace('fevr', 'févr').replace('aout', 'août').replace('dec', 'déc').match(/(\d{1,2})(?:er)?\s+([a-zéû]+)\.?\s*(\d{4})?\D+(\d{2,3}(?:[.,]\d+)?)/);
+        const mo = mm && MO.findIndex((x) => mm[2].startsWith(x.slice(0, 3)) && (x !== 'juin' || mm[2].startsWith('juin')) && (x !== 'juil' || mm[2].startsWith('juil')));
+        if (mm && mo >= 0) { m = mm; date = `${mm[3] || year}-${pad2(mo + 1)}-${pad2(+mm[1])}`; }
+      }
+      const weight = m ? Number(m[4].replace(',', '.')) : NaN;
+      if (!m || !(weight > 30 && weight < 250) || isNaN(new Date(date))) { bad++; continue; }
+      if (seen.has(`${date}|${weight}`)) continue;
+      seen.add(`${date}|${weight}`);
+      add.push({ date, weight });
+    }
+    const n = add.length;
+    state.pastePesees = false;
+    if (n) store.addMany('body', add); else render();
+    toast(`${n} pesée${n > 1 ? 's' : ''} ajoutée${n > 1 ? 's' : ''}${bad ? ` · ${bad} ligne${bad > 1 ? 's' : ''} illisible${bad > 1 ? 's' : ''}` : ''}`);
   },
   workout() {
     const d = state.draft;
@@ -1144,6 +1183,7 @@ const actions = {
   },
   'all-workouts'() { state.allWorkouts = true; render(); },
   'all-weights'() { state.allWeights = true; render(); },
+  'paste-pesees'() { state.pastePesees = true; render(); },
   'del-set'(el) {
     const sets = state.draft.exercises[+el.dataset.ex].sets;
     sets.splice(+el.dataset.set, 1);
