@@ -778,29 +778,23 @@ function bodyfatLine() {
 }
 
 views.body = () => {
-  const s = store.settings();
-  const { raw, trend } = weightSeries();
   const vb = visbody();
   const { last, prev } = vb;
   const weights = [...store.get().body].filter((e) => e.weight != null).sort(byDate).reverse();
-  const slope = weightSlope();
 
   return `
-    <header class="page-head"><h1>Corps</h1></header>
-
-    ${card(
-      'Pesée',
-      `<form data-form="body" class="burn-form">
+    <p class="fx-date">${force.todayLong()}</p>
+    <header class="fx-head"><h1>Ton poids</h1></header>
+    <section class="card fx-weigh">
+      <form data-form="body" class="burn-form">
         <input type="hidden" name="date" value="${today()}">
         <input name="weight" inputmode="decimal" placeholder="Poids du jour (kg)" autocomplete="off">
-        <button class="primary">OK</button>
+        <button class="primary">＋ Pesée</button>
       </form>
-      ${lineChart(raw, { trend, goal: s.weightGoal, unit: ' kg' })}
-      <p class="hint legend"><i class="lg raw"></i> pesées <i class="lg trend"></i> moyenne 7 j</p>
-      <p class="hint">Tendance : <b>${trend.length ? fr(trend[trend.length - 1].value, 1) + ' kg' : '–'}</b>${slope == null ? '' : ` · ${slope > 0 ? '+' : '−'}${fr(Math.abs(slope), 2)} kg/sem`}</p>
-      <p class="hint">${calibrationText(calibration())}</p>
-      ${weights.length ? `<ul class="list">${weights.slice(0, 10).map((e) => `<li><div><b>${fmtDate(e.date)}</b><small>${fr(e.weight, 1)} kg</small></div>${delBtn('body', e.id)}</li>`).join('')}</ul>` : ''}`
-    )}
+    </section>
+    ${force.weightView()}
+    ${weights.length ? card('📋 Tes pesées', `<ul class="list">${weights.slice(0, state.allWeights ? undefined : 10).map((e) => `<li><div><b>${fmtDate(e.date)}</b><small>${fr(e.weight, 2)} kg</small></div>${delBtn('body', e.id)}</li>`).join('')}</ul>
+      ${weights.length > 10 && !state.allWeights ? `<button class="chip" data-action="all-weights">Voir les ${weights.length} pesées</button>` : ''}`) : ''}
 
     <section class="card vb-hero">
       <h2>🧬 Body fat · Visbody</h2>
@@ -885,7 +879,7 @@ function render() {
   main.innerHTML = spaceSwitch(space) + page;
   formatNumberInputs(main); // espaces entre les milliers dans les champs
   document.body.classList.toggle('no-tabbar', space !== 'muscu');
-  document.body.classList.toggle('carnet', space === 'muscu' && current === 'gym' && !(state.draft && state.editorOpen));
+  document.body.classList.toggle('carnet', space === 'muscu' && ((current === 'gym' && !(state.draft && state.editorOpen)) || current === 'body'));
   document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.tab === current));
   window.scrollTo(0, y);
   if (space === 'muscu' && current === 'gym') force.afterRender();
@@ -1149,6 +1143,7 @@ const actions = {
     render();
   },
   'all-workouts'() { state.allWorkouts = true; render(); },
+  'all-weights'() { state.allWeights = true; render(); },
   'del-set'(el) {
     const sets = state.draft.exercises[+el.dataset.ex].sets;
     sets.splice(+el.dataset.set, 1);
@@ -1508,7 +1503,7 @@ if (!store.settings().dexaSeeded) {
 const initial = location.hash.slice(1);
 if (views[initial]) current = initial;
 render();
-force.loadJournal().then(() => { if (space === 'muscu' && current === 'gym') render(); });
+force.loadJournal().then(() => { if (space === 'muscu' && (current === 'gym' || current === 'body')) render(); });
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});

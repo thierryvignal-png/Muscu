@@ -950,6 +950,14 @@ export function view(extra = {}) {
   return head(an, page) + body + foot();
 }
 
+export const todayLong = () => longDate(today());
+// Onglet Corps : la page Poids du carnet (sans la barre de navigation de Salle)
+export function weightView() {
+  if (!journalText) return `<section class="card"><p class="hint">${journalError ? '⚠️ Journal introuvable : vérifie ta connexion puis rouvre l\'app.' : 'Chargement…'}</p></section>`;
+  const an = analysis();
+  return weightPage(an);
+}
+
 // Aperçu en direct dans la saisie d'une séance : 1RM → score → objectif
 export function preview(name, sets, bw) {
   const k = exKeyOf(name);

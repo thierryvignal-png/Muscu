@@ -1183,3 +1183,5 @@ body.carnet .fx-mission { border-color: color-mix(in srgb, var(--fx-brass) 60%, 
 .fx-target .fx-blockfoot { gap: 10px; align-items: center; }
 .fx-target .fx-blockfoot b { white-space: nowrap; }
 .fx-dexa b { font-size: 15px; }
+.fx-weigh .burn-form button { white-space: nowrap; }
+body.carnet .fx-weigh { padding: 12px; }
