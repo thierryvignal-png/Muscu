@@ -1,0 +1,6 @@
+name = "chantier90-coach"
+main = "coach-worker.js"
+compatibility_date = "2026-10-01"
+# wrangler secret put CLAUDE_API_KEY
+# [vars] CLAUDE_MODEL = "claude-opus-5-5"  (ou claude-sonnet-5-5, moins cher)
+# [vars] ALLOWED_ORIGIN = "https://<ton-domaine>"
