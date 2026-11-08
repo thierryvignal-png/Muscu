@@ -155,6 +155,17 @@ function streamCard(s) {
   const today = d.items.filter((x) => x.date === ideaDay());
   const todo = pending(d).length;
   const pickHint = todo ? `<p class="hint warn">🏆 ${todo} meilleure${todo > 1 ? 's' : ''} idée${todo > 1 ? 's' : ''} à choisir avant 21 h <button class="chip" data-action="space" data-space="${c.space}">Choisir ›</button></p>` : '';
+  // Idée d'app du jour notée : la carte reste avec le bouton « Créée » tant que l'app n'est pas créée
+  const toMake = c.made ? today.filter((x) => !x.made) : [];
+  if (toMake.length) {
+    return `
+      <section class="card idea-card done">
+        <div class="j-head"><h2>${c.icon} ${c.short} du jour</h2><button class="chip" data-action="space" data-space="${c.space}">Toutes ›</button></div>
+        ${toMake.map((x) => `<p class="idea-today-text">${esc(x.text)}</p>
+          <button class="idea-made-btn big" data-action="idea-made" data-stream="${s}" data-id="${x.id}">☐ Je l'ai créée</button>`).join('')}
+        ${pickHint}
+      </section>`;
+  }
   // Idée du jour notée : la carte disparaît de Ma journée (sauf s'il reste une meilleure idée à choisir)
   if (today.length) {
     return todo ? `
@@ -246,7 +257,7 @@ export function view(s) {
             <div class="idea-edit-actions"><button class="primary">Enregistrer</button><button type="button" data-action="idea-cancel">Annuler</button></div>
           </form></li>` : `
           <li class="${x.made ? 'idea-made' : ''}"><div><small>${fmtDate(x.date)} ${crowned(x)}</small><p>${esc(x.text)}</p>${starsOf(s, x)}
-            ${c.made ? `<button class="idea-made-btn ${x.made ? 'on' : ''}" data-action="idea-made" data-stream="${s}" data-id="${x.id}">${x.made ? `✅ Créée le ${fmtDate(x.made, false)}` : '☐ Créée ?'}</button>` : ''}</div>
+            ${c.made ? `<button class="idea-made-btn ${x.made ? 'on' : ''}" data-action="idea-made" data-stream="${s}" data-id="${x.id}">${x.made ? `✅ Créée le ${fmtDate(x.made, false)}` : "☐ Je l'ai créée"}</button>` : ''}</div>
             <span class="idea-row-btns">
               <button class="icon-btn" data-action="idea-edit" data-id="${x.id}" aria-label="Modifier">✎</button>
               <button class="icon-btn" data-action="idea-del" data-stream="${s}" data-id="${x.id}" aria-label="Supprimer">✕</button>

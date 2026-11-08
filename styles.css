@@ -1215,3 +1215,5 @@ body.carnet .fx-weigh { padding: 12px; }
 .idea-made-btn { display: inline-block; margin-top: 6px; min-height: 36px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--muted); font-size: 14px; font-weight: 600; }
 .idea-made-btn.on { background: color-mix(in srgb, var(--good) 15%, var(--card)); color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
 .sheet .space-item { padding: 10px 12px; margin-bottom: 6px; }
+.idea-made-btn.big { display: block; width: 100%; min-height: 48px; font-size: 16px; color: var(--text); background: var(--accent-soft); border-color: transparent; }
+.idea-today-text { margin: 6px 0 4px; white-space: pre-wrap; }
