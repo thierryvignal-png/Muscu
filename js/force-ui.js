@@ -671,9 +671,10 @@ function reprisesCard(an) {
     </section>`;
 }
 
-// ---------- Poids : blocs de 15 jours, repères, courbe, DEXA ----------
-const W_ANCHOR = '2026-06-26';
-const W_BLOCK = 15;
+// ---------- Poids : blocs fixes de 21 jours depuis le 5 juillet 2026, repères, courbe, DEXA ----------
+const W_ANCHOR = '2026-07-05';
+const W_BLOCK = 21;
+const W_TARGET = { lo: 75, hi: 75.5 }; // cible personnelle par défaut (modifiable dans l'app)
 const kg2 = (v) => n1(v, 2);
 const signedKg = (v) => `${v < 0 ? '−' : '+'}${kg2(Math.abs(v))}`;
 // Poids par jour : pesées de l'app (médiane du jour) ; avant la première pesée, poids des séances du journal (estimé)
@@ -695,7 +696,9 @@ function weightBlocks(an, series) {
     const days = series.filter((m) => m.date >= start && m.date <= stop);
     const open = stop > an.today;
     if (!days.length && !open) continue;
-    out.push({ n: b + 1, start, stop, days, open, est: days.length > 0 && days.every((d) => d.est), real: days.filter((d) => !d.est).length, avg: days.length ? days.reduce((s, m) => s + m.weight, 0) / days.length : null });
+    const realDays = days.filter((d) => !d.est);
+    const used = realDays.length ? realDays : days;
+    out.push({ n: b + 1, start, stop, days: used, open, est: !realDays.length && days.length > 0, real: realDays.length, avg: used.length ? used.reduce((s, m) => s + m.weight, 0) / used.length : null });
   }
   return out;
 }
@@ -731,21 +734,26 @@ function weightPage(an) {
       <div class="fx-wk-foot"><div><b>${blocks.length > 1 ? `${signedKg(last.avg - blocks[0].avg)} kg` : '–'}</b><span>depuis le premier bloc</span></div>
         <div><b>${streak} baisse${streak > 1 ? 's' : ''} de suite</b><span>sur les blocs clos</span></div></div>
     </section>` : '';
-  // Cible du bloc en cours : rester sous la moyenne du bloc précédent (tranche de 0,5 kg)
+  // Bloc en cours : deux repères distincts, ta cible personnelle et la moyenne du bloc précédent
+  const tg = settings().weightTarget || W_TARGET;
   let targetCard = '';
   if (cur && last) {
-    const hi = Math.floor(last.avg * 2) / 2;
-    const lo = hi - 0.5;
-    const st = cur.avg == null ? 'En attente de la première pesée'
-      : cur.avg <= hi + 1e-9 && cur.avg >= lo - 1e-9 ? '✓ Dans la cible'
-        : cur.avg > hi ? `Au-dessus de la cible : encore ${kg2(cur.avg - hi)} kg` : '✓ Sous la cible';
+    const a = cur.avg;
+    const vsPrev = a == null ? '' : a < last.avg ? `<b class="good">↘ ${signedKg(a - last.avg)} kg</b> · baisse en vue` : `<b class="warn">↗ ${signedKg(a - last.avg)} kg</b> · au-dessus`;
+    const vsTarget = a == null ? '' : a > tg.hi + 1e-9 ? `encore ${kg2(a - tg.hi)} kg` : a < tg.lo - 1e-9 ? '<b class="good">✓ sous ta cible</b>' : '<b class="good">✓ dans ta cible</b>';
     targetCard = `
       <section class="card fx-target">
-        <div class="fx-card-head">${kicker(`◎ Cible du bloc ${cur.n}`)}<span class="fx-badge brass">En cours</span></div>
-        <p class="fx-huge fx-target-v">${n1(lo)} à ${n1(hi)} <small>kg</small></p>
-        <p class="fx-target-sub">Poids moyen du ${dShort(cur.start)} au ${dShort(cur.stop)}</p>
-        <div class="fx-stats2"><div><span>Bloc précédent</span><b>${kg2(last.avg)} <small>kg</small></b></div><div><span>Moyenne du bloc ${cur.n}</span><b>${cur.avg == null ? '—' : `${kg2(cur.avg)} <small>kg</small>`}</b></div></div>
-        <p class="fx-blockfoot"><span>${st}</span><b>${cur.real}/${W_BLOCK} jours pesés</b></p>
+        <div class="fx-card-head">${kicker(`◎ Bloc ${cur.n} · ${dShort(cur.start)} – ${dShort(cur.stop)}`)}<span class="fx-badge brass">En cours</span></div>
+        <div class="fx-target-mid"><div><span>Moyenne provisoire</span><p class="fx-huge fx-target-v">${a == null ? '—' : kg2(a)} <small>kg</small></p></div>
+          <div class="fx-target-days"><b>${cur.real}</b><small>/${W_BLOCK} jours pesés</small></div></div>
+        <div class="fx-marks">
+          <div class="fx-mark-t"><span>🎯 Ta cible</span>${ui.wEdit ? `
+            <form data-form="forceTarget" class="fx-tedit"><input name="lo" inputmode="decimal" value="${n1(tg.lo)}"> à <input name="hi" inputmode="decimal" value="${n1(tg.hi)}"> <button class="primary">OK</button></form>`
+            : `<b>${n1(tg.lo)} à ${n1(tg.hi)} <small>kg</small></b><button class="fx-pen" data-action="force-wtarget" aria-label="Modifier la cible">✎</button>`}
+            <small>${a == null ? 'moyenne du bloc' : vsTarget}</small></div>
+          <div class="fx-mark-p"><span>↔ Bloc ${last.n}</span><b>${kg2(last.avg)} <small>kg</small></b><small>${a == null ? 'à battre pour une baisse' : vsPrev}</small></div>
+        </div>
+        <p class="fx-blockfoot"><span>${a == null ? 'En attente de la première pesée' : 'La baisse se compte à la clôture'}</span><b>clôture le ${dShort(cur.stop)}</b></p>
       </section>`;
   }
   // Barres des blocs (le bloc en cours en dernier)
@@ -758,9 +766,10 @@ function weightPage(an) {
   const bwid = Math.min(30, (W - 16) / shown.length - 6);
   const gap = shown.length > 1 ? (W - 16 - shown.length * bwid) / (shown.length - 1) : 0;
   const withAvg = shown.filter((b) => b.avg != null);
-  const lo = Math.min(...withAvg.map((b) => b.avg)) - 3;
+  const lo = Math.min(...withAvg.map((b) => b.avg), tg.lo) - 2;
   const hi = Math.max(...withAvg.map((b) => b.avg)) + 0.5;
   const y = yOf(lo, hi, 116, 22);
+  const band = `<rect x="4" y="${y(tg.hi)}" width="${W - 8}" height="${Math.max(2, y(tg.lo) - y(tg.hi))}" class="fx-tband"/><line x1="4" x2="${W - 4}" y1="${y(tg.hi)}" y2="${y(tg.hi)}" class="fx-tline"/>`;
   const bars = shown.map((b, i) => {
     const x = 8 + i * (bwid + gap);
     return `<g data-action="force-wb" data-i="${i}" class="fx-hit"><rect x="${x - 3}" y="4" width="${bwid + 6}" height="${H - 8}" rx="6" class="fx-wk-sel ${i === pick ? 'on' : ''}"/>
@@ -771,20 +780,20 @@ function weightPage(an) {
   const list = raw.filter((r) => r.date >= sel.start && r.date <= sel.stop).sort((a, b) => (a.date < b.date ? 1 : -1));
   const blocksCard = shown.length ? `
     <section class="card">
-      <div class="fx-card-head">${kicker(`◈ Blocs de ${W_BLOCK} jours`)}<span class="fx-badge brass">${blocks.length} bloc${blocks.length > 1 ? 's' : ''} clos</span></div>
-      <h2 class="fx-title">${downs} baisse${downs > 1 ? 's' : ''} sur ${Math.max(0, blocks.length - 1)} comparaison${blocks.length > 2 ? 's' : ''}</h2>
-      <svg class="fx-svg" viewBox="0 0 ${W} ${H}">${bars}</svg>
+      <div class="fx-card-head">${kicker(`◈ Blocs de ${W_BLOCK} jours`)}<span class="fx-badge brass">${downs}/${Math.max(0, blocks.length - 1)} en baisse</span></div>
+      <h2 class="fx-title">${blocks.length} bloc${blocks.length > 1 ? 's' : ''} clos · ${streak} baisse${streak > 1 ? 's' : ''} consécutive${streak > 1 ? 's' : ''}</h2>
+      <svg class="fx-svg" viewBox="0 0 ${W} ${H}">${bars}${band}</svg>
       <div class="fx-wk-nav"><button data-action="force-wb" data-i="${pick - 1}" ${pick ? '' : 'disabled'}>‹</button>
         <div><b>Bloc ${sel.n}${sel.open ? ' · en cours' : ''}</b><small>${dShort(sel.start)} – ${dShort(sel.stop)}</small></div>
         <button data-action="force-wb" data-i="${pick + 1}" ${pick < shown.length - 1 ? '' : 'disabled'}>›</button></div>
       <div class="fx-stats3"><div><span>Moyenne</span><b>${sel.avg == null ? '—' : kg2(sel.avg)} <small>kg</small></b></div>
-        <div><span>Bloc précédent</span><b>${prevSel && sel.avg != null ? signedKg(sel.avg - prevSel.avg) : '—'} <small>${prevSel && sel.avg != null ? 'kg' : ''}</small></b></div>
+        <div><span>Écart bloc préc.</span><b class="${prevSel && sel.avg != null ? (sel.avg < prevSel.avg ? 'good' : 'warn') : ''}">${prevSel && sel.avg != null ? signedKg(sel.avg - prevSel.avg) : '—'} <small>${prevSel && sel.avg != null ? 'kg' : ''}</small></b></div>
         <div><span>Jours pesés</span><b>${sel.real}<small>/${W_BLOCK}</small></b></div></div>
-      ${sel.open ? `<p class="hint">Moyenne provisoire jusqu'au ${dShort(sel.stop)}.</p>` : ''}
+      ${sel.open ? `<p class="hint">Moyenne provisoire jusqu'au ${dShort(sel.stop)} : la baisse ne compte qu'à la clôture.</p>` : ''}
       ${sel.est ? '<p class="hint">Bloc estimé : pas de pesée dans l\'app, poids repris des séances du journal.</p>' : ''}
-      <button class="fx-more" data-action="force-wlist">📋 ${ui.wlist ? 'Masquer' : 'Voir'} les ${list.length} pesée${list.length > 1 ? 's' : ''} du bloc ${ui.wlist ? '⌃' : '⌄'}</button>
+      <button class="fx-more" data-action="force-wlist">📋 ${ui.wlist ? 'Masquer' : 'Voir'} ${list.length === 1 ? 'la pesée' : `les ${list.length} pesées`} du bloc ${ui.wlist ? '⌃' : '⌄'}</button>
       ${ui.wlist ? `<ul class="fx-miles">${list.map((r) => `<li><span>${dShort(r.date)}</span><b>${kg2(r.weight)} kg</b></li>`).join('')}</ul>` : ''}
-      <p class="hint">Chaque jour pesé compte une fois, par sa médiane. Les jours sans pesée restent vides.</p>
+      <p class="hint">Bande dorée : ta cible ${n1(tg.lo)}–${n1(tg.hi)} kg. Chaque jour pesé compte une fois, par sa médiane ; les jours sans pesée restent vides.</p>
     </section>` : '';
   // Où tu en es
   const real = series.filter((m) => !m.est);
@@ -891,7 +900,7 @@ function methodPage() {
       ${li('Poids du moment', 'moyenne des médianes de pesée à ± 3 jours de la séance, sinon interpolation entre deux pesées ; avant le 23 juin, 85 kg par hypothèse.')}
       ${li('Force relative', '1RM ÷ poids du moment, en moyenne sur 15 jours ; base 100 à la reprise du 6 août.')}
       ${li('Désentraînement', 'la force maximale tient environ 4 semaines sans entraînement puis baisse plus vite (Bosquet et al., 2013) : vert sous 14 jours, orange jusqu\'à 27, rouge à partir de 28.')}
-      ${li('Poids', 'blocs de 15 jours ; chaque jour pesé compte une fois, par sa médiane.')}
+      ${li('Poids', 'blocs fixes de 21 jours depuis le 5 juillet 2026, sans chevauchement. Plusieurs pesées le même jour : la médiane du jour. Moyenne du bloc sur les seuls jours pesés, sans combler les jours manquants, arrondie à 2 décimales pour l\'affichage. Une baisse se compte à la clôture d\'un bloc, en comparant les moyennes avant arrondi.')}
     </ul><p class="hint">Sources : strengthlevel.com (barèmes hommes en kg : squat, incline dumbbell bench press, romanian deadlift, chin ups) ; stronger by science (désentraînement).</p></section>`;
 }
 
@@ -1077,6 +1086,7 @@ export const actions = {
   'force-page'(el) { ui.page = el.dataset.p; ui.detail = null; if (el.dataset.backup) ui.backup = true; window.scrollTo(0, 0); },
   'force-wb'(el) { ui.wb = +el.dataset.i; ui.wlist = false; },
   'force-wlist'() { ui.wlist = !ui.wlist; },
+  'force-wtarget'() { ui.wEdit = true; },
   'force-wrange'(el) { ui.wRange = el.dataset.r; },
   'force-jf'(el) { ui.jf = el.dataset.f; ui.jn = 40; },
   'force-jmore'() { ui.jn += 40; },
@@ -1106,6 +1116,14 @@ export const actions = {
   'force-paste'() { ui.paste = !ui.paste; },
 };
 export const forms = {
+  forceTarget(f) {
+    const lo = Number(String(f.lo).replace(',', '.'));
+    const hi = Number(String(f.hi).replace(',', '.'));
+    if (!(lo > 0 && hi >= lo)) return 'Cible invalide';
+    ui.wEdit = false;
+    store.setSettings({ weightTarget: { lo, hi } });
+    return 'Cible enregistrée';
+  },
   forcePause(f) {
     if (!f.from) return false;
     const list = [...pauses()];
