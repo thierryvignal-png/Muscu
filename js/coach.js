@@ -41,9 +41,10 @@
       const blocking = wrong.filter(x => x.b);
       let txt = "Jalon non passé. Score " + attempt.score + "/10.";
       if (blocking.length) txt += " La question " + (blocking[0].i + 1) + " est bloquante : " + blocking[0].e;
-      txt += "\n\nCe que tu gardes : tes critères cochés, ton livrable, " + attempt.score + " bonnes réponses. La tranche reste ouverte.";
+      const mis = window.State.isMission();
+      txt += "\n\nCe que tu gardes : tes critères cochés, ton livrable, " + attempt.score + " bonnes réponses. " + (mis ? "La tranche reste ouverte." : "Le jalon reste ouvert.");
       txt += "\n\nCe qu'on reprend : " + wrong.slice(0, 3).map(x => "\n• Q" + (x.i + 1) + " — " + x.e).join("");
-      txt += "\n\nEnsuite : variante du QCM (mêmes points, autres données), puis test pratique sur un cas nouveau. Tu peux demander un report de deux jours ouvrés au donneur d'ordre : le montant ne change pas.";
+      txt += "\n\nEnsuite : variante du QCM (mêmes points, autres données), puis test pratique sur un cas nouveau." + (mis ? " Tu peux demander un report de deux jours ouvrés au donneur d'ordre : le montant ne change pas." : " Tu peux décaler ton échéance dans la mission de la semaine.");
       return txt;
     },
 
@@ -56,7 +57,7 @@
       const day = S.dayNumber();
       if (day >= 45 && S.fluxB().paye + S.fluxB().accepte === 0) out.push({ level: "warn", text: "J" + day + " sans client extérieur. Demain matin : profil Malt ou ComeUp publié, trois missions alimentaires candidatées, dix messages de ton offre envoyés. Pas de module." });
       const gap = S.daysSinceLastOpen();
-      if (gap >= 2) out.push({ level: "info", text: "Rien n'a été perdu depuis " + gap + " jours. Si le prochain jalon ne passe pas, la tranche reste ouverte : elle ne disparaît pas." });
+      if (gap >= 2) out.push({ level: "info", text: "Rien n'a été perdu depuis " + gap + " jours. " + (S.isMission() ? "Si le prochain jalon ne passe pas, la tranche reste ouverte : elle ne disparaît pas." : "Ton travail est gardé là où tu l'as laissé.") });
       return out;
     },
 

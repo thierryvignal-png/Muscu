@@ -31,6 +31,12 @@
       try { const raw = localStorage.getItem(KEY); this.data = raw ? JSON.parse(raw) : blank(); }
       catch (e) { this.data = blank(); }
       if (!this.data.ui) this.data.ui = { role: "apprenante", simDate: "" };
+      // Migration : avant, le statut était demandé à l'onboarding. Sans accord donné, on repasse en parcours autonome.
+      if (this.data.profile && !this.data.profile.mode) {
+        const agreed = Object.values(this.data.weeks || {}).some(w => w.accordA || w.accordD);
+        this.data.profile.mode = agreed ? "mission" : "autonome";
+        this.save();
+      }
       return this.data;
     },
     save() { try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch (e) { /* stockage indisponible */ } },
@@ -45,6 +51,9 @@
       if (sim) { const d = new Date(sim + "T10:00:00"); if (!isNaN(d)) return d; }
       return new Date();
     },
+
+    // Mode : « autonome » (par défaut, jalons pédagogiques sans montant) ou « mission » (activé par le donneur d'ordre).
+    isMission() { return !!(this.data.profile && this.data.profile.mode === "mission"); },
 
     // ---- Calendrier ----
     startDate() { return new Date(((this.data.profile && this.data.profile.startDate) || CFG.defaultStartDate) + "T00:00:00"); },

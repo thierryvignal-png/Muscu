@@ -73,3 +73,5 @@ th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line
 .q { font-size: 17px; font-weight: 600; }
 details summary { cursor: pointer; }
 a { color: var(--accent); }
+input[type="date"], input[type="datetime-local"] { -webkit-appearance: none; appearance: none; display: block; min-width: 0; max-width: 100%; min-height: 42px; }
+input::-webkit-date-and-time-value { text-align: left; }

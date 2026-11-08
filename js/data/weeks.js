@@ -69,7 +69,7 @@ window.WEEKS = [
     tech: "Brancher une API dont le client a besoin : e-mail transactionnel, lien de paiement, agenda. Secrets côté serveur, variables d'environnement.",
     commercial: "Proposition de pilote payant écrite (150 à 300 €) envoyée avant le jeudi de la semaine (J26).",
     preuves: ["Un e-mail (ou SMS, ou paiement) déclenché par l'app et reçu", "Proposition de pilote payant envoyée"],
-    blocage: "Sans prospect chaud : proposition à un contact du donneur d'ordre au tarif réel ; flux B seulement si l'entité est extérieure et paie elle-même, sinon flux A.",
+    blocage: "Sans prospect chaud : proposition à un contact de ton réseau au tarif réel ; flux B seulement si l'entité est extérieure et paie elle-même, sinon flux A.",
     milestones: [
       { title: "Première API", criteria: [
         { text: "Un compte créé sur un service (Resend, Stripe ou Google Calendar) et une clé obtenue.", minutes: 20, next: "Crée un compte Resend, génère une clé, colle-la dans les variables d'environnement de Vercel, jamais dans le code." },
@@ -121,7 +121,7 @@ window.WEEKS = [
       ] },
       { title: "Casse et répare", criteria: [
         { text: "10 tests verts au total, dont un sur l'API de la semaine 4.", minutes: 60, next: "Ajoute un test qui vérifie qu'un e-mail est envoyé avec une clé de test." },
-        { text: "Le donneur d'ordre introduit un bug : un test le détecte avant livraison.", minutes: 30, next: "Demande au donneur d'ordre de casser quelque chose. Lance les tests. Note ce qui tombe." },
+        { text: "Un tiers (ou un agent) introduit un bug : un test le détecte avant livraison.", minutes: 30, next: "Demande à quelqu'un, ou à un agent, de casser quelque chose. Lance les tests. Note ce qui tombe." },
         { text: "Les tests tournent automatiquement à chaque commit (CI).", minutes: 30, next: "Demande à l'IA un fichier GitHub Actions qui lance les tests à chaque push." },
         { text: "Pilote payant livré ou deuxième offre envoyée (capture).", minutes: 30, next: "Si le pilote est signé : livre. Sinon, envoie l'offre v2 à 3 nouveaux prospects." },
       ] },
@@ -150,7 +150,7 @@ window.WEEKS = [
   },
   {
     n: 8, title: "Réparer", layer: "Réparer", short: true,
-    tech: "Le donneur d'ordre casse la production (clé expirée, migration ratée) : diagnostic par les journaux, retour arrière, correctif, post-mortem de dix lignes.",
+    tech: "Un tiers (ou un agent) casse la production (clé expirée, migration ratée) : diagnostic par les journaux, retour arrière, correctif, post-mortem de dix lignes.",
     commercial: "Profil Malt ou ComeUp publié, 1 mission alimentaire candidatée.",
     preuves: ["Panne réparée en moins de 2 h avec journal", "Profil freelance en ligne"],
     blocage: "Fêtes : jalons allégés, montants maintenus si convenu.",
@@ -162,7 +162,7 @@ window.WEEKS = [
         { text: "Post-mortem de dix lignes : cause, correctif, ce qui l'empêchera de revenir.", minutes: 15, next: "Dix lignes, pas plus. Range-les dans l'inventaire." },
       ] },
       { title: "Panne n°2 et profil", criteria: [
-        { text: "Seconde panne (différente) réparée en moins de 2 h, chrono.", minutes: 90, next: "Demande au donneur d'ordre de casser autre chose. Lance le chrono." },
+        { text: "Seconde panne (différente) réparée en moins de 2 h, chrono.", minutes: 90, next: "Demande à quelqu'un, ou à un agent, de casser autre chose. Lance le chrono." },
         { text: "Un test ajouté qui aurait attrapé chaque panne.", minutes: 30, next: "Pour chaque panne, écris le test qui l'aurait vue avant le client." },
         { text: "Profil Malt ou ComeUp publié avec deux captures.", minutes: 30, next: "Titre, trois lignes, deux captures, un tarif horaire." },
         { text: "1 mission alimentaire candidatée (capture).", minutes: 15, next: "Filtre « données », « rédaction », « saisie ». Réponds à la première qui correspond." },
@@ -174,7 +174,7 @@ window.WEEKS = [
     tech: "Domaine du client, environnements de prévisualisation, surveillance de disponibilité, alertes, livraison chez un client réel.",
     commercial: "Première facture extérieure si pilote ; sinon 10 nouveaux messages.",
     preuves: ["Domaine client en ligne", "Facture ou 10 captures"],
-    blocage: "Pas de client : déploie pour le donneur d'ordre comme client témoin, mais ne compte rien en flux B.",
+    blocage: "Pas de client : déploie pour un proche comme client témoin, mais ne compte rien en flux B.",
     milestones: [
       { title: "Domaine et surveillance", criteria: [
         { text: "Domaine acheté ou fourni par le client, relié au site, HTTPS actif.", minutes: 40, next: "Achète le domaine ou demande l'accès DNS au client, ajoute-le dans Vercel." },

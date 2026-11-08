@@ -10,7 +10,8 @@ Parcours de 90 jours pour apprendre à gagner de l'argent avec l'IA, conçu pour
 - **QCM obligatoire** : 10 questions sur les décisions prises dans le projet, seuil 8/10 et deux questions bloquantes justes ; variantes au second essai ; en cas d'échec, le jalon reste ouvert, la suite est verrouillée, les travaux sont conservés.
 - **Test pratique** sur données jamais vues, avec vérifications automatiques (longueurs, mentions, absence de données interdites) ; l'apprenante peut signaler un test erroné.
 - **Dossier vérifiable** pour le donneur d'ordre : livrable, critères, QCM, test, dates, reprises ; accepter ou demander une correction motivée.
-- **Trois flux séparés** : A (tranches pilote), B (ventes extérieures), C (reste à vivre). Statut salariée (suivi pédagogique, paie indépendante) ou prestataire (due → facturée → payée). Un résultat de quiz ne modifie jamais une somme due ; l'app ne déclenche aucun virement.
+- **Deux modes** : parcours autonome par défaut (jalons pédagogiques, aucun montant), ou mission commandée, activée par le donneur d'ordre dans Réglages. C'est là qu'il choisit le statut : salariée (suivi pédagogique, paie indépendante) ou prestataire (due → facturée → payée).
+- **Trois flux séparés** : A (tranches pilote, visible seulement en mission commandée), B (ventes extérieures), C (reste à vivre). Un résultat de quiz ne modifie jamais une somme due ; l'app ne déclenche aucun virement.
 - **Carte des capacités** : 30 cartes datées (disponible / démonstration / prévision), chacune avec un essai de dix minutes sur ses propres données.
 - **Kits de terrain** : immobilier, restauration, beauté, administratif, bricolage, ou autre. La mission 1 est le même modèle instancié par terrain.
 - **Parcours avancé** : trois défis (panne, trois agents sur un dépôt, correctif vérifié).
