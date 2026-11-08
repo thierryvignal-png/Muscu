@@ -1170,3 +1170,16 @@ body.carnet .fx-mission { border-color: color-mix(in srgb, var(--fx-brass) 60%, 
 .fx-pauseline { border-radius: 0; display: flex; justify-content: space-between; width: 100%; min-height: 48px; align-items: center; padding: 10px 0 0; border-top: 1px solid var(--line); background: none; color: var(--muted); font-size: 15px; }
 .fx-pauseline b { color: var(--fx-brass); }
 .fx-sec { margin: 18px 2px 10px; }
+
+/* Poids : cible du bloc en cours */
+.fx-target { border-left: 4px solid var(--fx-brass); background: linear-gradient(135deg, color-mix(in srgb, var(--fx-brass) 9%, var(--card)), var(--card) 60%); }
+.fx-target-v { font-size: 46px !important; margin: 6px 0 2px !important; color: var(--fx-index); }
+.fx-target-sub { margin: 0 0 12px; color: var(--muted); }
+.fx-target .fx-stats2 b { font-size: 26px; }
+.fx-target .fx-stats2 b small { font-size: .55em; color: var(--muted); }
+.fx-wk-bar.est { opacity: .55; }
+.fx-t-strong.brass { fill: var(--fx-brass); }
+.fx-wk-sel.on { fill: color-mix(in srgb, var(--fx-brass) 16%, transparent); }
+.fx-target .fx-blockfoot { gap: 10px; align-items: center; }
+.fx-target .fx-blockfoot b { white-space: nowrap; }
+.fx-dexa b { font-size: 15px; }
