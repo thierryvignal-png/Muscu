@@ -1342,6 +1342,7 @@ spaceViews.goodnews = goodnews.view;
 spaceViews.clinique = clinic.view;
 spaceViews.ideas = () => ideas.view('ai');
 spaceViews.ideasSing = () => ideas.view('sing');
+spaceViews.ideasApp = () => ideas.view('app');
 spaceViews.fundraising = fundraising.view;
 // Objectifs de vie + suivi financier en bas
 spaceViews.goals = () => goals.view() + finance.view();

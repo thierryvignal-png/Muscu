@@ -318,7 +318,7 @@ body.no-tabbar .tabbar { display: none; }
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 31;
   background: var(--card); border-radius: 18px 18px 0 0; border-top: 1px solid var(--line);
   padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
-  max-width: 640px; margin: 0 auto;
+  max-width: 640px; margin: 0 auto; max-height: 88vh; max-height: 88dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
   animation: sheet-up .2s ease-out;
 }
 @keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
@@ -1210,3 +1210,8 @@ body.carnet .fx-weigh { padding: 12px; }
 .fx-tband { fill: color-mix(in srgb, var(--fx-brass) 35%, transparent); pointer-events: none; }
 .fx-tline { stroke: var(--fx-brass); stroke-width: 1.4; stroke-dasharray: 4 3; pointer-events: none; }
 .fx-stats3 b.good { color: var(--fx-good); } .fx-stats3 b.warn { color: var(--fx-bad); }
+
+/* Idées d'app : bouton « créée » */
+.idea-made-btn { display: inline-block; margin-top: 6px; min-height: 36px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--muted); font-size: 14px; font-weight: 600; }
+.idea-made-btn.on { background: color-mix(in srgb, var(--good) 15%, var(--card)); color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
+.sheet .space-item { padding: 10px 12px; margin-bottom: 6px; }

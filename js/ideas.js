@@ -19,6 +19,11 @@ export const STREAMS = {
     today: 'Idée Singulier du jour',
     placeholder: 'Une idée pour Singulier : nouveau soin, offre, partenariat, marketing, expérience patient, recrutement, organisation…',
   },
+  app: {
+    key: 'ideas-app.data.v1', space: 'ideasApp', icon: '📱', title: "Idées d'app", short: "Idée d'app", lower: "idée d'app",
+    today: "Idée d'app du jour", made: true,
+    placeholder: "Une app à créer : le problème, pour qui, l'écran principal, ce qu'elle fait en un geste…",
+  },
 };
 const LOCK_HOUR = 21; // blocage à partir de 21 h
 const DAY_END_HOUR = 4; // la journée se termine à 4 h
@@ -195,10 +200,12 @@ function exportText(s) {
     x.stars ? `${x.stars}/5 ★` : '',
     Object.values(d.picks.weeks).includes(x.id) ? 'meilleure de sa semaine' : '',
     Object.values(d.picks.months).includes(x.id) ? 'meilleure de son mois' : '',
+    x.made ? `créée le ${x.made}` : '',
   ].filter(Boolean).join(', ');
   const intro = s === 'sing'
     ? "Voici mes idées pour Singulier, mon centre de médecine esthétique et de bien-être à Paris (ouverture prévue en 2027)."
-    : "Voici mes idées de business utilisant l'IA, notées une par jour.";
+    : s === 'app' ? "Voici mes idées d'apps, notées une par jour (celles marquées « créée » existent déjà)."
+      : "Voici mes idées de business utilisant l'IA, notées une par jour.";
   return `${intro}
 Classe-les de la plus prometteuse à la moins prometteuse. Pour chacune : potentiel de CA, facilité et coût de mise en œuvre, risques, et mon avantage à la porter. Termine par les 3 idées à creuser en priorité et le premier test concret à faire pour chacune.
 
@@ -218,7 +225,7 @@ export function view(s) {
   ].join('');
   return `
     <header class="page-head"><h1>${c.title}</h1>
-      <p>${items.length} idée${items.length > 1 ? 's' : ''}${st ? ` · 🔥 ${st} jour${st > 1 ? 's' : ''} d'affilée` : ''}
+      <p>${items.length} idée${items.length > 1 ? 's' : ''}${c.made ? ` · ✅ ${items.filter((x) => x.made).length} créée${items.filter((x) => x.made).length > 1 ? 's' : ''}` : ''}${st ? ` · 🔥 ${st} jour${st > 1 ? 's' : ''} d'affilée` : ''}
       ${items.length ? `<button class="chip idea-export-btn" data-action="idea-export" data-stream="${s}">📋 Exporter pour une IA</button>` : ''}</p></header>
     <section class="card">${doneToday(d) ? ideaForm(s, false, '＋ Ajouter une idée') : ideaForm(s, false)}</section>
     ${exporting === s ? `
@@ -238,7 +245,8 @@ export function view(s) {
             <textarea name="text" rows="6" required>${esc(x.text)}</textarea>
             <div class="idea-edit-actions"><button class="primary">Enregistrer</button><button type="button" data-action="idea-cancel">Annuler</button></div>
           </form></li>` : `
-          <li><div><small>${fmtDate(x.date)} ${crowned(x)}</small><p>${esc(x.text)}</p>${starsOf(s, x)}</div>
+          <li class="${x.made ? 'idea-made' : ''}"><div><small>${fmtDate(x.date)} ${crowned(x)}</small><p>${esc(x.text)}</p>${starsOf(s, x)}
+            ${c.made ? `<button class="idea-made-btn ${x.made ? 'on' : ''}" data-action="idea-made" data-stream="${s}" data-id="${x.id}">${x.made ? `✅ Créée le ${fmtDate(x.made, false)}` : '☐ Créée ?'}</button>` : ''}</div>
             <span class="idea-row-btns">
               <button class="icon-btn" data-action="idea-edit" data-id="${x.id}" aria-label="Modifier">✎</button>
               <button class="icon-btn" data-action="idea-del" data-stream="${s}" data-id="${x.id}" aria-label="Supprimer">✕</button>
@@ -301,6 +309,17 @@ export const actions = {
     save(s, d);
   },
   'idea-edit'(el) { editing = el.dataset.id; },
+  // Idée d'app effectivement créée : cochée avec la date du jour (retoucher pour décocher)
+  'idea-made'(el) {
+    const s = streamOf(el.dataset.stream);
+    const d = load(s);
+    const x = d.items.find((y) => y.id === el.dataset.id);
+    if (!x) return false;
+    if (x.made && !confirm('Décocher « créée » ?')) return false;
+    x.made = x.made ? null : isoOf(new Date());
+    save(s, d);
+    return x.made ? '🚀 App créée, bravo !' : undefined;
+  },
   // Copie le texte d'export ; si le presse-papiers refuse, on l'affiche pour copie manuelle
   'idea-export'(el) {
     const s = streamOf(el.dataset.stream);
