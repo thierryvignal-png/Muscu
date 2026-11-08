@@ -50,24 +50,47 @@
 
   // Onboarding
   VIEWS.onboarding = function () {
-    const terrains = window.TERRAINS.map(t => '<label class="opt"><input type="radio" name="terrain" value="' + t.id + '"' + (t.id === "immobilier" ? " checked" : "") + '> <span><b>' + esc(t.label) + "</b><br><small>" + esc(t.tour) + "</small></span></label>").join("");
+    const terrains = window.TERRAINS.map(t => '<label class="opt"><input type="radio" name="terrain" value="' + t.id + '"' + "" + '> <span><b>' + esc(t.label) + "</b><br><small>Exemple : " + esc(t.demo.domaine) + " pour " + esc(t.demo.qui) + "</small></span></label>").join("");
     const games = [["quete", "Je finis une quête laissée en plan"], ["equipement", "J'améliore mon équipement ou ma base"], ["farm", "Je farme des ressources tranquillement"], ["explore", "J'explore une zone inconnue"], ["refaire", "Je refais un passage pour le réussir mieux"], ["social", "Je joue avec d'autres"]].map(([v, l]) => '<label class="opt"><input type="radio" name="jeu" value="' + v + '"> <span>' + l + "</span></label>").join("");
-    return card("Bienvenue", '<p>Quinze minutes. Ensuite tu as un lien à toi et ta première règle dans l\'inventaire.</p>') +
+    return card("Où on va", "<p>En 90 jours : construire avec l'IA un petit outil qui fait gagner du temps à quelqu'un, puis le lui vendre. Le premier objectif est qu'un vrai client te paie quelque chose que tu as fabriqué.</p><p class=\"muted\">Aujourd'hui : quinze minutes pour régler l'app et voir le genre d'outil que tu vas construire.</p>") +
       card("1 · Identité", '<label>Comment tu veux être appelée ici<input id="ob-pseudo" placeholder="pseudo" maxlength="24"></label><div class="avatars">' + AVATARS.map((a, i) => '<label class="av"><input type="radio" name="avatar" value="' + a + '"' + (i === 0 ? " checked" : "") + "><span>" + a + "</span></label>").join("") + '</div><p class="muted">Ces informations n\'apparaissent nulle part ailleurs. Dehors, tu peux travailler sous pseudo et vendre par écrit.</p>') +
       card("2 · Ce que tu aimes dans un jeu", '<p>Quand tu as 20 minutes libres dans un jeu, tu fais quoi ?</p>' + games + '<label>Et tu joues à quoi en ce moment ? <input id="ob-jeunom" placeholder="facultatif"></label><p class="muted">Pas de jeu ? Pense à la cuisine, au bricolage, à ton métier : on cherche ce qui te donne envie de réessayer.</p>') +
-      card("3 · Ton terrain de départ", "<p>La mission 1 sera construite dessus. Tu peux en changer plus tard.</p>" + terrains + '<label>Si « autre », décris-le en une phrase<input id="ob-terrain-autre" placeholder="ex. gestion d\'un club de sport"></label>') +
+      card("3 · Dans quel domaine tu veux commencer ?", "<p>Choisis un domaine que tu connais un peu. Ton premier outil servira à quelqu'un de ce domaine. Tu pourras en changer.</p>" + terrains + '<label>Si « autre », décris-le en une phrase<input id="ob-terrain-autre" placeholder="ex. gestion d\'un club de sport"></label>') +
       card("4 · Quand tu commences", '<label>Date de départ (J0)<input id="ob-start" type="date" value="' + S.todayISO() + '"></label><p class="muted">La semaine 1 commence le lundi suivant.</p>') +
       card("", btn("onboard", "Commencer", "primary"));
   };
 
   // Premier effort (écran 4 de J0)
   VIEWS["premier-effort"] = function (p) {
-    const step = Number(p[0] || 1); const t = S.terrain(); const first = t.notes[0];
-    if (step === 1) return card("Premier effort · 5 min", "<p>Avant tout cours : colle les notes d'un cas que tu as déjà traité, telles que tu les aurais reçues, brutes, pas propres. Si tu n'en as plus sous la main, prends le cas n°1.</p>" + (first ? '<pre class="note">' + esc(first.text) + "</pre>" : "") + '<textarea id="pe-notes" rows="5" placeholder="colle ici"></textarea>' + btn("pe-notes", "Envoyer", "primary"));
-    if (step === 2) return card("Coach", '<div class="bubble">Dans ces notes, qu\'est-ce qui empêcherait de livrer demain matin ? Une chose qui manque, ou une chose qu\'on n\'a pas le droit d\'écrire.</div><input id="pe-answer" placeholder="ta réponse, en quelques mots">' + btn("pe-answer", "Répondre", "primary"));
-    if (step === 3) return card("Coach", '<div class="bubble">Exact, ou presque. Ta page va faire cette vérification à la place du client, à chaque fois. Tu viens d\'écrire la règle n°1 de ton vérificateur. Elle est dans ton inventaire : <b>' + esc(t.vocab.regle1) + '</b>.</div><div class="bubble">Deuxième chose, 3 minutes. Ouvre ChatGPT (ou l\'outil de ton choix) et demande la page en une phrase. En voici une que tu peux modifier :</div><pre class="note">Crée une page publique où je colle des notes brutes de ' + esc(t.label.toLowerCase()) + ' et qui me rend ' + esc(t.vocab.formats) + ', après m\'avoir listé ce qui manque ou ce qui est interdit.</pre><label>Colle le lien quand il existe (ou « plus tard »)<input id="pe-link" placeholder="https://"></label>' + btn("pe-link", "Terminer", "primary"));
-    return card("Ton chantier", '<p>' + (S.data.profile.lienV0 ? '<a href="' + esc(S.data.profile.lienV0) + '" target="_blank" rel="noopener">' + esc(S.data.profile.lienV0) + "</a>" : "Lien à coller plus tard dans le jalon 1.") + "</p><p>Il est moche et incomplet. Normal : tu as quatre jours.</p><p>Dans l'inventaire : Règle n°1, Phrase de départ" + (S.data.profile.lienV0 ? ", Lien v0" : "") + ".</p><p>Prochaine ouverture : atelier d'idées (10 min), puis la mission.</p>" + link("#/", "Aller à Aujourd'hui", "primary"));
+    const step = Number(p[0] || 1); const t = S.terrain(); const d = t.demo; const pr = S.data.profile;
+    if (step === 1) return card("Le genre d'outil que tu vas construire",
+      "<p>Beaucoup de gens reçoivent des demandes en vrac, par SMS ou par e-mail, et passent du temps à les remettre au propre. L'outil que tu vas construire fait ça en quelques secondes. Et surtout, il repère ce qui manque au lieu de l'inventer.</p>" +
+      "<h4>Exemple : " + esc(d.qui) + "</h4>" +
+      '<p class="muted">Avant : le message reçu</p><blockquote>' + esc(d.avant) + "</blockquote>" +
+      '<p class="muted">Après : ce que l\'outil rend</p><blockquote>' + esc(d.apres) + "</blockquote>" +
+      '<p class="muted">Et ce qu\'il signale</p><blockquote>' + esc(d.manque) + "</blockquote>" +
+      link("#/premier-effort/2", "À moi d'essayer · 5 min", "primary"));
+    if (step === 2) return card("À toi · 5 min",
+      "<p>Colle un message en vrac que tu as reçu ou écrit récemment : un SMS, un e-mail, une note. N'importe quel sujet. Tu n'en as pas sous la main ? Prends l'exemple.</p>" +
+      '<textarea id="pe-notes" rows="5" placeholder="colle ici">' + esc(pr.notesV0 || "") + "</textarea>" +
+      btn("pe-example", "Prendre l'exemple") + " " + btn("pe-notes", "Continuer", "primary"));
+    if (step === 3) return card("Coach",
+      '<blockquote>' + esc(pr.notesV0 || "") + "</blockquote>" +
+      '<div class="bubble">Si tu devais agir sur ce message demain matin, qu\'est-ce qui te manquerait ? Une information, une date, un montant, une précision.</div>' +
+      '<input id="pe-answer" placeholder="en quelques mots">' + btn("pe-answer", "Répondre", "primary"));
+    if (step === 4) return card("Coach",
+      '<div class="bubble">C\'est exactement le travail de l\'outil : repérer ce qui manque avant de produire, et le demander au lieu de l\'inventer. Ta réponse devient ta première règle. Elle est dans ton inventaire :</div>' +
+      "<blockquote>" + esc(pr.regle1 || "") + "</blockquote>" +
+      '<div class="bubble">Dernière étape, 3 minutes, si tu as ChatGPT ou un outil équivalent. Copie cette phrase, colle-la, et regarde ce qu\'il te fabrique :</div>' +
+      '<pre class="note">' + esc(phraseDepart(t)) + "</pre>" +
+      '<label>Si l\'outil te donne un lien, colle-le ici<input id="pe-link" placeholder="https://"></label>' +
+      btn("pe-link", "Terminer", "primary") + " " + btn("pe-skip", "Je le ferai plus tard"));
+    return card("C'est parti",
+      (pr.lienV0 ? '<p>Ton premier lien : <a href="' + esc(pr.lienV0) + '" target="_blank" rel="noopener">' + esc(pr.lienV0) + "</a>. Il est imparfait, c'est normal.</p>" : "<p>Pas encore de lien : tu le feras pendant la mission de la semaine 1.</p>") +
+      "<p>Dans ton inventaire : ta règle n°1 et la phrase de départ.</p><p>La suite : à chaque ouverture, une idée du jour en dix minutes, puis la mission de la semaine.</p>" +
+      link("#/", "Aller à Aujourd'hui", "primary"));
   };
+  function phraseDepart(t) { return "Crée une page web où je colle un message en vrac (" + t.demo.domaine + ") et qui me rend " + t.vocab.formats + ". Avant de produire quoi que ce soit, la page liste ce qui manque et le demande, sans jamais l'inventer."; }
 
   // Aujourd'hui
   VIEWS[""] = function () {
@@ -315,18 +338,19 @@
   const ACTIONS = {
     onboard() {
       const pseudoV = $("#ob-pseudo").value.trim() || "Mira";
-      const game = ($('input[name="jeu"]:checked') || {}).value || ""; const terrain = $('input[name="terrain"]:checked').value;
+      const game = ($('input[name="jeu"]:checked') || {}).value || ""; const tSel = $('input[name="terrain"]:checked'); if (!tSel) { alert("Choisis un domaine pour commencer (étape 3)."); return; } const terrain = tSel.value;
       S.data.profile = { pseudo: pseudoV, avatar: $('input[name="avatar"]:checked').value, jeu: game, jeuNom: $("#ob-jeunom").value.trim(), terrain, terrainAutre: $("#ob-terrain-autre").value.trim(), mode: "autonome", donneurNom: "", statut: null, startDate: $("#ob-start").value || S.todayISO(), createdAt: new Date().toISOString() };
       S.data.ui.role = "apprenante"; S.week(1);
       const t = S.terrain();
-      S.addInventory("regle", "Règle n°1 — " + t.vocab.regle1, "Vérificateur : " + t.vocab.regle1, 1);
-      S.addInventory("note", "Phrase de départ", "Crée une page publique où je colle des notes brutes de " + t.label.toLowerCase() + " et qui me rend " + t.vocab.formats + ", après m'avoir listé ce qui manque ou ce qui est interdit.", 1);
+      S.addInventory("note", "Phrase de départ", phraseDepart(t), 1);
       S.log("onboarding", "profil créé"); S.save();
       go("/premier-effort/1");
     },
-    "pe-notes"() { const v = $("#pe-notes").value.trim(); if (v.length < 10) return alert("Colle au moins quelques lignes."); S.data.profile.notesV0 = v; S.save(); go("/premier-effort/2"); },
-    "pe-answer"() { const v = $("#pe-answer").value.trim(); if (!v) return alert("Même une réponse fausse : écris-la."); S.log("premier-effort", v); go("/premier-effort/3"); },
-    "pe-link"() { const v = $("#pe-link").value.trim(); if (/^https?:\/\//.test(v)) { S.data.profile.lienV0 = v; S.addInventory("demo", "Lien v0", v, 1); } S.save(); go("/premier-effort/4"); },
+    "pe-example"() { $("#pe-notes").value = S.terrain().demo.avant; },
+    "pe-notes"() { const v = $("#pe-notes").value.trim(); if (v.length < 10) return alert("Colle au moins une phrase, ou prends l'exemple."); S.data.profile.notesV0 = v; S.save(); go("/premier-effort/3"); },
+    "pe-answer"() { const v = $("#pe-answer").value.trim(); if (!v) return alert("Même une réponse approximative : écris-la."); const regle = "Si « " + v + " » manque, l'outil le demande au lieu de l'inventer."; S.data.profile.regle1 = regle; S.addInventory("regle", "Règle n°1 (la tienne)", regle, 1); S.log("premier-effort", v); S.save(); go("/premier-effort/4"); },
+    "pe-link"() { const v = $("#pe-link").value.trim(); if (/^https?:\/\//.test(v)) { S.data.profile.lienV0 = v; S.addInventory("demo", "Lien v0", v, 1); } S.save(); go("/premier-effort/5"); },
+    "pe-skip"() { go("/premier-effort/5"); },
     "idea-answer"() { const d = S.data.ideaDraft; const v = $("#id-answer").value.trim(); d.dialog.push({ who: "me", text: v }); d.last = v; if (v.length >= 12) { const k = ["qui", "debrouille", "acheter", "test48"].find(x => !d[x] || d[x].trim().length < 12); if (k) d[k] = v; } const q = C.nextIdeaQuestion(d, d.last, d.stuck); d.dialog.push({ who: "coach", text: q.text }); if (q.level) d.stuck = q.level; S.save(); route(); },
     "idea-stuck"() { const d = S.data.ideaDraft; d.last = "aucune idée"; const q = C.nextIdeaQuestion(d, d.last, d.stuck); d.dialog.push({ who: "me", text: "Aucune idée" }, { who: "coach", text: q.text }); d.stuck = q.level; S.log("atelier", "aucune idée, niveau " + q.level); S.save(); route(); },
     "idea-save"() { const d = S.data.ideaDraft; document.querySelectorAll("[data-idea]").forEach(el => { d[el.dataset.idea] = el.value; }); const vague = ["qui", "debrouille", "acheter", "test48"].filter(k => (d[k] || "").trim().length < 12); if (vague.length) { alert("Encore vague : " + vague.join(", ") + ". Une phrase chacun."); return; } S.data.ideas.unshift({ id: S.uid(), date: S.todayISO(), qui: d.qui, debrouille: d.debrouille, acheter: d.acheter, test48: d.test48, stuck: d.stuck }); S.today().ideaDone = true; S.data.ideaDraft = null; S.log("atelier", "idée validée"); S.save(); go("/"); },

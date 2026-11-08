@@ -91,7 +91,7 @@
       return this.data.weeks[n];
     },
     weekDef(n) { return (window.WEEKS || []).find(w => w.n === n); },
-    terrain() { const id = this.data.profile && this.data.profile.terrain; return (window.TERRAINS || []).find(t => t.id === id) || window.TERRAINS[0]; },
+    terrain() { const id = this.data.profile && this.data.profile.terrain; return (window.TERRAINS || []).find(t => t.id === id) || window.TERRAINS.find(t => t.id === "autre"); },
     tpl(text) {
       const v = this.terrain().vocab; return String(text || "").replace(/\{\{(\w+)\}\}/g, (m, k) => (v[k] !== undefined ? v[k] : m));
     },
