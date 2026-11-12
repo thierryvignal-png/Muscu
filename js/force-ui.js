@@ -672,10 +672,10 @@ function reprisesCard(an) {
     </section>`;
 }
 
-// ---------- Poids : blocs fixes de 84 jours depuis le 23 mai 2026, repères, courbe, DEXA ----------
-// Mêmes blocs de 12 semaines que la force : bloc 3 du 7 nov. au 29 janv. (avant le 23 juin, pas de poids connu)
+// ---------- Poids : blocs fixes de 56 jours depuis le 23 mai 2026, repères, courbe, DEXA ----------
+// Poids : blocs de 8 semaines depuis le 23 mai (4 blocs) ; bloc 4 du 7 nov. au 1er janv. (avant le 23 juin, pas de poids connu)
 const W_ANCHOR = '2026-05-23';
-const W_BLOCK = 84;
+const W_BLOCK = 56;
 const W_TARGET = { lo: 75, hi: 75.5 }; // cible personnelle par défaut (modifiable dans l'app)
 const kg2 = (v) => n1(v, 2);
 const signedKg = (v) => `${v < 0 ? '−' : '+'}${kg2(Math.abs(v))}`;
@@ -905,7 +905,7 @@ function methodPage() {
       ${li('Poids du moment', 'moyenne des médianes de pesée à ± 3 jours de la séance, sinon interpolation entre deux pesées ; avant le 23 juin, 85 kg par hypothèse.')}
       ${li('Force relative', '1RM ÷ poids du moment, en moyenne sur 15 jours ; base 100 à la reprise du 6 août.')}
       ${li('Désentraînement', 'la force maximale tient environ 4 semaines sans entraînement puis baisse plus vite (Bosquet et al., 2013) : vert sous 14 jours, orange jusqu\'à 27, rouge à partir de 28.')}
-      ${li('Poids', 'mêmes blocs de 12 semaines que la force, sans chevauchement : bloc 1 du 23 mai au 14 août (poids connu à partir du 23 juin), bloc 2 du 15 août au 6 nov., bloc 3 du 7 nov. au 29 janv. Plusieurs pesées le même jour : la médiane du jour. Moyenne du bloc sur les seuls jours pesés, sans combler les jours manquants, arrondie à 2 décimales pour l\'affichage. Une baisse se compte à la clôture d\'un bloc, en comparant les moyennes avant arrondi.')}
+      ${li('Poids', 'blocs fixes de 8 semaines, sans chevauchement : bloc 1 du 23 mai au 17 juil. (poids connu à partir du 23 juin), bloc 2 du 18 juil. au 11 sept., bloc 3 du 12 sept. au 6 nov., bloc 4 du 7 nov. au 1er janv. Plusieurs pesées le même jour : la médiane du jour. Moyenne du bloc sur les seuls jours pesés, sans combler les jours manquants, arrondie à 2 décimales pour l\'affichage. Une baisse se compte à la clôture d\'un bloc, en comparant les moyennes avant arrondi.')}
     </ul><p class="hint">Sources : strengthlevel.com (barèmes hommes en kg : squat, incline dumbbell bench press, romanian deadlift, chin ups) ; stronger by science (désentraînement).</p></section>`;
 }
 
