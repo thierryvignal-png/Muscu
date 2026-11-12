@@ -52,25 +52,25 @@ test('indice : 82,3 le 7 nov., 43,8 le 7 févr.', () => {
   near(an.monthEnds.find((m) => m.date === '2026-09-30').index, 78.4);
 });
 
-test('blocs : 53,5 → 82,2, 7 sur 7 en hausse', () => {
+test('blocs de 14 semaines : départ 70,3, bloc 1 jusqu\'au 30 janv.', () => {
   const an8 = F.analyze(journal, { today: '2026-11-08' });
-  const idx = an8.blocks.map((b) => Math.round(b.index * 10) / 10);
-  assert.deepEqual(idx.slice(0, 8), [53.5, 56.3, 66.3, 72.6, 78.2, 79.4, 80.1, 82.2]);
-  assert.equal(an8.wonCount, 7); assert.equal(an8.doneCount, 7);
-  assert.equal(an8.cur.n, 8); assert.equal(an8.cur.start, '2026-11-08'); assert.equal(an8.cur.stop, '2026-11-21');
+  assert.deepEqual(an8.blocks.map((b) => Math.round(b.index * 10) / 10), [70.3, 76.6]);
+  assert.equal(an8.cur.n, 1); assert.equal(an8.cur.start, '2026-10-25'); assert.equal(an8.cur.stop, '2027-01-30');
+  assert.equal(an8.doneCount, 0);
+  // fin janvier : bloc 1 clos et gagné, bloc 2 en cours
+  const anFeb = F.analyze(journal, { today: '2027-02-01' });
+  assert.equal(anFeb.cur.n, 2); assert.equal(anFeb.wonCount, 1); assert.equal(anFeb.doneCount, 1);
 });
 
-test('objectifs du bloc 8', () => {
-  const an8 = F.analyze(journal, { today: '2026-11-08' });
-  const g = an8.goals;
+test('objectifs du bloc 1 (battre le départ)', () => {
+  const g = F.analyze(journal, { today: '2026-11-08' }).goals;
   assert.deepEqual(g.squat.options.map((o) => o.label), ['10 × 122,5 kg', '12 × 117,5 kg']);
-  assert.deepEqual(g.dev.options.map((o) => o.label), ['11 × 2 × 40 kg', '9 × 2 × 42 kg']);
-  assert.deepEqual(g.rdl.options.map((o) => o.label), ['16 × 120 kg', '12 × 130 kg']);
-  assert.equal(g.tr.options[0].label, '20 reps');
+  assert.deepEqual(g.dev.options.map((o) => o.label), ['11 × 2 × 36 kg', '9 × 2 × 38 kg']);
+  assert.deepEqual(g.rdl.options.map((o) => o.label), ['16 × 107,5 kg', '12 × 117,5 kg']);
+  assert.equal(g.tr.options[0].label, '16 reps');
   assert.deepEqual(g.tr.next, { reps: 21, zone: 'avancé' });
   assert.equal(g.squat.options[0].unlock, 'avancé');
-  assert.equal(g.rdl.options[0].unlock, 'record');
-  assert.equal(g.dev.options[0].unlock, undefined);
+  assert.ok(g.dev.done && g.tr.done);
 });
 
 test('potentiel ≈ 85, force relative depuis la reprise', () => {

@@ -1,6 +1,6 @@
 // Moteur de calcul de la force (module pur : aucun accès à l'écran ni au stockage, testable sous Node).
 // Méthode : 1RM estimé (Epley) → score /100 face aux hommes de même poids (barèmes Strength Level à 76 kg)
-// → niveau du moment par exercice (moyenne sur 15 jours) → indice global pondéré → blocs de 2 semaines.
+// → niveau du moment par exercice (moyenne sur 15 jours) → indice global pondéré → blocs de 14 semaines.
 
 export const EXS = ['squat', 'dev', 'rdl', 'tr'];
 // th : seuils débutant / novice / intermédiaire / avancé / élite à 76 kg
@@ -53,14 +53,15 @@ export function thAt(ex, bw = REF_BW) {
 }
 
 export const START = '2026-02-07'; // premier jour où les 4 exercices ont un niveau
-export const ANCHOR = '2026-07-19'; // départ des blocs de 14 jours
+export const ANCHOR = '2026-07-19'; // départ des blocs de 98 jours (14 semaines)
 export const REPRISE = '2026-08-06'; // reprise : base 100 des courbes de force relative
 export const ASSUMED_BEFORE = '2026-06-23'; // avant : poids supposé à 85 kg
 export const ASSUMED_BW = 85;
 export const DEFAULT_BW = 75.5;
 export const BW_REF = [73, 79]; // barèmes à 76 kg : avertissement hors de cette plage
 export const WINDOW = 14; // fenêtre de 15 jours : [date − 14 ; date]
-export const BLOCK = 14;
+// Blocs longs (14 semaines) : de la marge pour progresser malgré une pause ; le bloc 1 court du 25 oct. au 30 janv.
+export const BLOCK = 98;
 
 // ---------- Dates (ISO AAAA-MM-JJ, calcul en UTC pour éviter les décalages d'heure) ----------
 const ms = (iso) => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10));
@@ -228,7 +229,7 @@ export function analyze(rawSessions, { today, weights = [], pauses = [] } = {}) 
   const index = indexOf(nowLv);
   const at = (date) => daily.find((x) => x.date === date)?.index ?? null;
 
-  // Blocs de 14 jours
+  // Blocs de 98 jours
   const nBlocks = Math.floor(diffDays(ANCHOR, end) / BLOCK);
   const blocks = [];
   for (let b = 0; b <= nBlocks; b++) {
