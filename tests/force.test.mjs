@@ -52,25 +52,22 @@ test('indice : 82,3 le 7 nov., 43,8 le 7 févr.', () => {
   near(an.monthEnds.find((m) => m.date === '2026-09-30').index, 78.4);
 });
 
-test('blocs de 14 semaines : départ 70,3, bloc 1 jusqu\'au 30 janv.', () => {
-  const an8 = F.analyze(journal, { today: '2026-11-08' });
-  assert.deepEqual(an8.blocks.map((b) => Math.round(b.index * 10) / 10), [70.3, 76.6]);
-  assert.equal(an8.cur.n, 1); assert.equal(an8.cur.start, '2026-10-25'); assert.equal(an8.cur.stop, '2027-01-30');
-  assert.equal(an8.doneCount, 0);
-  // fin janvier : bloc 1 clos et gagné, bloc 2 en cours
-  const anFeb = F.analyze(journal, { today: '2027-02-01' });
-  assert.equal(anFeb.cur.n, 2); assert.equal(anFeb.wonCount, 1); assert.equal(anFeb.doneCount, 1);
+test('3 blocs de 12 semaines : bloc 3 du 7 nov. au 29 janv.', () => {
+  const an = F.analyze(journal, { today: '2026-11-12' });
+  assert.deepEqual(an.blocks.map((b) => Math.round(b.index * 10) / 10), [54.3, 73.9, 76.4]);
+  assert.deepEqual(an.blocks.map((b) => b.n), [1, 2, 3]);
+  assert.equal(an.cur.n, 3); assert.equal(an.cur.start, '2026-11-07'); assert.equal(an.cur.stop, '2027-01-29');
+  assert.equal(an.wonCount, 1); assert.equal(an.doneCount, 1);
 });
 
-test('objectifs du bloc 1 (battre le départ)', () => {
-  const g = F.analyze(journal, { today: '2026-11-08' }).goals;
+test('objectifs du bloc 3 (battre le bloc 2)', () => {
+  const g = F.analyze(journal, { today: '2026-11-12' }).goals;
   assert.deepEqual(g.squat.options.map((o) => o.label), ['10 × 122,5 kg', '12 × 117,5 kg']);
-  assert.deepEqual(g.dev.options.map((o) => o.label), ['11 × 2 × 36 kg', '9 × 2 × 38 kg']);
-  assert.deepEqual(g.rdl.options.map((o) => o.label), ['16 × 107,5 kg', '12 × 117,5 kg']);
-  assert.equal(g.tr.options[0].label, '16 reps');
-  assert.deepEqual(g.tr.next, { reps: 21, zone: 'avancé' });
+  assert.deepEqual(g.dev.options.map((o) => o.label), ['11 × 2 × 38 kg', '9 × 2 × 40 kg']);
+  assert.deepEqual(g.rdl.options.map((o) => o.label), ['16 × 110 kg', '12 × 122,5 kg']);
+  assert.equal(g.tr.options[0].label, '17 reps');
+  assert.ok(g.tr.done);
   assert.equal(g.squat.options[0].unlock, 'avancé');
-  assert.ok(g.dev.done && g.tr.done);
 });
 
 test('potentiel ≈ 85, force relative depuis la reprise', () => {

@@ -221,7 +221,7 @@ function blocksCard(an) {
   const bars = bl.map((b, i) => {
     const x = 8 + i * (bw + gap);
     const cx = x + bw / 2;
-    const label = i === 0 ? 'dép.' : `B${b.n}`;
+    const label = `B${b.n}`;
     if (b.current) {
       const any = EXS.some((k) => b.fresh[k]);
       return `<g data-action="force-block" data-i="${i}" class="fx-hit">
@@ -240,15 +240,15 @@ function blocksCard(an) {
     const b = bl[pick];
     const p = bl[pick - 1];
     return `<div class="fx-block-detail">
-      <p><b>${pick === 0 ? 'Départ' : `Bloc ${b.n}`}</b> · ${dShort(b.start)} → ${dShort(b.stop)}${b.current ? ' · en cours' : ''}</p>
+      <p><b>Bloc ${b.n}</b> · ${dShort(b.start)} → ${dShort(b.stop)}${b.current ? ' · en cours' : ''}</p>
       <div class="fx-mini4">${EXS.map((k) => `<div><span><i style="background:${EX[k].color}"></i>${EX[k].short}</span><b>${n1(b.values[k])}</b>
         <small class="${!p ? '' : b.values[k] > p.values[k] + 0.05 ? 'good' : b.values[k] < p.values[k] - 0.05 ? 'warn' : ''}">${!b.fresh[k] ? '= sans séance' : p ? sgn(b.values[k] - p.values[k]) : ''}</small></div>`).join('')}</div>
     </div>`;
   })() : `<p class="fx-blockfoot"><span>⚑ Bloc ${an.cur.n} · ${dShort(an.cur.start)} – ${dShort(an.cur.stop)}</span><b>À jouer</b></p><p class="hint">Touche un bloc pour voir ses 4 exercices.</p>`;
   return `
     <section class="card">
-      <div class="fx-card-head">${kicker('◈ Régularité')}<span class="fx-badge">14 semaines</span></div>
-      <h2 class="fx-title">${an.doneCount ? `${an.wonCount} bloc${an.wonCount > 1 ? 's' : ''} sur ${an.doneCount} en hausse` : `Bloc ${an.cur.n} : ${n1(an.cur.index)} contre ${n1(an.prevBlock.index)} au départ`}</h2>
+      <div class="fx-card-head">${kicker('◈ Régularité')}<span class="fx-badge">12 semaines</span></div>
+      <h2 class="fx-title">${an.doneCount ? `${an.wonCount} bloc${an.wonCount > 1 ? 's' : ''} sur ${an.doneCount} en hausse` : `Bloc ${an.cur.n} : ${n1(an.cur.index)} contre ${n1(an.prevBlock.index)} au bloc ${an.prevBlock.n}`}</h2>
       ${an.doneCount ? '' : `<p class="fx-sub">${an.cur.index > an.prevBlock.index ? '✓ Déjà au-dessus' : 'À dépasser'} · ${F.diffDays(an.today, an.cur.stop) + 1} jours pour tenir, jusqu'au ${dShort(an.cur.stop)}</p>`}
       <svg class="fx-svg" viewBox="0 0 ${W} ${H}">${bars}</svg>
       ${detail}
@@ -672,10 +672,10 @@ function reprisesCard(an) {
     </section>`;
 }
 
-// ---------- Poids : blocs fixes de 105 jours depuis le 5 juillet 2026, repères, courbe, DEXA ----------
-const W_ANCHOR = '2026-07-05';
-// Blocs longs (15 semaines) : le bloc 2 court du 18 oct. au 30 janv., de la marge malgré la pause de décembre
-const W_BLOCK = 105;
+// ---------- Poids : blocs fixes de 84 jours depuis le 23 mai 2026, repères, courbe, DEXA ----------
+// Mêmes blocs de 12 semaines que la force : bloc 3 du 7 nov. au 29 janv. (avant le 23 juin, pas de poids connu)
+const W_ANCHOR = '2026-05-23';
+const W_BLOCK = 84;
 const W_TARGET = { lo: 75, hi: 75.5 }; // cible personnelle par défaut (modifiable dans l'app)
 const kg2 = (v) => n1(v, 2);
 const signedKg = (v) => `${v < 0 ? '−' : '+'}${kg2(Math.abs(v))}`;
@@ -900,12 +900,12 @@ function methodPage() {
       ${li('1RM estimé', 'formule d\'Epley sur la meilleure série : charge × (1 + reps ÷ 30). Au-delà de 12 reps, estimation moins sûre.')}
       ${li('Fiabilité', '« solide » de 2 à 12 reps ; « indicative » au-delà de 12 reps ou sur une seule rep ; « légère » sous 50 % de ton meilleur 1RM à date, exclue des moyennes et de l\'indice.')}
       ${li('Niveau du moment', 'moyenne des scores des 15 derniers jours, prise à ta dernière séance. Sans séance, il garde sa valeur : l\'indice ne baisse jamais sans mesure.')}
-      ${li('Blocs de 14 semaines', `depuis le ${dShort(F.ANCHOR)} (départ jusqu'au 24 oct., bloc 1 du 25 oct. au 30 janv.). Valeur d'un exercice = moyenne de ses scores du bloc ; sans séance, celle du bloc d'avant. Un bloc est gagné quand l'indice dépasse celui du bloc précédent.`)}
+      ${li('Blocs de 12 semaines', `depuis la reprise du ${dShort(F.ANCHOR)} : bloc 1 jusqu'au 14 août, bloc 2 du 15 août au 6 nov., bloc 3 du 7 nov. au 29 janv. Valeur d'un exercice = moyenne de ses scores du bloc ; sans séance, celle du bloc d'avant. Un bloc est gagné quand l'indice dépasse celui du bloc précédent.`)}
       ${li('Objectifs du bloc', 'le score à battre (au squat : 80 minimum pour passer avancé), converti en séries par Epley inversé, charge arrondie au-dessus (2,5 kg à la barre, 2 kg par haltère).')}
       ${li('Poids du moment', 'moyenne des médianes de pesée à ± 3 jours de la séance, sinon interpolation entre deux pesées ; avant le 23 juin, 85 kg par hypothèse.')}
       ${li('Force relative', '1RM ÷ poids du moment, en moyenne sur 15 jours ; base 100 à la reprise du 6 août.')}
       ${li('Désentraînement', 'la force maximale tient environ 4 semaines sans entraînement puis baisse plus vite (Bosquet et al., 2013) : vert sous 14 jours, orange jusqu\'à 27, rouge à partir de 28.')}
-      ${li('Poids', 'blocs fixes de 15 semaines (105 jours) depuis le 5 juillet 2026, sans chevauchement : bloc 1 jusqu\'au 17 oct., bloc 2 du 18 oct. au 30 janv. Plusieurs pesées le même jour : la médiane du jour. Moyenne du bloc sur les seuls jours pesés, sans combler les jours manquants, arrondie à 2 décimales pour l\'affichage. Une baisse se compte à la clôture d\'un bloc, en comparant les moyennes avant arrondi.')}
+      ${li('Poids', 'mêmes blocs de 12 semaines que la force, sans chevauchement : bloc 1 du 23 mai au 14 août (poids connu à partir du 23 juin), bloc 2 du 15 août au 6 nov., bloc 3 du 7 nov. au 29 janv. Plusieurs pesées le même jour : la médiane du jour. Moyenne du bloc sur les seuls jours pesés, sans combler les jours manquants, arrondie à 2 décimales pour l\'affichage. Une baisse se compte à la clôture d\'un bloc, en comparant les moyennes avant arrondi.')}
     </ul><p class="hint">Sources : strengthlevel.com (barèmes hommes en kg : squat, incline dumbbell bench press, romanian deadlift, chin ups) ; stronger by science (désentraînement).</p></section>`;
 }
 
