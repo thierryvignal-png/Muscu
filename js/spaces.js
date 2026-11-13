@@ -43,7 +43,7 @@ export function spaceSwitch(current) {
 }
 
 // À changer à chaque mise à jour (comme VERSION dans sw.js) : affiché en bas du menu
-export const APP_VERSION = 'v150';
+export const APP_VERSION = 'v151';
 
 export function spaceMenu(current) {
   return `
@@ -63,6 +63,6 @@ export function spaceMenu(current) {
 }
 
 // Clés de stockage des espaces autres que Muscu (pour la sauvegarde complète)
-export const SPACE_KEYS = ['todo.data.v1', 'atom.data.v1', 'goodnews.data.v1', 'goals.data.v1', 'finance.data.v1', 'esthetique.data.v1', CLINIC_KEY, 'ideas.data.v1', 'ideas-singulier.data.v1', 'ideas-app.data.v1', 'fundraising.data.v1'];
+export const SPACE_KEYS = ['todo.data.v1', 'atom.data.v1', 'goodnews.data.v1', 'goals.data.v1', 'finance.data.v1', 'esthetique.data.v1', CLINIC_KEY, 'ideas.data.v1', 'ideas-singulier.data.v1', 'ideas-app.data.v1', 'atom-leads.data.v1', 'fundraising.data.v1'];
 
 export const spaceViews = {};

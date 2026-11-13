@@ -114,7 +114,7 @@ function pickCard(s, d, p) {
 }
 
 // Écran de blocage (remplace toute l'app) : tout ce qui manque, flux par flux
-export function lockView() {
+export function lockView(extra = '') {
   const blocks = Object.keys(STREAMS).filter(needs).map((s) => {
     const d = load(s);
     const st = streak(d);
@@ -144,7 +144,7 @@ export function lockView() {
       <h1>Avant de continuer</h1>
       <p>L'app se débloque quand tout est fait.</p>
     </section>
-    ${blocks}`;
+    ${blocks}${extra}`;
 }
 
 // Cartes en haut de « Ma journée » (une par flux)

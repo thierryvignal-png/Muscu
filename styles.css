@@ -1217,3 +1217,8 @@ body.carnet .fx-weigh { padding: 12px; }
 .sheet .space-item { padding: 10px 12px; margin-bottom: 6px; }
 .idea-made-btn.big { display: block; width: 100%; min-height: 48px; font-size: 16px; color: var(--text); background: var(--accent-soft); border-color: transparent; }
 .idea-today-text { margin: 6px 0 4px; white-space: pre-wrap; }
+
+/* Leads Atom : 5 cases */
+.lead-boxes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 8px; }
+.lead-boxes button { min-height: 52px; border-radius: 12px; border: 2px solid var(--line); background: var(--input); color: var(--muted); font-size: 18px; font-weight: 700; }
+.lead-boxes button.on { background: var(--accent); border-color: var(--accent); color: #fff; }

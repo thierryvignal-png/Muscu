@@ -2,6 +2,7 @@ import { store } from './store.js';
 import { setSpace, spaceSwitch, spaceMenu, spaceViews, SPACE_KEYS } from './spaces.js';
 import * as clinic from './clinic.js';
 import * as ideas from './ideas.js';
+import * as leads from './leads.js';
 import * as force from './force-ui.js';
 import * as fundraising from './fundraising.js';
 import { formatNumberInputs } from './util.js';
@@ -871,12 +872,14 @@ views.more = () => {
 let space = 'today';
 
 let locked = false;
+// Blocage : idées du jour (21 h / jours oubliés) ou journée sans les 5 leads Atom
+const mustLockAll = () => ideas.mustLock() || leads.mustLock();
 function render() {
   const main = $('#main');
   // Idée de boîte IA du jour pas encore saisie après 21 h : l'app est bloquée sur cet écran
-  locked = ideas.mustLock();
+  locked = mustLockAll();
   if (locked) {
-    main.innerHTML = ideas.lockView();
+    main.innerHTML = ideas.lockView(leads.lockBlocks());
     document.body.classList.add('no-tabbar');
     return;
   }
@@ -1262,6 +1265,7 @@ function journeeView() {
   return `
     <header class="page-head"><h1>Ma journée</h1><p>${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</p></header>
     ${ideas.todayCard()}
+    ${leads.todayCard()}
     ${quickActions()}
 
     <section class="card j-muscu">
@@ -1354,7 +1358,7 @@ function wrapSpace(handlers) {
     render();
   }]));
 }
-Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions), wrapSpace(todo.actions), wrapSpace(esthetique.actions), wrapSpace(atom.actions), wrapSpace(finance.actions), wrapSpace(clinic.actions), wrapSpace(ideas.actions), wrapSpace(fundraising.actions), wrapSpace(force.actions));
+Object.assign(actions, wrapSpace(goodnews.actions), wrapSpace(goals.actions), wrapSpace(todo.actions), wrapSpace(esthetique.actions), wrapSpace(atom.actions), wrapSpace(finance.actions), wrapSpace(clinic.actions), wrapSpace(ideas.actions), wrapSpace(leads.actions), wrapSpace(fundraising.actions), wrapSpace(force.actions));
 Object.assign(forms, wrapSpace(goodnews.forms), wrapSpace(goals.forms), wrapSpace(todo.forms), wrapSpace(esthetique.forms), wrapSpace(atom.forms), wrapSpace(finance.forms), wrapSpace(clinic.forms), wrapSpace(ideas.forms), wrapSpace(fundraising.forms), wrapSpace(force.forms));
 
 // ---------- Retour sur aujourd'hui ----------
@@ -1369,11 +1373,11 @@ function backToToday() {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   if (today() !== openedDay) { backToToday(); render(); }
-  else if (ideas.mustLock() !== locked) render();
+  else if (mustLockAll() !== locked) render();
 });
 setInterval(() => {
   if (today() !== openedDay) { backToToday(); render(); }
-  else if (ideas.mustLock() !== locked) render(); // 21 h passées : blocage sans attendre une action
+  else if (mustLockAll() !== locked) render(); // 21 h passées : blocage sans attendre une action
 }, 60000);
 
 // ---------- Événements (délégation) ----------
