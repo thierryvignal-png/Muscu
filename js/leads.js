@@ -1,4 +1,4 @@
-// Objectif quotidien Atom : contacter 5 leads par jour. Une journée passée sans les 5 bloque l'app
+// Objectif quotidien Atom : contacter 5 leads par jour, du lundi au samedi (repos le dimanche). Une journée passée sans les 5 bloque l'app
 // à l'ouverture jusqu'à ce qu'elle soit rattrapée. La journée se termine à 4 h du matin (comme les idées).
 import { fmtDate, addDays, read, write } from './util.js';
 import { ideaDay } from './ideas.js';
@@ -14,16 +14,23 @@ function since(d) {
   return d.since;
 }
 const countOf = (d, day) => d.days[day] || 0;
+// Pas d'objectif le dimanche
+const isSunday = (day) => new Date(day + 'T12:00:00').getDay() === 0;
+const owed = (day) => !isSunday(day);
 // Jours passés sous l'objectif, du plus ancien au plus récent
 function missing(d) {
   const out = [];
-  for (let day = since(d); day < ideaDay() && out.length < 366; day = addDays(day, 1)) if (countOf(d, day) < GOAL) out.push(day);
+  for (let day = since(d); day < ideaDay() && out.length < 366; day = addDays(day, 1)) if (owed(day) && countOf(d, day) < GOAL) out.push(day);
   return out;
 }
 function streak(d) {
-  let day = countOf(d, ideaDay()) >= GOAL ? ideaDay() : addDays(ideaDay(), -1);
+  let day = countOf(d, ideaDay()) >= GOAL || isSunday(ideaDay()) ? ideaDay() : addDays(ideaDay(), -1);
   let n = 0;
-  while (countOf(d, day) >= GOAL) { n++; day = addDays(day, -1); }
+  for (;;) {
+    if (isSunday(day)) { day = addDays(day, -1); continue; } // le dimanche ne casse pas la série
+    if (countOf(d, day) < GOAL) break;
+    n++; day = addDays(day, -1);
+  }
   return n;
 }
 
@@ -55,7 +62,7 @@ export function todayCard() {
   since(d);
   const day = ideaDay();
   const n = countOf(d, day);
-  if (n >= GOAL) return '';
+  if (n >= GOAL || isSunday(day)) return '';
   const st = streak(d);
   return `
     <section class="card idea-card">
