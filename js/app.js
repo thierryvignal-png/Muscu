@@ -876,7 +876,7 @@ let locked = false;
 const mustLockAll = () => ideas.mustLock() || leads.mustLock();
 function render() {
   const main = $('#main');
-  // Idée de boîte IA du jour pas encore saisie après 21 h : l'app est bloquée sur cet écran
+  // Idée IA / Atom ou Singulier du jour pas encore saisie après 21 h : l'app est bloquée sur cet écran
   locked = mustLockAll();
   if (locked) {
     main.innerHTML = ideas.lockView(leads.lockBlocks());

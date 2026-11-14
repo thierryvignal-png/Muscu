@@ -10,9 +10,9 @@ export const SPACES = [
   { key: 'goals', icon: '🎯', name: 'Objectifs de vie', desc: 'Objectifs, flux et portefeuille' },
   { key: 'esthetique', icon: '✨', name: 'Roadmap esthétique', desc: 'Traitements prévus et score /100' },
   { key: 'clinique', icon: '🏥', name: 'Clinique Singulier', desc: 'Revenus, coûts par BU, résultat' },
-  { key: 'ideas', icon: '💡', name: 'Idées de boîte IA', desc: 'Une idée par jour' },
+  { key: 'ideas', icon: '💡', name: 'Idées IA ou Atom', desc: 'Une idée par jour, IA ou Atom' },
   { key: 'ideasSing', icon: '🌟', name: 'Idées Singulier', desc: 'Une idée par jour pour Singulier' },
-  { key: 'ideasApp', icon: '📱', name: "Idées d'app", desc: 'Une idée d\'app par jour, cochée quand elle est créée' },
+  { key: 'ideasApp', icon: '📱', name: "Idées d'app", desc: 'Idées d\'apps libres, cochées quand elles sont créées' },
   { key: 'fundraising', icon: '💰', name: 'Fundraising Singulier', desc: 'Investisseurs et leveurs de fonds' },
 ];
 
@@ -43,7 +43,7 @@ export function spaceSwitch(current) {
 }
 
 // À changer à chaque mise à jour (comme VERSION dans sw.js) : affiché en bas du menu
-export const APP_VERSION = 'v151';
+export const APP_VERSION = 'v152';
 
 export function spaceMenu(current) {
   return `

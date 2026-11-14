@@ -1,4 +1,4 @@
-// Idées du jour : deux flux identiques, « Idées de boîte IA » et « Idées Singulier ».
+// Idées du jour : « Idées IA ou Atom » et « Idées Singulier » obligatoires, « Idées d'app » libres.
 // Une idée par jour et par flux. Rappel sur Ma journée toute la journée, et l'app se bloque à partir de 21 h
 // tant que les idées du jour ne sont pas saisies. La journée se termine à 4 h du matin (après minuit,
 // on est encore « hier »). On peut ajouter d'autres idées dans l'espace dédié : datées du jour, elles
@@ -10,9 +10,9 @@ import { esc, uid, read, write, isoOf, addDays, fmtDate } from './util.js';
 
 export const STREAMS = {
   ai: {
-    key: 'ideas.data.v1', space: 'ideas', icon: '💡', title: 'Idées de boîte IA', short: 'Idée IA', lower: 'idée IA',
-    today: 'Idée de boîte IA du jour',
-    placeholder: "Quel métier, quel process, quelle industrie l'IA peut-elle disrupter ? Le problème, la cible, comment l'IA le résout…",
+    key: 'ideas.data.v1', space: 'ideas', icon: '💡', title: 'Idées IA ou Atom', short: 'Idée IA / Atom', lower: 'idée IA ou Atom',
+    today: 'Idée IA ou Atom du jour',
+    placeholder: "Une idée IA (quel métier, quel process l'IA peut-elle disrupter ?) ou pour Atom (deals, acquisition, produit…)",
   },
   sing: {
     key: 'ideas-singulier.data.v1', space: 'ideasSing', icon: '🌟', title: 'Idées Singulier', short: 'Idée Singulier', lower: 'idée Singulier',
@@ -21,10 +21,12 @@ export const STREAMS = {
   },
   app: {
     key: 'ideas-app.data.v1', space: 'ideasApp', icon: '📱', title: "Idées d'app", short: "Idée d'app", lower: "idée d'app",
-    today: "Idée d'app du jour", made: true,
+    today: "Idée d'app du jour", made: true, optional: true, // pas d'obligation quotidienne
     placeholder: "Une app à créer : le problème, pour qui, l'écran principal, ce qu'elle fait en un geste…",
   },
 };
+// Flux obligatoires chaque jour (les idées d'app sont libres)
+const DAILY = () => Object.keys(STREAMS).filter((s) => !STREAMS[s].optional);
 const LOCK_HOUR = 21; // blocage à partir de 21 h
 const DAY_END_HOUR = 4; // la journée se termine à 4 h
 
@@ -88,7 +90,7 @@ const needs = (s) => {
 };
 
 export function mustLock() {
-  return Object.keys(STREAMS).some(needs);
+  return DAILY().some(needs);
 }
 
 const ideaForm = (s, big, label = "Enregistrer l'idée du jour", date = '') => `
@@ -115,7 +117,7 @@ function pickCard(s, d, p) {
 
 // Écran de blocage (remplace toute l'app) : tout ce qui manque, flux par flux
 export function lockView(extra = '') {
-  const blocks = Object.keys(STREAMS).filter(needs).map((s) => {
+  const blocks = DAILY().filter(needs).map((s) => {
     const d = load(s);
     const st = streak(d);
     const late = missing(s, d);
@@ -182,7 +184,7 @@ function streamCard(s) {
       ${pickHint}
     </section>`;
 }
-export const todayCard = () => Object.keys(STREAMS).map(streamCard).join('');
+export const todayCard = () => DAILY().map(streamCard).join('');
 
 // Classements : meilleures idées des semaines et des mois, du plus récent au plus ancien
 function ranking(s, d, kind) {
@@ -215,8 +217,8 @@ function exportText(s) {
   ].filter(Boolean).join(', ');
   const intro = s === 'sing'
     ? "Voici mes idées pour Singulier, mon centre de médecine esthétique et de bien-être à Paris (ouverture prévue en 2027)."
-    : s === 'app' ? "Voici mes idées d'apps, notées une par jour (celles marquées « créée » existent déjà)."
-      : "Voici mes idées de business utilisant l'IA, notées une par jour.";
+    : s === 'app' ? "Voici mes idées d'apps (celles marquées « créée » existent déjà)."
+      : "Voici mes idées de business utilisant l'IA ou pour Atom (mon activité immobilière), notées une par jour.";
   return `${intro}
 Classe-les de la plus prometteuse à la moins prometteuse. Pour chacune : potentiel de CA, facilité et coût de mise en œuvre, risques, et mon avantage à la porter. Termine par les 3 idées à creuser en priorité et le premier test concret à faire pour chacune.
 
