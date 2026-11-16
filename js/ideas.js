@@ -86,7 +86,7 @@ const lateHour = () => { const h = new Date().getHours(); return h >= LOCK_HOUR 
 // Ce flux bloque-t-il l'app ? Un jour manqué : toujours. Après 21 h : idée du jour ou meilleure idée à choisir.
 const needs = (s) => {
   const d = load(s);
-  return missing(s, d).length > 0 || (lateHour() && (!doneToday(d) || pending(d).length > 0));
+  return missing(s, d).length > 0 || (lateHour() && !doneToday(d)); // choisir la meilleure idée n'est plus exigé
 };
 
 export function mustLock() {
@@ -138,7 +138,7 @@ export function lockView(extra = '') {
           ${st ? `<p class="hint">Série en cours : <b>${st} jour${st > 1 ? 's' : ''}</b> 🔥 — ne la casse pas.</p>` : ''}
           ${ideaForm(s, true)}
         </section>`}
-      ${pending(d).map((p) => pickCard(s, d, p)).join('')}`;
+      `;
   }).join('');
   return `
     <section class="idea-lock compact">
@@ -155,8 +155,7 @@ function streamCard(s) {
   const d = load(s);
   const st = streak(d);
   const today = d.items.filter((x) => x.date === ideaDay());
-  const todo = pending(d).length;
-  const pickHint = todo ? `<p class="hint warn">🏆 ${todo} meilleure${todo > 1 ? 's' : ''} idée${todo > 1 ? 's' : ''} à choisir avant 21 h <button class="chip" data-action="space" data-space="${c.space}">Choisir ›</button></p>` : '';
+  const pickHint = ''; // meilleure idée de la semaine / du mois : facultatif, à choisir dans l'espace dédié
   // Idée d'app du jour notée : la carte reste avec le bouton « Créée » tant que l'app n'est pas créée
   const toMake = c.made ? today.filter((x) => !x.made) : [];
   if (toMake.length) {
@@ -170,11 +169,7 @@ function streamCard(s) {
   }
   // Idée du jour notée : la carte disparaît de Ma journée (sauf s'il reste une meilleure idée à choisir)
   if (today.length) {
-    return todo ? `
-      <section class="card idea-card done">
-        <div class="j-head"><h2>${c.icon} ${c.short} du jour ✅</h2></div>
-        ${pickHint}
-      </section>` : '';
+    return '';
   }
   return `
     <section class="card idea-card">
