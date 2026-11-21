@@ -826,8 +826,10 @@ function weightCurve(an, med) {
   if (!ma.length) return '';
   const H = 200, L = 32, R = 334, T = 10, B = 172;
   const step = ui.wRange === '30' ? 1 : 5;
-  const lo = Math.floor(Math.min(...ma.map((p) => p.v)) / step) * step - (step === 5 ? 5 : 0);
-  const hi = Math.ceil(Math.max(...ma.map((p) => p.v)) / step) * step + (step === 5 ? 5 : 0);
+  // Tout l'historique : ordonnée fixe de 70 à 90 kg (élargie seulement si une valeur en sort)
+  const vmin = Math.min(...ma.map((p) => p.v)), vmax = Math.max(...ma.map((p) => p.v));
+  const lo = step === 5 ? Math.min(70, Math.floor(vmin / 5) * 5) : Math.floor(vmin / step) * step;
+  const hi = step === 5 ? Math.max(90, Math.ceil(vmax / 5) * 5) : Math.ceil(vmax / step) * step;
   const x = xOf(ma[0].date, an.today, L, R);
   const y = yOf(lo, hi, B, T);
   const grid = [];
