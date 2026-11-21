@@ -445,24 +445,120 @@ if (typeof document !== 'undefined') {
   });
 }
 
+// ---------- Simulateur mensuel / annuel (curseurs) : écran d'ouverture de l'espace ----------
+// CA mensuel = bureaux occupés × heures / jour × jours ouvrés × CA médecin / heure × take-rate + devices / jour × jours ouvrés.
+// Valeurs de départ neutres (ou tirées de ton modèle) : touche un chiffre pour taper le tien, il reste enregistré.
+const ETP_HOURS = 151.67; // heures / mois d'un temps plein (35 h)
+const SIM = [
+  { k: 'offices', label: 'Bureaux occupés', min: 0, max: 20, step: 1, fmt: (v) => fr(v) },
+  { k: 'hours', label: 'Heures / jour / bureau', min: 4, max: 12, step: 0.5, fmt: (v) => `${fr(v, v % 1 ? 1 : 0)} h` },
+  { k: 'rate', label: 'CA médecin / heure', min: 50, max: 500, step: 5, fmt: (v) => `${fr(v)} €` },
+  { k: 'take', label: 'Take-rate Singulier', min: 0, max: 60, step: 1, fmt: (v) => `${fr(v)} %` },
+  { k: 'devices', label: 'CA devices / jour', min: 0, max: 5000, step: 50, fmt: (v) => `${fr(v)} €`, hint: 'Part revenant à Singulier, après rétrocession' },
+  { k: 'days', label: 'Jours ouvrés / mois', min: 15, max: 31, step: 1, fmt: (v) => `${fr(v)} j` },
+  { k: 'costs', label: 'Coûts fixes annuels', min: 0, max: 3000000, step: 10000, fmt: (v) => `${fr(Math.round(v / 1000))} k€`, big: true },
+  { k: 'surface', label: 'Surface', min: 50, max: 1500, step: 10, fmt: (v) => `${fr(v)} m²` },
+];
+function simDefaults(d) {
+  const occ = Math.round(REVENUES.filter((r) => r.offices).reduce((s, r) => s + (d.rev[r.key].count || 0) * ((d.rev[r.key].to || 0) / 100), 0));
+  const costs = fixedCosts(d);
+  return { offices: occ || 6, hours: 8, rate: 150, take: 30, devices: 500, days: d.days ? Math.min(31, Math.round(d.days / 12)) : 22, costs: costs ? Math.round(costs / 10000) * 10000 : 800000, surface: 300 };
+}
+const simOf = (d) => ({ ...simDefaults(d), ...(d.sim || {}) });
+export function simCalc(s) {
+  const hoursMonth = s.offices * s.hours * s.days; // heures facturées / mois
+  const doctors = hoursMonth * s.rate * (s.take / 100);
+  const devices = s.devices * s.days;
+  const month = doctors + devices;
+  const year = month * 12;
+  const res = year - s.costs;
+  return { hoursMonth, doctors, devices, month, year, res, perDay: s.days ? month / s.days : 0, perHour: s.days && s.hours ? month / s.days / s.hours : 0, perM2: s.surface ? year / s.surface : 0, etp: hoursMonth / ETP_HOURS };
+}
+// ETP du pipe de médecins : brut (jours / sem ÷ 5) et pondéré par le statut
+const pipeEtp = (d) => ({
+  raw: d.doctors.reduce((s, x) => s + (x.days || 0), 0) / 5,
+  weighted: totalDays(d.doctors) / 5,
+  sure: d.doctors.filter((x) => docStatus(x) === 'sur').reduce((s, x) => s + (x.days || 0), 0) / 5,
+});
+function simResult(d, s) {
+  const r = simCalc(s);
+  const p = pipeEtp(d);
+  const cell = (label, v, cls = '') => `<div><span>${label}</span><b class="${cls}">${v}</b></div>`;
+  return `
+    <span class="sim-k">CA mensuel Singulier</span>
+    <b class="sim-big">${euros(r.month)}</b>
+    <div class="sim-line"><span>CA annuel</span><b>${euros(r.year)}</b></div>
+    <div class="sim-line"><span>Coûts fixes annuels</span><b>−${euros(s.costs)}</b></div>
+    <div class="sim-res"><span>Résultat annuel Singulier</span><b class="${resCls(r.res)}">${euros(r.res)}</b></div>
+    <div class="sim-grid">
+      ${cell('CA / jour', euros(r.perDay))}
+      ${cell("CA / heure d'ouverture", euros(r.perHour))}
+      ${cell('CA / m² / an', euros(r.perM2))}
+      ${cell('ETP médecins', fr(r.etp, r.etp < 10 ? 1 : 0))}
+      ${cell('Part médecins / mois', euros(r.doctors))}
+      ${cell('Part devices / mois', euros(r.devices))}
+      ${cell('Heures facturées / mois', `${fr(r.hoursMonth)} h`)}
+      ${cell('Résultat / mois', euros(r.res / 12), resCls(r.res))}
+    </div>
+    ${d.doctors.length ? `<p class="sim-pipe">🩺 Pipe médecins : <b>${fr(p.weighted, 1)} ETP</b> pondérés (${fr(p.raw, 1)} bruts) pour ${fr(r.etp, 1)} ETP nécessaires${p.weighted >= r.etp ? ' ✓' : ` · manque ${fr(r.etp - p.weighted, 1)}`}</p>` : ''}`;
+}
+function simView(d) {
+  const s = simOf(d);
+  return `
+    <section class="card sim-card" data-sim-result>${simResult(d, s)}</section>
+    <section class="card sim-sliders">
+      ${SIM.map((x) => {
+        const v = s[x.k];
+        const lo = Math.min(x.min, v), hi = Math.max(x.max, v);
+        return `
+        <div class="tester-row sim-row">
+          <span>${x.label}</span>
+          <button class="tester-val" data-action="clinic-sim-edit" data-k="${x.k}" data-sim-val="${x.k}">${x.fmt(v)}</button>
+          <input type="range" data-sim-k="${x.k}" min="${lo}" max="${hi}" step="${x.step}" value="${v}" style="${fillStyle(lo, hi, v)}">
+          ${x.hint ? `<small class="hint">${x.hint}</small>` : ''}
+        </div>`;
+      }).join('')}
+      <p class="hint">Touche un chiffre pour taper la valeur exacte. Tout reste enregistré sur ce téléphone.</p>
+      <button class="chip" data-action="clinic-sim-costs">↺ Coûts fixes = onglet Coûts (${kEuros(fixedCosts(d))})</button>
+    </section>`;
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('input', (e) => {
+    const k = e.target.dataset?.simK;
+    if (!k) return;
+    const d = load();
+    d.sim = { ...simOf(d), [k]: Number(e.target.value) };
+    save(d);
+    e.target.style.setProperty('--fill', `${(((e.target.value - e.target.min) / (e.target.max - e.target.min || 1)) * 100).toFixed(1)}%`);
+    const x = SIM.find((y) => y.k === k);
+    const val = document.querySelector(`[data-sim-val="${k}"]`);
+    if (val) val.textContent = x.fmt(d.sim[k]);
+    const box = document.querySelector('[data-sim-result]');
+    if (box) box.innerHTML = simResult(d, d.sim);
+  });
+}
+
+// ---------- Onglets de l'espace ----------
+const CTABS = [['sim', 'Simulateur'], ['tresor', 'Trésor'], ['couts', 'Coûts'], ['medecins', 'Médecins'], ['modele', 'Modèle']];
+let ctab = 'sim';
+// Ouverture de l'espace : toujours sur le simulateur
+export const resetTab = () => { ctab = 'sim'; };
+
 export function view() {
   const d = load();
   const m = model(d);
   if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(updateSticky); // après un re-rendu
 
+  const nav = `<nav class="fx-nav ctabs">${CTABS.map(([k, t]) => `<button class="${ctab === k ? 'on' : ''}" data-action="clinic-tab" data-t="${k}">${t}</button>`).join('')}</nav>`;
+  const head = `<header class="page-head"><h1>Clinique Singulier</h1></header>${nav}`;
+  if (ctab === 'sim') return head + simView(d);
+  if (ctab === 'tresor') return head + tresorView(d);
+  if (ctab === 'couts') return head + costsView(d, m);
+  if (ctab === 'medecins') return head + pipeHead(d) + doctorsCard(d);
   return `
-    <header class="page-head"><h1>Clinique Singulier</h1><p>Modèle financier</p></header>
+    ${head}
     <button class="tester-cta" data-action="clinic-test-open"><span class="tester-cta-icon">📊</span><span><b>Tester des scénarios</b><small>Curseurs, EBITDA et marges en direct</small></span><span class="tester-cta-go">›</span></button>
     ${tester ? testerView(d) : ''}
-    ${cashCard(d.cash, 'clinicCash')}
-    ${cashCard(d.capex, 'clinicCapex', { title: '🏗️ Capex restant', placeholder: 'Montant restant (€)', colored: false, sign: false })}
-    ${(() => {
-      // Solde disponible pour le ramp-up = trésorerie − capex restant
-      const cash = d.cash?.amount, capex = d.capex?.amount;
-      const left = cash == null ? null : cash - (capex || 0);
-      const cls = left == null ? '' : left >= 0 ? 'good' : 'warn';
-      return `<section class="card fin-net"><span>🚀 Solde pour le ramp-up</span><b class="${cls}">${euros(left)}</b></section>`;
-    })()}
 
     <section class="card clinic-sum" data-clinic-sum>${sumInner(d, m)}</section>
     <div class="clinic-sticky" data-clinic-sticky>${stickyInner(m)}</div>
@@ -524,6 +620,25 @@ export function view() {
       </div>
     </section>
 
+  `;
+}
+
+
+
+function tresorView(d) {
+  return `
+    ${cashCard(d.cash, 'clinicCash')}
+    ${cashCard(d.capex, 'clinicCapex', { title: '🏗️ Capex restant', placeholder: 'Montant restant (€)', colored: false, sign: false })}
+    ${(() => {
+      // Solde disponible pour le ramp-up = trésorerie − capex restant
+      const cash = d.cash?.amount, capex = d.capex?.amount;
+      const left = cash == null ? null : cash - (capex || 0);
+      const cls = left == null ? '' : left >= 0 ? 'good' : 'warn';
+      return `<section class="card fin-net"><span>🚀 Solde pour le ramp-up</span><b class="${cls}">${euros(left)}</b></section>`;
+    })()}`;
+}
+function costsView(d, m) {
+  return `
     <h2 class="section-title">📉 Coûts</h2>
     <section class="card fin">
       ${d.costs.length ? `
@@ -546,8 +661,21 @@ export function view() {
       <p class="hint">🔒 Tes chiffres restent sur ce téléphone (et dans ta sauvegarde), jamais dans le code public.</p>
     </section>
 
-    ${doctorsCard(d)}
   `;
+}
+// En-tête de l'onglet Médecins : équivalent temps plein du pipe
+function pipeHead(d) {
+  if (!d.doctors.length) return '';
+  const p = pipeEtp(d);
+  return `
+    <section class="card pipe-etp">
+      <span class="sim-k">Pipe médecins · équivalent temps plein</span>
+      <div class="pipe-grid">
+        <div><b>${fr(p.weighted, 1)}</b><span>ETP pondérés</span><small>sûr 90 % · réflexion 50 % · prospectif 10 %</small></div>
+        <div><b>${fr(p.raw, 1)}</b><span>ETP bruts</span><small>si tous signent · dont ${fr(p.sure, 1)} sûrs</small></div>
+      </div>
+      <p class="hint">${d.doctors.length} médecin${d.doctors.length > 1 ? 's' : ''} · 1 ETP = 5 jours / semaine</p>
+    </section>`;
 }
 
 // ---------- Médecins candidats (nom, jours / semaine, Singulier / CM28, statut — modifiables directement) ----------
@@ -1108,6 +1236,23 @@ export const actions = {
     if (!p || !confirm(`Supprimer le scénario « ${p.name} » ?`)) return false;
     d.presets = d.presets.filter((x) => x !== p);
     save(d);
+  },
+  'clinic-tab'(el) { ctab = el.dataset.t; window.scrollTo(0, 0); },
+  'clinic-sim-edit'(el) {
+    const x = SIM.find((y) => y.k === el.dataset.k);
+    const d = load();
+    const s = simOf(d);
+    const cur = x.big ? s[x.k] / 1000 : s[x.k];
+    const v = num(prompt(`${x.label}${x.big ? ' (en k€)' : ''}`, String(cur).replace('.', ',')));
+    if (v == null) return false;
+    d.sim = { ...s, [x.k]: x.big ? v * 1000 : v };
+    save(d);
+  },
+  'clinic-sim-costs'() {
+    const d = load();
+    d.sim = { ...simOf(d), costs: Math.round(fixedCosts(d)) };
+    save(d);
+    return 'Coûts fixes repris de l\'onglet Coûts';
   },
   'clinic-test-open'() { tester = testFromScenario(load()); },
   'clinic-test-close'() { tester = null; },

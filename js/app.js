@@ -1084,6 +1084,7 @@ const actions = {
   space(el) {
     $('#sheet').hidden = true;
     space = el.dataset.space;
+    if (space === 'clinique') clinic.resetTab(); // l'espace Clinique s'ouvre sur le simulateur
     setSpace(space);
     render();
     window.scrollTo(0, 0);
