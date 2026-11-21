@@ -554,7 +554,7 @@ export function view() {
   if (ctab === 'sim') return head + simView(d);
   if (ctab === 'tresor') return head + tresorView(d);
   if (ctab === 'couts') return head + costsView(d, m);
-  if (ctab === 'medecins') return head + pipeHead(d) + doctorsCard(d);
+  if (ctab === 'medecins') return head + doctorsSimple(d);
   return `
     ${head}
     <button class="tester-cta" data-action="clinic-test-open"><span class="tester-cta-icon">📊</span><span><b>Tester des scénarios</b><small>Curseurs, EBITDA et marges en direct</small></span><span class="tester-cta-go">›</span></button>
@@ -620,6 +620,7 @@ export function view() {
       </div>
     </section>
 
+  ${doctorsCard(d)}
   `;
 }
 
@@ -915,20 +916,11 @@ const dupNames = (docs) => {
   return new Set(Object.keys(seen).filter((k) => seen[k] > 1));
 };
 
-function doctorsCard(d) {
-  const docs = d.doctors, etpDays = d.etpDays;
+// Liste des candidats (lignes modifiables + ajout)
+function docRows(d) {
+  const docs = d.doctors;
   const dups = dupNames(docs);
   return `
-    <h2 class="section-title">🩺 Médecins candidats</h2>
-    <section class="card">
-      ${docs.length ? `
-        <div class="doc-days" data-doc-days>${docDays(docs, etpDays)}</div>
-        <p class="hint center">Pondéré : sûr 90 % · réflexion 50 % · prospectif 10 %<br>1 ETP = 5 j/sem × ${fr(etpDays / 5)} semaines = ${fr(etpDays)} j/an</p>
-        ${objBlock(d)}
-        <div data-doc-burn>${docBurn(d)}</div>
-        <div data-doc-plan>${docPlan(d)}</div>
-        <p class="hint" data-doc-count>${docCount(docs)}</p>
-        ${dups.size ? `<p class="hint warn">⚠️ Saisis 2 fois : ${docs.filter((x, i) => dups.has(x.name.trim().toLowerCase()) && docs.findIndex((y) => y.name.trim().toLowerCase() === x.name.trim().toLowerCase()) === i).map((x) => esc(x.name)).join(', ')}. Ce sont deux fiches distinctes : supprime le doublon avec ✕ (il est encadré en rouge).</p>` : ''}` : ''}
       ${docs.map((x) => `
         <div class="doc-row ${dups.has(x.name.trim().toLowerCase()) ? 'dup' : ''}">
           <input class="doc-name" data-doc="name" data-id="${x.id}" value="${esc(x.name)}" autocomplete="off">
@@ -947,6 +939,41 @@ function doctorsCard(d) {
         ${docSelect('name="type"', 'singulier')}
         ${statusSelect('name="status"', 'prospectif')}
       </form>
+  `;
+}
+// Onglet Médecins : jours-médecins / sem pondérés et équivalent ETP, puis la liste
+function doctorsSimple(d) {
+  const docs = d.doctors;
+  const tot = totalDays(docs);
+  const dups = dupNames(docs);
+  return `
+    <section class="card pipe-etp">
+      <div class="pipe-grid">
+        <div><b data-doc-tot>${j(tot)}</b><span>jours / sem</span><small>pondérés</small></div>
+        <div><b data-doc-etp>${fr(tot / 5, 1)}</b><span>ETP</span><small>1 ETP = 5 j / sem</small></div>
+      </div>
+      <p class="hint">${docs.length} médecin${docs.length > 1 ? 's' : ''} · sûr 90 % · réflexion 50 % · prospectif 10 %</p>
+    </section>
+    <section class="card">
+      ${dups.size ? `<p class="hint warn">⚠️ Saisis 2 fois : ${docs.filter((x, i) => dups.has(x.name.trim().toLowerCase()) && docs.findIndex((y) => y.name.trim().toLowerCase() === x.name.trim().toLowerCase()) === i).map((x) => esc(x.name)).join(', ')} (encadré en rouge).</p>` : ''}
+      ${docRows(d)}
+    </section>`;
+}
+function doctorsCard(d) {
+  const docs = d.doctors, etpDays = d.etpDays;
+  const dups = dupNames(docs);
+  return `
+    <h2 class="section-title">🩺 Médecins candidats</h2>
+    <section class="card">
+      ${docs.length ? `
+        <div class="doc-days" data-doc-days>${docDays(docs, etpDays)}</div>
+        <p class="hint center">Pondéré : sûr 90 % · réflexion 50 % · prospectif 10 %<br>1 ETP = 5 j/sem × ${fr(etpDays / 5)} semaines = ${fr(etpDays)} j/an</p>
+        ${objBlock(d)}
+        <div data-doc-burn>${docBurn(d)}</div>
+        <div data-doc-plan>${docPlan(d)}</div>
+        <p class="hint" data-doc-count>${docCount(docs)}</p>
+        ${dups.size ? `<p class="hint warn">⚠️ Saisis 2 fois : ${docs.filter((x, i) => dups.has(x.name.trim().toLowerCase()) && docs.findIndex((y) => y.name.trim().toLowerCase() === x.name.trim().toLowerCase()) === i).map((x) => esc(x.name)).join(', ')}. Ce sont deux fiches distinctes : supprime le doublon avec ✕ (il est encadré en rouge).</p>` : ''}` : ''}
+      ${docRows(d)}
     </section>`;
 }
 
@@ -960,7 +987,7 @@ if (typeof document !== 'undefined') {
       if (e.type !== 'change' || !/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) return;
       d.recruit.open = e.target.value;
       save(d);
-      document.querySelector('[data-doc-plan]').innerHTML = docPlan(d);
+      { const pl = document.querySelector('[data-doc-plan]'); if (pl) pl.innerHTML = docPlan(d); }
       return;
     }
     const refreshObj = () => {
@@ -1008,6 +1035,10 @@ if (typeof document !== 'undefined') {
     if (c) c.textContent = docCount(d.doctors);
     const days = document.querySelector('[data-doc-days]');
     if (days) days.innerHTML = docDays(d.doctors, d.etpDays);
+    const tot = document.querySelector('[data-doc-tot]');
+    if (tot) tot.textContent = j(totalDays(d.doctors));
+    const etp = document.querySelector('[data-doc-etp]');
+    if (etp) etp.textContent = fr(totalDays(d.doctors) / 5, 1);
     const burn = document.querySelector('[data-doc-burn]');
     if (burn) burn.innerHTML = docBurn(d);
     const plan = document.querySelector('[data-doc-plan]');
