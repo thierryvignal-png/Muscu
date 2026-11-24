@@ -42,17 +42,29 @@ const boxes = (day, n) => `
     <button class="${i < n ? 'on' : ''}" data-action="lead-set" data-day="${day}" data-n="${i + 1}" aria-label="${i + 1} lead${i ? 's' : ''}">${i < n ? '✓' : i + 1}</button>`).join('')}
   </div>`;
 
-// Blocs de l'écran de blocage (jour oublié)
+// Écran de blocage : tout le retard cumulé, une case par lead dû (jours manqués, du plus ancien au plus récent).
+// Les jours affichés restent fixes pendant le rattrapage (un jour complété ne fait pas sauter les cases).
+let session = [];
+function lockDays(d) {
+  const late = missing(d);
+  if (!late.length) { session = []; return []; }
+  session = [...new Set([...session.filter((x) => late.includes(x) || countOf(d, x) >= GOAL), ...late])].sort();
+  return session;
+}
 export function lockBlocks() {
   const d = load();
-  const late = missing(d);
-  if (!late.length) return '';
-  const day = late[0];
+  const days = lockDays(d);
+  if (!days.length) return '';
+  const total = days.length * GOAL;
+  const done = days.reduce((s, x) => s + Math.min(GOAL, countOf(d, x)), 0);
+  const left = total - done;
   return `
     <section class="card idea-lock-card">
-      <h2>📞 Leads Atom · ${fmtDate(day)}</h2>
-      <p class="hint warn">⏰ ${countOf(d, day)}/${GOAL} leads contactés${late.length > 1 ? ` · ${late.length} jours à rattraper` : ''} : coche les leads contactés ce jour-là pour débloquer l'app.</p>
-      ${boxes(day, countOf(d, day))}
+      <h2>📞 Leads Atom · ${left} en retard</h2>
+      <p class="hint warn">⏰ ${days.length} jour${days.length > 1 ? 's' : ''} sans les ${GOAL} leads (${days.map((x) => fmtDate(x, false)).join(', ')}) : coche tous les leads rattrapés pour débloquer l'app.</p>
+      <div class="lead-boxes">${Array.from({ length: total }, (_, i) => `
+        <button class="${i < done ? 'on' : ''}" data-action="lead-catchup" data-n="${i + 1}" aria-label="${i + 1} lead${i ? 's' : ''}">${i < done ? '✓' : i + 1}</button>`).join('')}
+      </div>
     </section>`;
 }
 
@@ -73,6 +85,17 @@ export function todayCard() {
 }
 
 export const actions = {
+  // Rattrapage : n leads cochés au total, répartis sur les jours en retard du plus ancien au plus récent
+  'lead-catchup'(el) {
+    const d = load();
+    const days = lockDays(d);
+    const done = days.reduce((s, x) => s + Math.min(GOAL, countOf(d, x)), 0);
+    let n = +el.dataset.n;
+    if (n === done) n -= 1; // retoucher la dernière case cochée la décoche
+    for (const day of days) { const c = Math.min(GOAL, Math.max(0, n)); d.days[day] = c; n -= c; }
+    save(d);
+    if (!missing(d).length) { session = []; return '📞 Retard rattrapé, app débloquée'; }
+  },
   'lead-set'(el) {
     const d = load();
     const day = el.dataset.day;

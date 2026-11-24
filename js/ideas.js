@@ -93,11 +93,20 @@ export function mustLock() {
   return DAILY().some(needs);
 }
 
+// Brouillons des idées en cours de saisie (plusieurs formulaires de rattrapage à l'écran : rien n'est perdu au re-rendu)
+const drafts = {};
+const draftKey = (s, date) => `${s}|${date || 'today'}`;
+if (typeof document !== 'undefined') {
+  document.addEventListener('input', (e) => {
+    const k = e.target.dataset?.draft;
+    if (k) drafts[k] = e.target.value;
+  });
+}
 const ideaForm = (s, big, label = "Enregistrer l'idée du jour", date = '') => `
   <form data-form="idea" class="idea-form">
     <input type="hidden" name="stream" value="${s}">${date ? `
     <input type="hidden" name="date" value="${date}">` : ''}
-    <textarea name="text" rows="${big ? 5 : 3}" required placeholder="${STREAMS[s].placeholder}"></textarea>
+    <textarea name="text" rows="${big ? 5 : 3}" required placeholder="${STREAMS[s].placeholder}" data-draft="${draftKey(s, date)}">${esc(drafts[draftKey(s, date)] || '')}</textarea>
     <button class="primary block">${label}</button>
   </form>`;
 
@@ -121,14 +130,18 @@ export function lockView(extra = '') {
     const d = load(s);
     const st = streak(d);
     const late = missing(s, d);
-    // Jours manqués d'abord, un par un, du plus ancien au plus récent
+    // Tout le retard d'un coup : un formulaire par jour manqué (du plus ancien au plus récent), plus l'idée du jour après 21 h
     if (late.length) {
-      return `
+      return late.map((day, i) => `
         <section class="card idea-lock-card">
-          <h2>${STREAMS[s].icon} ${STREAMS[s].short} · ${fmtDate(late[0])}</h2>
-          <p class="hint warn">⏰ Jour oublié${late.length > 1 ? ` (${late.length} jours de retard)` : ''} : rattrape-le pour débloquer l'app.</p>
-          ${ideaForm(s, true, `Enregistrer l'idée du ${fmtDate(late[0], false)}`, late[0])}
-        </section>`;
+          <h2>${STREAMS[s].icon} ${STREAMS[s].short} · ${fmtDate(day)}</h2>
+          ${i === 0 ? `<p class="hint warn">⏰ ${late.length} idée${late.length > 1 ? 's' : ''} en retard : rattrape tout pour débloquer l'app.</p>` : ''}
+          ${ideaForm(s, true, `Enregistrer l'idée du ${fmtDate(day, false)}`, day)}
+        </section>`).join('') + (lateHour() && !doneToday(d) ? `
+        <section class="card idea-lock-card">
+          <h2>${STREAMS[s].icon} ${STREAMS[s].today}</h2>
+          ${ideaForm(s, true)}
+        </section>` : '');
     }
     if (!lateHour()) return '';
     return `
@@ -286,6 +299,7 @@ export const forms = {
     const d = load(s);
     // Rattrapage : la date d'un jour manqué est acceptée, sinon c'est l'idée du jour
     const date = f.date && missing(s, d).includes(f.date) ? f.date : ideaDay();
+    delete drafts[draftKey(s, f.date)];
     d.items.push({ id: uid(), date, text });
     save(s, d);
     return `${STREAMS[s].icon} Idée enregistrée${date !== ideaDay() ? ` pour le ${fmtDate(date, false)}` : ''}`;
