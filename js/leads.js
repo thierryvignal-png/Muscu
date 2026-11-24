@@ -60,7 +60,7 @@ export function lockBlocks() {
   const left = total - done;
   return `
     <section class="card idea-lock-card">
-      <h2>📞 Leads Atom · ${left} en retard</h2>
+      <h2>📞 Leads WhatsApp · ${left} en retard</h2>
       <p class="hint warn">⏰ ${days.length} jour${days.length > 1 ? 's' : ''} sans les ${GOAL} leads (${days.map((x) => fmtDate(x, false)).join(', ')}) : coche tous les leads rattrapés pour débloquer l'app.</p>
       <div class="lead-boxes">${Array.from({ length: total }, (_, i) => `
         <button class="${i < done ? 'on' : ''}" data-action="lead-catchup" data-n="${i + 1}" aria-label="${i + 1} lead${i ? 's' : ''}">${i < done ? '✓' : i + 1}</button>`).join('')}
@@ -78,7 +78,7 @@ export function todayCard() {
   const st = streak(d);
   return `
     <section class="card idea-card">
-      <div class="j-head"><h2>📞 Contacter ${GOAL} leads Atom</h2>${st ? `<span class="hint">🔥 ${st} j</span>` : ''}</div>
+      <div class="j-head"><h2>📞 Contacter ${GOAL} leads WhatsApp</h2>${st ? `<span class="hint">🔥 ${st} j</span>` : ''}</div>
       <p class="hint">${n}/${GOAL} aujourd'hui · une journée sans les ${GOAL} bloque l'app au réveil.</p>
       ${boxes(day, n)}
     </section>`;
